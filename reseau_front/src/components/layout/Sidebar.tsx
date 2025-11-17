@@ -5,13 +5,11 @@ import {
   Cable, 
   Router, 
   Settings,
-  Search,
   HardDrive,
   Wrench,
   Users
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 
 interface SidebarProps {
   activeSection: string;
@@ -31,7 +29,7 @@ const menuItems = [
 
 export default function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
   return (
-    <div className="w-64 h-screen bg-nav-background border-r border-border flex flex-col">
+    <div className="w-64 h-full bg-nav-background border-r border-border flex flex-col">
       {/* Header */}
       <div className="p-6 border-b border-border">
         <div className="flex items-center gap-2 text-primary">
@@ -40,17 +38,6 @@ export default function Sidebar({ activeSection, onSectionChange }: SidebarProps
             <h1 className="text-xl font-bold text-foreground">Réseau</h1>
             <p className="text-sm text-muted-foreground">Tableau de bord</p>
           </div>
-        </div>
-      </div>
-
-      {/* Search */}
-      <div className="p-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Recherche globale: armoires, équipements, ports..."
-            className="pl-10 bg-muted border-border text-foreground placeholder:text-muted-foreground"
-          />
         </div>
       </div>
 
