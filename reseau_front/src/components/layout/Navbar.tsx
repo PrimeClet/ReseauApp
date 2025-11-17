@@ -11,7 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { Bell, LogOut, User, Search, Network } from "lucide-react";
+import { Bell, LogOut, User, Network } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 export default function Navbar() {
@@ -69,18 +69,6 @@ export default function Navbar() {
               <h1 className="text-lg font-bold text-foreground">Réseau Inventaire</h1>
               <p className="text-xs text-muted-foreground">Gestion de l'infrastructure réseau</p>
             </div>
-          </div>
-        </div>
-
-        {/* Center - Search bar (optional) */}
-        <div className="hidden md:flex flex-1 max-w-md mx-8">
-          <div className="relative w-full">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Rechercher des équipements, ports, liaisons..."
-              className="w-full pl-10 pr-4 py-2 bg-muted border border-border rounded-md text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-            />
           </div>
         </div>
 

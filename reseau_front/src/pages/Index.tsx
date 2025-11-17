@@ -29,6 +29,15 @@ const Index = () => {
     }
   }, [isAuthenticated, navigate]);
 
+  // Récupérer la section active depuis localStorage au chargement
+  useEffect(() => {
+    const savedSection = localStorage.getItem('activeSection');
+    if (savedSection) {
+      setActiveSection(savedSection);
+      localStorage.removeItem('activeSection');
+    }
+  }, []);
+
   if (!isAuthenticated) {
     return null; // or loading spinner
   }
