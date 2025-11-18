@@ -17,7 +17,9 @@ import {
   ChevronRight,
   Tags,
   Shield,
-  KeyRound
+  KeyRound,
+  Network,
+  Map
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -155,6 +157,17 @@ export default function Sidebar({ activeSection, onSectionChange }: SidebarProps
               variant="ghost"
               className={cn(
                 "w-full justify-start text-nav-text hover:bg-muted hover:text-foreground",
+                location.pathname === "/lans" && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
+              )}
+              onClick={() => navigate("/lans")}
+            >
+              <Network className="mr-3 h-4 w-4" />
+              Gestion des LANs
+            </Button>
+            <Button
+              variant="ghost"
+              className={cn(
+                "w-full justify-start text-nav-text hover:bg-muted hover:text-foreground",
                 location.pathname === "/roles" && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
               )}
               onClick={() => navigate("/roles")}
@@ -172,6 +185,17 @@ export default function Sidebar({ activeSection, onSectionChange }: SidebarProps
             >
               <KeyRound className="mr-3 h-4 w-4" />
               Permissions
+            </Button>
+            <Button
+              variant="ghost"
+              className={cn(
+                "w-full justify-start text-nav-text hover:bg-muted hover:text-foreground",
+                location.pathname === "/cartographie-lan" && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
+              )}
+              onClick={() => navigate("/cartographie-lan")}
+            >
+              <Map className="mr-3 h-4 w-4" />
+              Cartographie LAN
             </Button>
           </div>
         </div>
