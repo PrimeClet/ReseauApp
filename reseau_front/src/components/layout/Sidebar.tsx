@@ -14,7 +14,10 @@ import {
   Building2,
   DoorOpen,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  Tags,
+  Shield,
+  KeyRound
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -35,6 +38,7 @@ const menuItems = [
   { id: "liaisons", label: "Liaisons", icon: Cable },
   { id: "ports", label: "Ports", icon: Router },
   { id: "maintenance", label: "Maintenance", icon: Wrench },
+  { id: "types", label: "Types", icon: Tags },
   { id: "users", label: "Utilisateurs", icon: Users },
   { id: "parametres", label: "Paramètres", icon: Settings },
 ];
@@ -145,6 +149,31 @@ export default function Sidebar({ activeSection, onSectionChange }: SidebarProps
               </Button>
             </CollapsibleContent>
           </Collapsible>
+
+          <div className="space-y-1 pt-4 border-t border-border mt-4">
+            <Button
+              variant="ghost"
+              className={cn(
+                "w-full justify-start text-nav-text hover:bg-muted hover:text-foreground",
+                location.pathname === "/roles" && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
+              )}
+              onClick={() => navigate("/roles")}
+            >
+              <Shield className="mr-3 h-4 w-4" />
+              Gestion des rôles
+            </Button>
+            <Button
+              variant="ghost"
+              className={cn(
+                "w-full justify-start text-nav-text hover:bg-muted hover:text-foreground",
+                location.pathname === "/permissions" && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
+              )}
+              onClick={() => navigate("/permissions")}
+            >
+              <KeyRound className="mr-3 h-4 w-4" />
+              Permissions
+            </Button>
+          </div>
         </div>
       </nav>
 

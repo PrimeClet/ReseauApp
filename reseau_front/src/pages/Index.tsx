@@ -15,6 +15,7 @@ import PortsSection from "@/components/sections/PortsSection";
 import MaintenanceSection from "@/components/sections/MaintenanceSection";
 import ParametresSection from "@/components/sections/ParametresSection";
 import UsersSection from "@/components/sections/UsersSection";
+import TypesSection from "@/components/sections/TypesSection";
 
 const queryClient = new QueryClient();
 
@@ -58,6 +59,8 @@ const Index = () => {
         return <ParametresSection />;
       case "users":
         return <UsersSection />;
+      case "types":
+        return <TypesSection />;
       default:
         return <DashboardOverview />;
     }

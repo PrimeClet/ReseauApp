@@ -11,6 +11,8 @@ import NotFound from "./pages/NotFound";
 import Profile from "./pages/Profile";
 import Batiments from "./pages/Batiments";
 import Salles from "./pages/Salles";
+import Roles from "./pages/Roles";
+import Permissions from "./pages/Permissions";
 
 const queryClient = new QueryClient();
 
@@ -28,6 +30,8 @@ const App = () => (
               <Route path="/profile" element={<Profile />} />
               <Route path="/batiments" element={<Batiments />} />
               <Route path="/salles" element={<Salles />} />
+              <Route path="/roles" element={<Roles />} />
+              <Route path="/permissions" element={<Permissions />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
