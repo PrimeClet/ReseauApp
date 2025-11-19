@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useRef } from "react";
+import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import AppShell from "@/components/layout/AppShell";
@@ -30,7 +30,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { RefreshCcw } from "lucide-react";
+import { RefreshCcw, FileDown, FileSpreadsheet } from "lucide-react";
+import { jsPDF } from "jspdf";
 import lanTopologies from "@/data/lan_topologies.json";
 
 type LanNode = {
@@ -149,6 +150,117 @@ const LanCartography = () => {
     return null;
   }
 
+  const downloadBlob = (blob: Blob, filename: string) => {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const exportTopology = useCallback(
+    (format: "csv" | "pdf") => {
+      if (!topology) return;
+
+      if (format === "csv") {
+        const csvLines: string[] = [
+          `Nom;${topology.name}`,
+          `Sous-réseau;${topology.subnet}`,
+          `VLAN;${topology.vlan}`,
+          "",
+          "Équipements",
+          "ID;Nom;Rôle;Statut;Site;IP;Modèle;Position X (%);Position Y (%)",
+          ...topology.nodes.map((node) => {
+            const pos = positions[node.id] ?? node.position;
+            return [
+              node.id,
+              node.name,
+              node.role,
+              node.status,
+              node.site,
+              node.ip,
+              node.model,
+              pos.x.toFixed(2),
+              pos.y.toFixed(2),
+            ].join(";");
+          }),
+          "",
+          "Liaisons",
+          "ID;Origine;Destination;Type;Statut;Bande passante;VLAN;Port origine;Port destination",
+          ...topology.links.map((link) =>
+            [
+              link.id,
+              topology.nodes.find((n) => n.id === link.from)?.name ?? link.from,
+              topology.nodes.find((n) => n.id === link.to)?.name ?? link.to,
+              link.type,
+              link.status,
+              link.bandwidth,
+              link.vlan,
+              link.fromPort ?? "",
+              link.toPort ?? "",
+            ].join(";"),
+          ),
+        ];
+        const blob = new Blob([csvLines.join("\n")], { type: "text/csv;charset=utf-8;" });
+        downloadBlob(blob, `cartographie-${topology.id}.csv`);
+        return;
+      }
+
+      const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+      doc.setFontSize(18);
+      doc.text(`Cartographie LAN - ${topology.name}`, 40, 40);
+      doc.setFontSize(12);
+      doc.text(`Sous-réseau : ${topology.subnet}`, 40, 60);
+      doc.text(`VLAN : ${topology.vlan}`, 40, 76);
+      doc.text(`Description : ${topology.description}`, 40, 92);
+
+      let y = 120;
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const addSection = (title: string, rows: string[]) => {
+        doc.setFontSize(14);
+        doc.text(title, 40, y);
+        y += 18;
+        doc.setFontSize(11);
+        rows.forEach((row, index) => {
+          if (y > pageHeight - 40) {
+            doc.addPage();
+            y = 60;
+            doc.setFontSize(14);
+            doc.text(`${title} (suite)`, 40, y);
+            y += 18;
+            doc.setFontSize(11);
+          }
+          doc.text(row, 40, y);
+          y += 14;
+        });
+        if (rows.length) {
+          y += 12;
+        }
+      };
+
+      const nodeRows = topology.nodes.map((node) => {
+        const pos = positions[node.id] ?? node.position;
+        return `${node.name} (${node.role}) — IP ${node.ip} — ${node.site} — Position ${pos.x.toFixed(1)}% / ${pos.y.toFixed(
+          1,
+        )}%`;
+      });
+      addSection("Équipements", nodeRows);
+
+      const linkRows = topology.links.map((link) => {
+        const fromName = topology.nodes.find((n) => n.id === link.from)?.name ?? link.from;
+        const toName = topology.nodes.find((n) => n.id === link.to)?.name ?? link.to;
+        return `${link.id} : ${fromName} (${link.fromPort ?? "?"}) → ${toName} (${link.toPort ?? "?"}) — ${link.type} ${link.bandwidth} — VLAN ${link.vlan}`;
+      });
+      addSection("Liaisons", linkRows);
+
+      doc.save(`cartographie-${topology.id}.pdf`);
+    },
+    [positions, topology],
+  );
+
   const renderLinks = () =>
     topology.links.map((link) => {
       const from = positions[link.from] ?? topology.nodes.find((node) => node.id === link.from)?.position;
@@ -227,14 +339,14 @@ const LanCartography = () => {
   return (
     <AppShell>
       <div className="space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div>
                 <h1 className="text-3xl font-bold tracking-tight">Cartographie des LANs</h1>
                 <p className="text-muted-foreground">
                   Visualisation des équipements et de leurs interconnexions réseau.
                 </p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap justify-end">
                 <Select value={selectedTopologyId} onValueChange={setSelectedTopologyId}>
                   <SelectTrigger className="w-[220px]">
                     <SelectValue placeholder="Sélectionner un LAN" />
@@ -249,6 +361,14 @@ const LanCartography = () => {
                 </Select>
                 <Button variant="outline" size="icon" onClick={() => setPositions((prev) => ({ ...prev }))}>
                   <RefreshCcw className="h-4 w-4" />
+                </Button>
+                <Button variant="outline" size="sm" className="gap-2" onClick={() => exportTopology("csv")}>
+                  <FileSpreadsheet className="h-4 w-4" />
+                  Export CSV
+                </Button>
+                <Button variant="outline" size="sm" className="gap-2" onClick={() => exportTopology("pdf")}>
+                  <FileDown className="h-4 w-4" />
+                  Export PDF
                 </Button>
               </div>
             </div>
