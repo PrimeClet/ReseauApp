@@ -1,8 +1,7 @@
 import { useEffect, useState, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import Navbar from "@/components/layout/Navbar";
-import Sidebar from "@/components/layout/Sidebar";
+import AppShell from "@/components/layout/AppShell";
 import {
   Card,
   CardContent,
@@ -226,12 +225,8 @@ const LanCartography = () => {
   };
 
   return (
-    <div className="flex h-screen bg-background flex-col">
-      <Navbar />
-      <div className="flex flex-1 overflow-hidden">
-        <Sidebar activeSection="" onSectionChange={() => {}} />
-        <main className="flex-1 overflow-auto">
-          <div className="p-8 space-y-6">
+    <AppShell>
+      <div className="space-y-6">
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-3xl font-bold tracking-tight">Cartographie des LANs</h1>
@@ -430,10 +425,8 @@ const LanCartography = () => {
                 </Card>
               </TabsContent>
             </Tabs>
-          </div>
-        </main>
       </div>
-    </div>
+    </AppShell>
   );
 };
 

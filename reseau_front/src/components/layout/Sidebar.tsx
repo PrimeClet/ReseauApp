@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { 
+import {
   LayoutDashboard, 
   Server, 
   Cable, 
@@ -41,14 +41,15 @@ const menuItems = [
   { id: "ports", label: "Ports", icon: Router },
   { id: "maintenance", label: "Maintenance", icon: Wrench },
   { id: "types", label: "Types", icon: Tags },
-  { id: "users", label: "Utilisateurs", icon: Users },
-  { id: "parametres", label: "Paramètres", icon: Settings },
 ];
+
+const accessSections = ["users", "roles", "permissions"];
 
 export default function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const [isLocalisationOpen, setIsLocalisationOpen] = useState(false);
+  const [isAccessOpen, setIsAccessOpen] = useState(false);
 
   // Ouvrir automatiquement le menu Localisation si on est sur une page de localisation
   useEffect(() => {
@@ -56,6 +57,32 @@ export default function Sidebar({ activeSection, onSectionChange }: SidebarProps
       setIsLocalisationOpen(true);
     }
   }, [location.pathname]);
+
+  useEffect(() => {
+    if (
+      (location.pathname === "/" && accessSections.includes(activeSection)) ||
+      location.pathname === "/roles" ||
+      location.pathname === "/permissions"
+    ) {
+      setIsAccessOpen(true);
+    }
+  }, [location.pathname, activeSection]);
+
+  const isAccessButtonActive = (sectionId: string) => {
+    if (location.pathname === "/") {
+      return activeSection === sectionId;
+    }
+    if (sectionId === "roles" && location.pathname === "/roles") {
+      return true;
+    }
+    if (sectionId === "permissions" && location.pathname === "/permissions") {
+      return true;
+    }
+    if (sectionId === "users" && location.pathname === "/users") {
+      return true;
+    }
+    return false;
+  };
 
   // Fonction pour gérer la navigation des items du menu
   const handleMenuClick = (itemId: string) => {
@@ -157,7 +184,8 @@ export default function Sidebar({ activeSection, onSectionChange }: SidebarProps
               variant="ghost"
               className={cn(
                 "w-full justify-start text-nav-text hover:bg-muted hover:text-foreground",
-                location.pathname === "/lans" && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
+                location.pathname === "/lans" &&
+                  "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
               )}
               onClick={() => navigate("/lans")}
             >
@@ -168,29 +196,8 @@ export default function Sidebar({ activeSection, onSectionChange }: SidebarProps
               variant="ghost"
               className={cn(
                 "w-full justify-start text-nav-text hover:bg-muted hover:text-foreground",
-                location.pathname === "/roles" && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
-              )}
-              onClick={() => navigate("/roles")}
-            >
-              <Shield className="mr-3 h-4 w-4" />
-              Gestion des rôles
-            </Button>
-            <Button
-              variant="ghost"
-              className={cn(
-                "w-full justify-start text-nav-text hover:bg-muted hover:text-foreground",
-                location.pathname === "/permissions" && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
-              )}
-              onClick={() => navigate("/permissions")}
-            >
-              <KeyRound className="mr-3 h-4 w-4" />
-              Permissions
-            </Button>
-            <Button
-              variant="ghost"
-              className={cn(
-                "w-full justify-start text-nav-text hover:bg-muted hover:text-foreground",
-                location.pathname === "/cartographie-lan" && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
+                location.pathname === "/cartographie-lan" &&
+                  "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
               )}
               onClick={() => navigate("/cartographie-lan")}
             >
@@ -198,6 +205,78 @@ export default function Sidebar({ activeSection, onSectionChange }: SidebarProps
               Cartographie LAN
             </Button>
           </div>
+
+          {/* Menu déroulant Gestion des accès */}
+          <Collapsible open={isAccessOpen} onOpenChange={setIsAccessOpen}>
+            <CollapsibleTrigger asChild>
+              <Button
+                variant="ghost"
+                className={cn(
+                  "w-full justify-between text-nav-text hover:bg-muted hover:text-foreground"
+                )}
+              >
+                <div className="flex items-center">
+                  <Users className="mr-3 h-4 w-4" />
+                  <span>Gestion des utilisateurs</span>
+                </div>
+                {isAccessOpen ? (
+                  <ChevronDown className="h-4 w-4" />
+                ) : (
+                  <ChevronRight className="h-4 w-4" />
+                )}
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="pl-4 space-y-1">
+              <Button
+                variant="ghost"
+                className={cn(
+                  "w-full justify-start text-nav-text hover:bg-muted hover:text-foreground text-sm",
+                  isAccessButtonActive("users") && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
+                )}
+                onClick={() => handleMenuClick("users")}
+              >
+                <Users className="mr-3 h-4 w-4" />
+                Utilisateurs
+              </Button>
+              <Button
+                variant="ghost"
+                className={cn(
+                  "w-full justify-start text-nav-text hover:bg-muted hover:text-foreground text-sm",
+                  isAccessButtonActive("roles") && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
+                )}
+                onClick={() => navigate("/roles")}
+              >
+                <Shield className="mr-3 h-4 w-4" />
+                Rôles
+              </Button>
+              <Button
+                variant="ghost"
+                className={cn(
+                  "w-full justify-start text-nav-text hover:bg-muted hover:text-foreground text-sm",
+                  isAccessButtonActive("permissions") && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
+                )}
+                onClick={() => navigate("/permissions")}
+              >
+                <KeyRound className="mr-3 h-4 w-4" />
+                Permissions
+              </Button>
+            </CollapsibleContent>
+          </Collapsible>
+
+          <div className="pt-4 border-t border-border mt-4">
+            <Button
+              variant="ghost"
+              className={cn(
+                "w-full justify-start text-nav-text hover:bg-muted hover:text-foreground",
+                location.pathname === "/" && activeSection === "parametres" && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
+              )}
+              onClick={() => handleMenuClick("parametres")}
+            >
+              <Settings className="mr-3 h-4 w-4" />
+              Paramètres
+            </Button>
+          </div>
+
         </div>
       </nav>
 

@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import Sidebar from "@/components/layout/Sidebar";
-import Navbar from "@/components/layout/Navbar";
+import AppShell from "@/components/layout/AppShell";
 import DataTableEnhanced from "@/components/ui/data-table-enhanced";
 import DetailsModal from "@/components/ui/details-modal";
 import EditModal from "@/components/ui/edit-modal";
@@ -134,157 +133,149 @@ const Salles = () => {
   }));
 
   return (
-    <div className="flex h-screen bg-background flex-col">
-      <Navbar />
-      <div className="flex flex-1 overflow-hidden">
-        <Sidebar activeSection="" onSectionChange={() => {}} />
-        <main className="flex-1 overflow-auto">
-          <div className="p-8">
-            <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-2xl font-bold text-foreground">Gestion des Salles</h2>
-                  <div className="text-sm text-muted-foreground mt-1">
-                    Configuration et gestion des salles de vos bâtiments
-                  </div>
-                </div>
-                <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-                  <DialogTrigger asChild>
-                    <Button>
-                      <Plus className="mr-2 h-4 w-4" />
-                      Ajouter une salle
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="sm:max-w-[425px]">
-                    <DialogHeader>
-                      <DialogTitle>Ajouter une nouvelle salle</DialogTitle>
-                      <DialogDescription>
-                        Remplissez les informations de la nouvelle salle.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <Form {...form}>
-                      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                        <FormField
-                          control={form.control}
-                          name="nom"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Nom</FormLabel>
-                              <FormControl>
-                                <Input placeholder="Salle 401" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="batiment"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Bâtiment</FormLabel>
-                              <FormControl>
-                                <Input placeholder="Bâtiment A" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="etage"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Étage</FormLabel>
-                              <FormControl>
-                                <Input placeholder="1er étage" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="capacite"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Capacité</FormLabel>
-                              <FormControl>
-                                <Input type="number" placeholder="30" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="type"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Type</FormLabel>
-                              <FormControl>
-                                <Input placeholder="Bureau" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="etat"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>État</FormLabel>
-                              <FormControl>
-                                <Input placeholder="Actif" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <div className="flex justify-end space-x-2">
-                          <Button type="button" variant="outline" onClick={() => setIsAddOpen(false)}>
-                            Annuler
-                          </Button>
-                          <Button type="submit">Ajouter</Button>
-                        </div>
-                      </form>
-                    </Form>
-                  </DialogContent>
-                </Dialog>
-              </div>
-
-              <DataTableEnhanced
-                title={`${salles.length} salles configurées`}
-                columns={["nom", "batiment", "etage", "capacite", "type", "etat"]}
-                data={tableData}
-                onRowClick={handleRowClick}
-                onEdit={handleEdit}
-              />
-
-              <DetailsModal
-                open={isDetailsOpen}
-                onOpenChange={setIsDetailsOpen}
-                title="Détails de la salle"
-                data={selectedSalle}
-                onEdit={() => {
-                  setIsDetailsOpen(false);
-                  setIsEditOpen(true);
-                }}
-              />
-
-              <EditModal
-                open={isEditOpen}
-                onOpenChange={setIsEditOpen}
-                title="Modifier la salle"
-                data={selectedSalle}
-                onSave={handleSave}
-              />
+    <AppShell>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold text-foreground">Gestion des Salles</h2>
+            <div className="text-sm text-muted-foreground mt-1">
+              Configuration et gestion des salles de vos bâtiments
             </div>
           </div>
-        </main>
+          <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                Ajouter une salle
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>Ajouter une nouvelle salle</DialogTitle>
+                <DialogDescription>
+                  Remplissez les informations de la nouvelle salle.
+                </DialogDescription>
+              </DialogHeader>
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="nom"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Nom</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Salle 401" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="batiment"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Bâtiment</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Bâtiment A" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="etage"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Étage</FormLabel>
+                        <FormControl>
+                          <Input placeholder="1er étage" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="capacite"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Capacité</FormLabel>
+                        <FormControl>
+                          <Input type="number" placeholder="30" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="type"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Type</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Bureau" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="etat"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>État</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Actif" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <div className="flex justify-end space-x-2">
+                    <Button type="button" variant="outline" onClick={() => setIsAddOpen(false)}>
+                      Annuler
+                    </Button>
+                    <Button type="submit">Ajouter</Button>
+                  </div>
+                </form>
+              </Form>
+            </DialogContent>
+          </Dialog>
+        </div>
+
+        <DataTableEnhanced
+          title={`${salles.length} salles configurées`}
+          columns={["nom", "batiment", "etage", "capacite", "type", "etat"]}
+          data={tableData}
+          onRowClick={handleRowClick}
+          onEdit={handleEdit}
+        />
+
+        <DetailsModal
+          open={isDetailsOpen}
+          onOpenChange={setIsDetailsOpen}
+          title="Détails de la salle"
+          data={selectedSalle}
+          onEdit={() => {
+            setIsDetailsOpen(false);
+            setIsEditOpen(true);
+          }}
+        />
+
+        <EditModal
+          open={isEditOpen}
+          onOpenChange={setIsEditOpen}
+          title="Modifier la salle"
+          data={selectedSalle}
+          onSave={handleSave}
+        />
       </div>
-    </div>
+    </AppShell>
   );
 };
 

@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import Navbar from "@/components/layout/Navbar";
-import Sidebar from "@/components/layout/Sidebar";
+import AppShell from "@/components/layout/AppShell";
 import DataTableEnhanced from "@/components/ui/data-table-enhanced";
 import DetailsModal from "@/components/ui/details-modal";
 import EditModal from "@/components/ui/edit-modal";
@@ -156,13 +155,8 @@ const Lans = () => {
   }));
 
   return (
-    <div className="flex h-screen bg-background flex-col">
-      <Navbar />
-      <div className="flex flex-1 overflow-hidden">
-        <Sidebar activeSection="" onSectionChange={() => {}} />
-        <main className="flex-1 overflow-auto">
-          <div className="p-8">
-            <div className="space-y-6">
+    <AppShell>
+      <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-2xl font-bold text-foreground">Gestion des LANs</h2>
@@ -302,11 +296,8 @@ const Lans = () => {
                 data={selectedLan}
                 onSave={handleSave}
               />
-            </div>
-          </div>
-        </main>
       </div>
-    </div>
+    </AppShell>
   );
 };
 

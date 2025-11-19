@@ -20,8 +20,7 @@ import {
 } from "@/components/ui/form";
 import { toast } from "@/hooks/use-toast";
 import { User, Mail, Shield, Save, Lock, ArrowLeft } from "lucide-react";
-import Sidebar from "@/components/layout/Sidebar";
-import Navbar from "@/components/layout/Navbar";
+import AppShell from "@/components/layout/AppShell";
 
 const profileSchema = z.object({
   name: z.string().min(2, "Le nom doit contenir au moins 2 caractères"),
@@ -138,13 +137,8 @@ const Profile = () => {
   };
 
   return (
-    <div className="flex h-screen bg-background flex-col">
-      <Navbar />
-      <div className="flex flex-1 overflow-hidden">
-        <Sidebar activeSection="" onSectionChange={() => {}} />
-        <main className="flex-1 overflow-auto">
-          <div className="p-8">
-            <div className="space-y-6">
+    <AppShell>
+      <div className="space-y-6">
               {/* Header */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
@@ -407,11 +401,8 @@ const Profile = () => {
                   </div>
                 </CardContent>
               </Card>
-            </div>
-          </div>
-        </main>
       </div>
-    </div>
+    </AppShell>
   );
 };
 
