@@ -1,14 +1,36 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import Navbar from "@/components/layout/Navbar";
 import Sidebar from "@/components/layout/Sidebar";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { RefreshCcw } from "lucide-react";
 import lanTopologies from "@/data/lan_topologies.json";
 
@@ -67,7 +89,13 @@ const LanCartography = () => {
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const [selectedTopologyId, setSelectedTopologyId] = useState(topologies[0].id);
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [positions, setPositions] = useState<Record<string, { x: number; y: number }>>({});
+  const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
+  const [contextNode, setContextNode] = useState<LanNode | null>(null);
+  const [contextLink, setContextLink] = useState<LanLink | null>(null);
+  const [contextLinkPosition, setContextLinkPosition] = useState<{ x: number; y: number } | null>(null);
+  const [hoveredLink, setHoveredLink] = useState<LanLink | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -80,7 +108,43 @@ const LanCartography = () => {
     [selectedTopologyId],
   );
 
-  const selectedNode = topology.nodes.find((node) => node.id === selectedNodeId) ?? null;
+  useEffect(() => {
+    if (!topology) return;
+    const mapped: Record<string, { x: number; y: number }> = {};
+    topology.nodes.forEach((node) => {
+      mapped[node.id] = { ...node.position };
+    });
+    setPositions(mapped);
+    setHoveredLink(null);
+    setContextLink(null);
+    setContextLinkPosition(null);
+  }, [topology]);
+
+  useEffect(() => {
+    const handlePointerMove = (event: PointerEvent) => {
+      if (!draggingNodeId || !containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const xPercent = ((event.clientX - rect.left) / rect.width) * 100;
+      const yPercent = ((event.clientY - rect.top) / rect.height) * 100;
+      setPositions((prev) => ({
+        ...prev,
+        [draggingNodeId]: {
+          x: Math.min(95, Math.max(5, xPercent)),
+          y: Math.min(95, Math.max(5, yPercent)),
+        },
+      }));
+    };
+
+    const handlePointerUp = () => setDraggingNodeId(null);
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+    };
+  }, [draggingNodeId]);
 
   if (!isAuthenticated) {
     return null;
@@ -88,22 +152,78 @@ const LanCartography = () => {
 
   const renderLinks = () =>
     topology.links.map((link) => {
-      const from = topology.nodes.find((node) => node.id === link.from);
-      const to = topology.nodes.find((node) => node.id === link.to);
+      const from = positions[link.from] ?? topology.nodes.find((node) => node.id === link.from)?.position;
+      const to = positions[link.to] ?? topology.nodes.find((node) => node.id === link.to)?.position;
       if (!from || !to) return null;
       return (
         <line
           key={link.id}
-          x1={`${from.position.x}%`}
-          y1={`${from.position.y}%`}
-          x2={`${to.position.x}%`}
-          y2={`${to.position.y}%`}
+          x1={`${from.x}%`}
+          y1={`${from.y}%`}
+          x2={`${to.x}%`}
+          y2={`${to.y}%`}
           strokeWidth={link.type === "fiber" ? 3 : 2}
           stroke={link.status === "up" ? "#10b981" : link.status === "warn" ? "#f59e0b" : "#ef4444"}
           strokeDasharray={link.type === "wireless" ? "6 4" : undefined}
+          className="hover:stroke-blue-400 transition-colors cursor-pointer"
+          onMouseEnter={() => setHoveredLink(link)}
+          onMouseLeave={() => setHoveredLink(null)}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            setContextLink(link);
+            setContextLinkPosition({ x: e.clientX, y: e.clientY });
+          }}
         />
       );
     });
+
+  const renderPortLabels = () => {
+    if (!hoveredLink || !containerRef.current) return null;
+    const from = positions[hoveredLink.from] ?? topology.nodes.find((node) => node.id === hoveredLink.from)?.position;
+    const to = positions[hoveredLink.to] ?? topology.nodes.find((node) => node.id === hoveredLink.to)?.position;
+    if (!from || !to) return null;
+
+    const fromNode = topology.nodes.find((node) => node.id === hoveredLink.from);
+    const toNode = topology.nodes.find((node) => node.id === hoveredLink.to);
+    if (!fromNode || !toNode) return null;
+
+    return (
+      <>
+        {/* Label pour le port de départ */}
+        <div
+          className="absolute pointer-events-none z-10"
+          style={{
+            left: `${from.x}%`,
+            top: `${from.y}%`,
+            transform: `translate(-50%, -100%) translateY(-15px)`,
+          }}
+        >
+          <div className="bg-primary text-primary-foreground text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap border border-primary/20">
+            <div className="text-[0.65rem] font-medium opacity-90">{fromNode.name}</div>
+            <div className="text-[0.75rem] font-semibold mt-0.5">
+              Port: {hoveredLink.fromPort || "N/A"}
+            </div>
+          </div>
+        </div>
+        {/* Label pour le port d'arrivée */}
+        <div
+          className="absolute pointer-events-none z-10"
+          style={{
+            left: `${to.x}%`,
+            top: `${to.y}%`,
+            transform: `translate(-50%, -100%) translateY(-15px)`,
+          }}
+        >
+          <div className="bg-primary text-primary-foreground text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap border border-primary/20">
+            <div className="text-[0.65rem] font-medium opacity-90">{toNode.name}</div>
+            <div className="text-[0.75rem] font-semibold mt-0.5">
+              Port: {hoveredLink.toPort || "N/A"}
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  };
 
   return (
     <div className="flex h-screen bg-background flex-col">
@@ -132,14 +252,14 @@ const LanCartography = () => {
                     ))}
                   </SelectContent>
                 </Select>
-                <Button variant="outline" size="icon" onClick={() => setSelectedNodeId(null)}>
+                <Button variant="outline" size="icon" onClick={() => setPositions((prev) => ({ ...prev }))}>
                   <RefreshCcw className="h-4 w-4" />
                 </Button>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <Card className="lg:col-span-2">
+            <div className="grid grid-cols-1">
+              <Card>
                 <CardHeader>
                   <CardTitle>{topology.name}</CardTitle>
                   <CardDescription>
@@ -148,130 +268,132 @@ const LanCartography = () => {
                 </CardHeader>
                 <CardContent>
                   <TooltipProvider>
-                    <div className="relative h-[500px] rounded-lg border border-dashed bg-muted/20">
-                      <svg className="absolute inset-0 w-full h-full pointer-events-none">
+                    <div
+                      ref={containerRef}
+                      className="relative h-[500px] rounded-lg border border-dashed bg-muted/20 select-none"
+                      onContextMenu={(e) => e.preventDefault()}
+                    >
+                      <svg className="absolute inset-0 w-full h-full">
                         {renderLinks()}
                       </svg>
+                      {renderPortLabels()}
+                      <DropdownMenu
+                        open={!!contextLink}
+                        onOpenChange={(open) => {
+                          if (!open) {
+                            setContextLink(null);
+                            setContextLinkPosition(null);
+                          }
+                        }}
+                      >
+                        <DropdownMenuTrigger asChild>
+                          <div
+                            style={{
+                              position: "absolute",
+                              left: contextLinkPosition?.x || 0,
+                              top: contextLinkPosition?.y || 0,
+                              width: 0,
+                              height: 0,
+                            }}
+                          />
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent
+                          style={{
+                            position: "fixed",
+                            left: contextLinkPosition?.x || 0,
+                            top: contextLinkPosition?.y || 0,
+                          }}
+                        >
+                          <DropdownMenuItem
+                            onClick={() => {
+                              const current = topologies.find((lan) => lan.id === selectedTopologyId);
+                              if (!contextLink || !current) return;
+                              current.links = current.links.filter((link) => link.id !== contextLink.id);
+                              setContextLink(null);
+                              setContextLinkPosition(null);
+                            }}
+                          >
+                            Supprimer cette liaison
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                       {topology.nodes.map((node) => (
-                        <Tooltip key={node.id}>
-                          <TooltipTrigger asChild>
-                            <button
-                              onClick={() => setSelectedNodeId(node.id)}
-                              className={`absolute -translate-x-1/2 -translate-y-1/2 min-w-[130px] rounded-xl border px-3 py-3 text-center shadow-sm transition hover:shadow-md ${roleStyles[node.role]}`}
-                              style={{
-                                left: `${node.position.x}%`,
-                                top: `${node.position.y}%`,
+                        <DropdownMenu key={node.id} onOpenChange={(open) => !open && setContextNode(null)}>
+                          <DropdownMenuTrigger asChild>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  onPointerDown={(event) => {
+                                    event.preventDefault();
+                                    setDraggingNodeId(node.id);
+                                  }}
+                                  onContextMenu={(event) => {
+                                    event.preventDefault();
+                                    setContextNode(node);
+                                  }}
+                                  className={`absolute -translate-x-1/2 -translate-y-1/2 min-w-[130px] rounded-xl border px-3 py-3 text-center shadow-sm transition hover:shadow-md ${roleStyles[node.role]}`}
+                                  style={{
+                                    left: `${positions[node.id]?.x ?? node.position.x}%`,
+                                    top: `${positions[node.id]?.y ?? node.position.y}%`,
+                                    cursor: draggingNodeId === node.id ? "grabbing" : "grab",
+                                  }}
+                                >
+                                  <div className="flex flex-col items-center gap-2">
+                                    <div className="relative">
+                                      <img
+                                        src={node.icon}
+                                        alt={node.name}
+                                        className="h-14 w-14 object-contain drop-shadow"
+                                        loading="lazy"
+                                      />
+                                      <span
+                                        className={`absolute -top-1 -right-1 h-3 w-3 rounded-full border border-white ${statusColors[node.status] || "bg-slate-400"}`}
+                                      />
+                                    </div>
+                                    <div>
+                                      <p className="text-xs font-semibold">{node.name}</p>
+                                      <p className="text-[0.65rem] text-muted-foreground">{node.site}</p>
+                                      <p className="text-[0.65rem] font-mono text-muted-foreground">{node.ip}</p>
+                                    </div>
+                                  </div>
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <div className="space-y-1 text-xs">
+                                  <p className="font-medium">{node.name}</p>
+                                  <p className="text-muted-foreground">Modèle : {node.model}</p>
+                                  <p className="text-muted-foreground">IP : {node.ip}</p>
+                                  <p className="text-muted-foreground">Site : {node.site}</p>
+                                  {node.notes && <p className="text-muted-foreground">{node.notes}</p>}
+                                </div>
+                              </TooltipContent>
+                            </Tooltip>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={() => {
+                                const current = topologies.find((lan) => lan.id === selectedTopologyId);
+                                if (!current || !contextNode) return;
+                                current.nodes = current.nodes.filter((n) => n.id !== contextNode.id);
+                                current.links = current.links.filter(
+                                  (link) => link.from !== contextNode.id && link.to !== contextNode.id,
+                                );
+                                const updatedPositions = { ...positions };
+                                delete updatedPositions[contextNode.id];
+                                setPositions(updatedPositions);
+                                setContextNode(null);
                               }}
                             >
-                              <div className="flex flex-col items-center gap-2">
-                                <div className="relative">
-                                  <img
-                                    src={node.icon}
-                                    alt={node.name}
-                                    className="h-14 w-14 object-contain drop-shadow"
-                                    loading="lazy"
-                                  />
-                                  <span
-                                    className={`absolute -top-1 -right-1 h-3 w-3 rounded-full border border-white ${statusColors[node.status] || "bg-slate-400"}`}
-                                  />
-                                </div>
-                                <div>
-                                  <p className="text-xs font-semibold">{node.name}</p>
-                                  <p className="text-[0.65rem] text-muted-foreground">{node.site}</p>
-                                  <p className="text-[0.65rem] font-mono text-muted-foreground">{node.ip}</p>
-                                </div>
-                              </div>
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <div className="space-y-1">
-                              <p className="font-medium">{node.name}</p>
-                              <p className="text-xs text-muted-foreground">{node.model}</p>
-                              <p className="text-xs">{node.notes ?? "Aucune note"}</p>
-                            </div>
-                          </TooltipContent>
-                        </Tooltip>
+                              Supprimer cet équipement
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       ))}
                     </div>
                   </TooltipProvider>
                 </CardContent>
               </Card>
 
-              <div className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Statut des liaisons</CardTitle>
-                    <CardDescription>Vue synthétique des liens physiques et logiques.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    {topology.links.map((link) => (
-                      <div key={link.id} className="rounded-lg border p-3">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="font-medium">
-                            {link.from} → {link.to}
-                          </span>
-                          <Badge
-                            variant={link.status === "up" ? "default" : link.status === "warn" ? "secondary" : "destructive"}
-                          >
-                            {link.status === "up" ? "Opérationnel" : link.status === "warn" ? "Instable" : "Down"}
-                          </Badge>
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          {link.type.toUpperCase()} • {link.vlan} • {link.bandwidth}
-                        </p>
-                        {(link.fromPort || link.toPort) && (
-                          <p className="text-xs text-muted-foreground">
-                            Ports : {link.fromPort ?? "?"} ↔ {link.toPort ?? "?"}
-                          </p>
-                        )}
-                      </div>
-                    ))}
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Détails équipement</CardTitle>
-                    <CardDescription>
-                      {selectedNode ? "Informations sur l’équipement sélectionné." : "Cliquez sur un nœud pour afficher les détails."}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {selectedNode ? (
-                      <div className="space-y-3 text-sm">
-                        <div>
-                          <p className="text-xs text-muted-foreground">Nom</p>
-                          <p className="font-semibold">{selectedNode.name}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground">Rôle</p>
-                          <p className="capitalize">{selectedNode.role}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground">Adresse IP</p>
-                          <p className="font-mono">{selectedNode.ip}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground">Site</p>
-                          <p>{selectedNode.site}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground">Modèle</p>
-                          <p>{selectedNode.model}</p>
-                        </div>
-                        {selectedNode.notes && (
-                          <div>
-                            <p className="text-xs text-muted-foreground">Notes</p>
-                            <p>{selectedNode.notes}</p>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">Aucun équipement sélectionné.</p>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
             </div>
 
             <Tabs defaultValue="legend" className="w-full">
