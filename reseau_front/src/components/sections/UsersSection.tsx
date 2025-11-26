@@ -6,14 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { toast } from "@/hooks/use-toast";
-import { Plus, Users, LogOut, Settings } from "lucide-react";
+import { Plus, Users } from "lucide-react";
 
 // Mock users data for demonstration
 const mockUsers = [
@@ -52,7 +51,7 @@ const userSchema = z.object({
 type UserFormData = z.infer<typeof userSchema>;
 
 const UsersSection = () => {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const [users, setUsers] = useState(mockUsers);
   const [open, setOpen] = useState(false);
 
@@ -64,14 +63,6 @@ const UsersSection = () => {
       role: "user"
     }
   });
-
-  const handleLogout = () => {
-    logout();
-    toast({
-      title: "Déconnexion réussie",
-      description: "À bientôt !",
-    });
-  };
 
   const onSubmit = (data: UserFormData) => {
     const newUser = {
@@ -196,38 +187,8 @@ const UsersSection = () => {
               </DialogContent>
             </Dialog>
           )}
-          <Button variant="outline" onClick={handleLogout}>
-            <LogOut className="mr-2 h-4 w-4" />
-            Se déconnecter
-          </Button>
         </div>
       </div>
-
-      {/* Current User Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Settings className="h-5 w-5" />
-            Mon profil
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center space-x-4">
-            <Avatar className="h-12 w-12">
-              <AvatarFallback>
-                {user?.name.split(' ').map(n => n[0]).join('').toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex-1">
-              <h3 className="text-lg font-semibold">{user?.name}</h3>
-              <p className="text-sm text-muted-foreground">{user?.email}</p>
-              <Badge className={getRoleBadgeColor(user?.role || 'user')}>
-                {getRoleLabel(user?.role || 'user')}
-              </Badge>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Users List */}
       <Card>

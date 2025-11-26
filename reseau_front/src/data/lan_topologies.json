@@ -1,0 +1,327 @@
+{
+  "topologies": [
+    {
+      "id": "lan-prod",
+      "name": "LAN Production",
+      "subnet": "10.10.0.0/22",
+      "vlan": "VLAN 120",
+      "description": "Topologie hiérarchique redondée pour les utilisateurs du site principal.",
+      "nodes": [
+        {
+          "id": "core-1",
+          "name": "Switch-Core-01",
+          "role": "core",
+          "status": "up",
+          "position": { "x": 45, "y": 10 },
+          "site": "Bâtiment A - Rack 1",
+          "ip": "10.10.0.1",
+          "model": "Cisco C9500-24Y4C",
+          "icon": "/icons/switch-core.svg"
+        },
+        {
+          "id": "dist-1",
+          "name": "Switch-Distribution-01",
+          "role": "distribution",
+          "status": "up",
+          "position": { "x": 25, "y": 35 },
+          "site": "Bâtiment A - Étage 2",
+          "ip": "10.10.0.2",
+          "model": "Cisco C9300-48P",
+          "icon": "/icons/switch-distribution.svg"
+        },
+        {
+          "id": "dist-2",
+          "name": "Switch-Distribution-02",
+          "role": "distribution",
+          "status": "up",
+          "position": { "x": 65, "y": 35 },
+          "site": "Bâtiment A - Étage 3",
+          "ip": "10.10.0.3",
+          "model": "Cisco C9300-48P",
+          "icon": "/icons/switch-distribution.svg"
+        },
+        {
+          "id": "access-1",
+          "name": "Switch-Access-01",
+          "role": "access",
+          "status": "up",
+          "position": { "x": 25, "y": 65 },
+          "site": "Open Space 2",
+          "ip": "10.10.1.10",
+          "model": "Cisco C9200L-24P",
+          "notes": "Ports 1-12 en PoE pour Wi-Fi & téléphonie.",
+          "icon": "/icons/switch-access.svg"
+        },
+        {
+          "id": "access-2",
+          "name": "Switch-Access-02",
+          "role": "access",
+          "status": "warn",
+          "position": { "x": 65, "y": 65 },
+          "site": "Open Space 3",
+          "ip": "10.10.1.11",
+          "model": "Cisco C9200L-24P",
+          "notes": "Port Gi1/0/24 en erreurs CRC.",
+          "icon": "/icons/switch-access.svg"
+        },
+        {
+          "id": "endpoint-1",
+          "name": "WiFi-AP-01",
+          "role": "endpoint",
+          "status": "up",
+          "position": { "x": 10, "y": 85 },
+          "site": "Salle réunion A",
+          "ip": "10.10.2.201",
+          "model": "Cisco 9120AX",
+          "icon": "/icons/device-wifi.svg"
+        },
+        {
+          "id": "endpoint-2",
+          "name": "Serveur-Fichiers",
+          "role": "endpoint",
+          "status": "up",
+          "position": { "x": 85, "y": 85 },
+          "site": "Salle serveurs",
+          "ip": "10.10.3.15",
+          "model": "Dell R750",
+          "icon": "/icons/device-server.svg"
+        }
+      ],
+      "links": [
+        {
+          "id": "link-1",
+          "from": "core-1",
+          "to": "dist-1",
+          "type": "fiber",
+          "vlan": "Trunk 120/130",
+          "status": "up",
+          "bandwidth": "40 Gbps",
+          "fromPort": "Gi1/0/1",
+          "toPort": "Gi0/1"
+        },
+        {
+          "id": "link-2",
+          "from": "core-1",
+          "to": "dist-2",
+          "type": "fiber",
+          "vlan": "Trunk 120/130",
+          "status": "up",
+          "bandwidth": "40 Gbps",
+          "fromPort": "Gi1/0/2",
+          "toPort": "Gi0/1"
+        },
+        {
+          "id": "link-3",
+          "from": "dist-1",
+          "to": "dist-2",
+          "type": "fiber",
+          "vlan": "RSTP",
+          "status": "up",
+          "bandwidth": "10 Gbps",
+          "fromPort": "Gi0/48",
+          "toPort": "Gi0/48"
+        },
+        {
+          "id": "link-4",
+          "from": "dist-1",
+          "to": "access-1",
+          "type": "fiber",
+          "vlan": "Access 120",
+          "status": "up",
+          "bandwidth": "10 Gbps",
+          "fromPort": "Gi0/10",
+          "toPort": "Gi0/24"
+        },
+        {
+          "id": "link-5",
+          "from": "dist-2",
+          "to": "access-2",
+          "type": "fiber",
+          "vlan": "Access 120",
+          "status": "warn",
+          "bandwidth": "10 Gbps",
+          "fromPort": "Gi0/10",
+          "toPort": "Gi0/24"
+        },
+        {
+          "id": "link-6",
+          "from": "access-1",
+          "to": "endpoint-1",
+          "type": "copper",
+          "vlan": "120",
+          "status": "up",
+          "bandwidth": "1 Gbps",
+          "fromPort": "Fa0/24",
+          "toPort": "eth0"
+        },
+        {
+          "id": "link-7",
+          "from": "access-2",
+          "to": "endpoint-2",
+          "type": "fiber",
+          "vlan": "120",
+          "status": "up",
+          "bandwidth": "10 Gbps",
+          "fromPort": "Gi1/0/24",
+          "toPort": "eth2"
+        }
+      ]
+    }
+    ,
+    {
+      "id": "lan-demo",
+      "name": "LAN Démonstration",
+      "subnet": "192.168.50.0/24",
+      "vlan": "VLAN 50",
+      "description": "Topologie mixte montrant routeur, switches, laptops, desktop et serveur.",
+      "nodes": [
+        {
+          "id": "router-1",
+          "name": "Routeur-Edge",
+          "role": "core",
+          "status": "up",
+          "position": { "x": 50, "y": 10 },
+          "site": "Salle réseau",
+          "ip": "192.168.50.1",
+          "model": "ISR 4331",
+          "icon": "/icons/device-router.svg"
+        },
+        {
+          "id": "switch-lab",
+          "name": "Switch-Lab",
+          "role": "distribution",
+          "status": "up",
+          "position": { "x": 30, "y": 35 },
+          "site": "Lab A",
+          "ip": "192.168.50.2",
+          "model": "Catalyst 9300",
+          "icon": "/icons/switch-distribution.svg"
+        },
+        {
+          "id": "switch-office",
+          "name": "Switch-Bureau",
+          "role": "access",
+          "status": "up",
+          "position": { "x": 70, "y": 35 },
+          "site": "Bureau",
+          "ip": "192.168.50.3",
+          "model": "Catalyst 9200",
+          "icon": "/icons/switch-access.svg"
+        },
+        {
+          "id": "laptop-1",
+          "name": "Laptop-Design",
+          "role": "endpoint",
+          "status": "up",
+          "position": { "x": 20, "y": 70 },
+          "site": "Lab A",
+          "ip": "192.168.50.21",
+          "model": "Dell XPS",
+          "icon": "/icons/device-laptop.svg"
+        },
+        {
+          "id": "laptop-2",
+          "name": "Laptop-Maintenance",
+          "role": "endpoint",
+          "status": "up",
+          "position": { "x": 40, "y": 75 },
+          "site": "Lab A",
+          "ip": "192.168.50.22",
+          "model": "Lenovo T14",
+          "icon": "/icons/device-laptop.svg"
+        },
+        {
+          "id": "desktop-1",
+          "name": "Desktop-Accueil",
+          "role": "endpoint",
+          "status": "warn",
+          "position": { "x": 65, "y": 70 },
+          "site": "Accueil",
+          "ip": "192.168.50.33",
+          "model": "HP EliteDesk",
+          "icon": "/icons/device-desktop.svg"
+        },
+        {
+          "id": "server-1",
+          "name": "Serveur-Intranet",
+          "role": "endpoint",
+          "status": "up",
+          "position": { "x": 80, "y": 80 },
+          "site": "Salle serveurs",
+          "ip": "192.168.50.10",
+          "model": "Dell R650",
+          "icon": "/icons/device-server.svg"
+        }
+      ],
+      "links": [
+        {
+          "id": "demo-link-1",
+          "from": "router-1",
+          "to": "switch-lab",
+          "type": "fiber",
+          "vlan": "Trunk 50/60",
+          "status": "up",
+          "bandwidth": "10 Gbps",
+          "fromPort": "Gi0/0/0",
+          "toPort": "Gi0/24"
+        },
+        {
+          "id": "demo-link-2",
+          "from": "router-1",
+          "to": "switch-office",
+          "type": "fiber",
+          "vlan": "Trunk 50",
+          "status": "up",
+          "bandwidth": "10 Gbps",
+          "fromPort": "Gi0/0/1",
+          "toPort": "Gi0/24"
+        },
+        {
+          "id": "demo-link-3",
+          "from": "switch-lab",
+          "to": "laptop-1",
+          "type": "copper",
+          "vlan": "50",
+          "status": "up",
+          "bandwidth": "1 Gbps",
+          "fromPort": "Fa0/5",
+          "toPort": "eth0"
+        },
+        {
+          "id": "demo-link-4",
+          "from": "switch-lab",
+          "to": "laptop-2",
+          "type": "copper",
+          "vlan": "50",
+          "status": "up",
+          "bandwidth": "1 Gbps",
+          "fromPort": "Fa0/6",
+          "toPort": "eth0"
+        },
+        {
+          "id": "demo-link-5",
+          "from": "switch-office",
+          "to": "desktop-1",
+          "type": "copper",
+          "vlan": "50",
+          "status": "warn",
+          "bandwidth": "1 Gbps",
+          "fromPort": "Fa0/12",
+          "toPort": "eth0"
+        },
+        {
+          "id": "demo-link-6",
+          "from": "switch-office",
+          "to": "server-1",
+          "type": "fiber",
+          "vlan": "50",
+          "status": "up",
+          "bandwidth": "10 Gbps",
+          "fromPort": "Gi0/2",
+          "toPort": "eth1"
+        }
+      ]
+    }
+  ]
+}
+

@@ -4,7 +4,7 @@ import { Button } from "./button";
 import { Input } from "./input";
 import { Label } from "./label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./select";
-import { Save, X } from "lucide-react";
+import { Save } from "lucide-react";
 
 interface EditModalProps {
   open: boolean;
@@ -62,16 +62,7 @@ export default function EditModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <div className="flex items-center justify-between">
-            <DialogTitle className="text-xl font-semibold">{title}</DialogTitle>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={() => onOpenChange(false)}
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
+          <DialogTitle className="text-xl font-semibold">{title}</DialogTitle>
         </DialogHeader>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">

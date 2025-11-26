@@ -8,6 +8,13 @@ import { DataProvider } from "@/contexts/DataContext";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
+import Profile from "./pages/Profile";
+import Batiments from "./pages/Batiments";
+import Salles from "./pages/Salles";
+import Roles from "./pages/Roles";
+import Permissions from "./pages/Permissions";
+import Lans from "./pages/Lans";
+import LanCartography from "./pages/LanCartography";
 
 const queryClient = new QueryClient();
 
@@ -22,6 +29,13 @@ const App = () => (
             <Routes>
               <Route path="/login" element={<Login />} />
               <Route path="/" element={<Index />} />
+              <Route path="/profile" element={<Profile />} />
+              <Route path="/batiments" element={<Batiments />} />
+              <Route path="/salles" element={<Salles />} />
+              <Route path="/roles" element={<Roles />} />
+              <Route path="/permissions" element={<Permissions />} />
+              <Route path="/lans" element={<Lans />} />
+              <Route path="/cartographie-lan" element={<LanCartography />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

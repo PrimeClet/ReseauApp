@@ -5,7 +5,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
-import Sidebar from "@/components/layout/Sidebar";
+import AppShell from "@/components/layout/AppShell";
 import DashboardOverview from "@/components/dashboard/DashboardOverview";
 import ArmoiresSection from "@/components/sections/ArmoiresSection";
 import EquipmentsSection from "@/components/sections/EquipmentsSection";
@@ -14,6 +14,7 @@ import PortsSection from "@/components/sections/PortsSection";
 import MaintenanceSection from "@/components/sections/MaintenanceSection";
 import ParametresSection from "@/components/sections/ParametresSection";
 import UsersSection from "@/components/sections/UsersSection";
+import TypesSection from "@/components/sections/TypesSection";
 
 const queryClient = new QueryClient();
 
@@ -27,6 +28,15 @@ const Index = () => {
       navigate('/login');
     }
   }, [isAuthenticated, navigate]);
+
+  // Récupérer la section active depuis localStorage au chargement
+  useEffect(() => {
+    const savedSection = localStorage.getItem('activeSection');
+    if (savedSection) {
+      setActiveSection(savedSection);
+      localStorage.removeItem('activeSection');
+    }
+  }, []);
 
   if (!isAuthenticated) {
     return null; // or loading spinner
@@ -48,6 +58,8 @@ const Index = () => {
         return <ParametresSection />;
       case "users":
         return <UsersSection />;
+      case "types":
+        return <TypesSection />;
       default:
         return <DashboardOverview />;
     }
@@ -58,17 +70,9 @@ const Index = () => {
       <TooltipProvider>
         <Toaster />
         <Sonner />
-        <div className="flex h-screen bg-background">
-          <Sidebar 
-            activeSection={activeSection} 
-            onSectionChange={setActiveSection} 
-          />
-          <main className="flex-1 overflow-auto">
-            <div className="p-8">
-              {renderContent()}
-            </div>
-          </main>
-        </div>
+        <AppShell activeSection={activeSection} onSectionChange={setActiveSection}>
+          {renderContent()}
+        </AppShell>
       </TooltipProvider>
     </QueryClientProvider>
   );
