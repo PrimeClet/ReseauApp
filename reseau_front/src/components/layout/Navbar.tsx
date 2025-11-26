@@ -11,12 +11,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { Bell, LogOut, User, Network } from "lucide-react";
+import { Bell, LogOut, User, Network, Menu, X } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { useSidebarToggle } from "@/components/layout/AppShell";
 
 export default function Navbar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const { isSidebarOpen, toggleSidebar } = useSidebarToggle();
 
   const handleLogout = () => {
     logout();
@@ -63,6 +65,15 @@ export default function Navbar() {
       <div className="flex h-full items-center justify-between px-6">
         {/* Left side - Logo and title */}
         <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleSidebar}
+            title={isSidebarOpen ? "Masquer la sidebar" : "Afficher la sidebar"}
+            className="h-9 w-9"
+          >
+            {isSidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </Button>
           <div className="flex items-center gap-2">
             <Network className="h-6 w-6 text-primary" />
             <div>

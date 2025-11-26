@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { useSidebarToggle } from "@/components/layout/AppShell";
 import {
   LayoutDashboard, 
   Server, 
@@ -48,6 +50,8 @@ const accessSections = ["users", "roles", "permissions"];
 export default function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
+  const isMobile = useIsMobile();
+  const { setSidebarOpen } = useSidebarToggle();
   const [isLocalisationOpen, setIsLocalisationOpen] = useState(false);
   const [isAccessOpen, setIsAccessOpen] = useState(false);
 
@@ -86,6 +90,11 @@ export default function Sidebar({ activeSection, onSectionChange }: SidebarProps
 
   // Fonction pour gérer la navigation des items du menu
   const handleMenuClick = (itemId: string) => {
+    // Fermer la sidebar sur mobile après un clic
+    if (isMobile) {
+      setSidebarOpen(false);
+    }
+    
     // Si on est sur la page Index, utiliser onSectionChange
     if (location.pathname === "/") {
       onSectionChange(itemId);
@@ -96,8 +105,17 @@ export default function Sidebar({ activeSection, onSectionChange }: SidebarProps
     }
   };
 
+  // Fonction pour gérer la navigation avec fermeture automatique sur mobile
+  const handleNavigate = (path: string) => {
+    // Fermer la sidebar sur mobile après un clic
+    if (isMobile) {
+      setSidebarOpen(false);
+    }
+    navigate(path);
+  };
+
   return (
-    <div className="w-64 h-full bg-nav-background border-r border-border flex flex-col">
+    <div className="w-64 bg-nav-background border-r border-border flex flex-col overflow-hidden h-full">
       {/* Header */}
       <div className="p-6 border-b border-border">
         <div className="flex items-center gap-2 text-primary">
@@ -160,7 +178,7 @@ export default function Sidebar({ activeSection, onSectionChange }: SidebarProps
                   "w-full justify-start text-nav-text hover:bg-muted hover:text-foreground text-sm",
                   location.pathname === "/batiments" && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
                 )}
-                onClick={() => navigate("/batiments")}
+                onClick={() => handleNavigate("/batiments")}
               >
                 <Building2 className="mr-3 h-4 w-4" />
                 Bâtiments
@@ -171,7 +189,7 @@ export default function Sidebar({ activeSection, onSectionChange }: SidebarProps
                   "w-full justify-start text-nav-text hover:bg-muted hover:text-foreground text-sm",
                   location.pathname === "/salles" && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
                 )}
-                onClick={() => navigate("/salles")}
+                onClick={() => handleNavigate("/salles")}
               >
                 <DoorOpen className="mr-3 h-4 w-4" />
                 Salles
@@ -187,7 +205,7 @@ export default function Sidebar({ activeSection, onSectionChange }: SidebarProps
                 location.pathname === "/lans" &&
                   "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
               )}
-              onClick={() => navigate("/lans")}
+              onClick={() => handleNavigate("/lans")}
             >
               <Network className="mr-3 h-4 w-4" />
               Gestion des LANs
@@ -199,7 +217,7 @@ export default function Sidebar({ activeSection, onSectionChange }: SidebarProps
                 location.pathname === "/cartographie-lan" &&
                   "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
               )}
-              onClick={() => navigate("/cartographie-lan")}
+              onClick={() => handleNavigate("/cartographie-lan")}
             >
               <Map className="mr-3 h-4 w-4" />
               Cartographie LAN
@@ -244,7 +262,7 @@ export default function Sidebar({ activeSection, onSectionChange }: SidebarProps
                   "w-full justify-start text-nav-text hover:bg-muted hover:text-foreground text-sm",
                   isAccessButtonActive("roles") && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
                 )}
-                onClick={() => navigate("/roles")}
+                onClick={() => handleNavigate("/roles")}
               >
                 <Shield className="mr-3 h-4 w-4" />
                 Rôles
@@ -255,7 +273,7 @@ export default function Sidebar({ activeSection, onSectionChange }: SidebarProps
                   "w-full justify-start text-nav-text hover:bg-muted hover:text-foreground text-sm",
                   isAccessButtonActive("permissions") && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
                 )}
-                onClick={() => navigate("/permissions")}
+                onClick={() => handleNavigate("/permissions")}
               >
                 <KeyRound className="mr-3 h-4 w-4" />
                 Permissions
