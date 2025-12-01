@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\Equipement;
-use App\Models\Equipements;
 use Illuminate\Http\Request;
 
 class EquipementsController extends Controller
@@ -13,7 +12,7 @@ class EquipementsController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Equipement::all();
+        $query = Equipement::query();
 
         if ($request->has('status')) {
             $query->where('status', $request->status);
@@ -26,7 +25,10 @@ class EquipementsController extends Controller
             });
         }
 
-        $equipement = $query->orderBy('name')->paginate(15);
+        $perPage = (int) $request->get('per_page', 15);
+        $perPage = $perPage > 0 && $perPage <= 100 ? $perPage : 15;
+
+        $equipement = $query->orderBy('name')->paginate($perPage);
 
         return response()->json($equipement);
     }
@@ -41,7 +43,7 @@ class EquipementsController extends Controller
         }
 
         $request->validate([
-            'equipement_code' => 'required|string|max:255|unique',
+            'equipement_code' => 'required|string|max:255|unique:equipements,equipement_code',
             'name' => 'required|string|max:255',
             'type' => 'required|string|max:255',
             'description' => 'nullable|string',
@@ -78,7 +80,7 @@ class EquipementsController extends Controller
         }
         
         $request->validate([
-            'equipement_code' => 'sometimes|string|max:255|unique',
+            'equipement_code' => 'sometimes|string|max:255|unique:equipements,equipement_code,' . $equipement->id,
             'name' => 'sometimes|string|max:255',
             'type' => 'sometimes|string|max:255',
             'description' => 'nullable|string',

@@ -57,4 +57,20 @@ class User extends Authenticatable
     {
         return $this->role === 'administrator';
     }
+
+    /**
+     * Vérifie si l'utilisateur dispose d'une permission donnée
+     * sur la base de son rôle et de la configuration permissions.php.
+     */
+    public function hasPermission(string $permission): bool
+    {
+        $role = $this->role ?? null;
+        if (!$role) {
+            return false;
+        }
+
+        $permissionsForRole = config('permissions.roles.' . $role, []);
+
+        return in_array($permission, $permissionsForRole, true);
+    }
 }

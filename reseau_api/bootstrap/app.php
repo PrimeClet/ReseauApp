@@ -14,7 +14,10 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->alias([
             'role' => \App\Http\Middleware\RoleMiddleware::class,
+            'permission' => \App\Http\Middleware\PermissionMiddleware::class,
         ]);
+
+        // Active la gestion des cookies / CSRF adaptée aux APIs stateful (Sanctum)
         $middleware->statefulApi();
     })
     ->withExceptions(function (Exceptions $exceptions) {
