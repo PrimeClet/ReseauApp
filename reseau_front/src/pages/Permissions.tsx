@@ -67,7 +67,7 @@ const permissionSchema = z.object({
 type PermissionFormData = z.infer<typeof permissionSchema>;
 
 const Permissions = () => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
   const [permissions, setPermissions] = useState<PermissionEntry[]>(initialPermissions);
   const [selectedPermission, setSelectedPermission] = useState<PermissionEntry | null>(null);

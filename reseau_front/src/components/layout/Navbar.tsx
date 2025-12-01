@@ -61,7 +61,7 @@ export default function Navbar() {
   };
 
   return (
-    <nav className="h-16 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <nav className={`h-16 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 relative z-50 transition-all duration-300 ${isSidebarOpen ? 'pl-64' : 'pl-0'}`}>
       <div className="flex h-full items-center justify-between px-6">
         {/* Left side - Logo and title */}
         <div className="flex items-center gap-4">

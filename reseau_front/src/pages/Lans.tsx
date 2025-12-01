@@ -82,7 +82,7 @@ const lanSchema = z.object({
 type LanFormData = z.infer<typeof lanSchema>;
 
 const Lans = () => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
   const [lans, setLans] = useState<LanEntry[]>(initialLans);
   const [selectedLan, setSelectedLan] = useState<LanEntry | null>(null);

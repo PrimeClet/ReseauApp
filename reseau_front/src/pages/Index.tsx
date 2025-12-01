@@ -20,14 +20,14 @@ const queryClient = new QueryClient();
 
 const Index = () => {
   const [activeSection, setActiveSection] = useState("dashboard");
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!isLoading && !isAuthenticated) {
       navigate('/login');
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, isLoading, navigate]);
 
   // Récupérer la section active depuis localStorage au chargement
   useEffect(() => {
@@ -38,8 +38,16 @@ const Index = () => {
     }
   }, []);
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-muted-foreground">Chargement...</div>
+      </div>
+    );
+  }
+
   if (!isAuthenticated) {
-    return null; // or loading spinner
+    return null;
   }
 
   const renderContent = () => {

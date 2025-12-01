@@ -57,7 +57,7 @@ const batimentSchema = z.object({
 type BatimentFormData = z.infer<typeof batimentSchema>;
 
 const Batiments = () => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
   const [batiments, setBatiments] = useState(mockBatiments);
   const [selectedBatiment, setSelectedBatiment] = useState<any>(null);
@@ -77,10 +77,18 @@ const Batiments = () => {
   });
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!isLoading && !isAuthenticated) {
       navigate("/login");
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, isLoading, navigate]);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-muted-foreground">Chargement...</div>
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     return null;

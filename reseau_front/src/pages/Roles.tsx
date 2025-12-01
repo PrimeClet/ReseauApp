@@ -67,7 +67,7 @@ const roleSchema = z.object({
 type RoleFormData = z.infer<typeof roleSchema>;
 
 const Roles = () => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
   const [roles, setRoles] = useState<RoleEntry[]>(initialRoles);
   const [selectedRole, setSelectedRole] = useState<RoleEntry | null>(null);
@@ -76,10 +76,22 @@ const Roles = () => {
   const [isAddOpen, setIsAddOpen] = useState(false);
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!isLoading && !isAuthenticated) {
       navigate("/login");
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, isLoading, navigate]);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-muted-foreground">Chargement...</div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return null;
+  }
 
   const form = useForm<RoleFormData>({
     resolver: zodResolver(roleSchema),
