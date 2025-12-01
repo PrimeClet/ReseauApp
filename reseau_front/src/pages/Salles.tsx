@@ -58,7 +58,7 @@ const salleSchema = z.object({
 type SalleFormData = z.infer<typeof salleSchema>;
 
 const Salles = () => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
   const [salles, setSalles] = useState(mockSalles);
   const [selectedSalle, setSelectedSalle] = useState<any>(null);
@@ -79,10 +79,18 @@ const Salles = () => {
   });
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!isLoading && !isAuthenticated) {
       navigate("/login");
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, isLoading, navigate]);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-muted-foreground">Chargement...</div>
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     return null;

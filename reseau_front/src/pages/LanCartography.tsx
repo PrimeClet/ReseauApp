@@ -18,7 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { RefreshCcw, FileDown, FileSpreadsheet, Plus, Trash2 } from "lucide-react";
+import { RefreshCcw, FileDown, FileSpreadsheet, Plus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -28,13 +28,7 @@ import {
 } from "@/components/ui/dialog";
 import { jsPDF } from "jspdf";
 import lanTopologies from "@/data/lan_topologies.json";
-import { NodeEditor, ClassicPreset } from "rete";
-import { ConnectionPlugin, Presets as ConnectionPresets } from "rete-connection-plugin";
-import { ReactPlugin, Presets as ReactPresets, type ReactArea2D, type ClassicScheme } from "rete-react-plugin";
-import { AreaPlugin, AreaExtensions } from "rete-area-plugin";
-
-// Importer le composant Connection depuis Presets
-const { Connection: ReteConnection } = ReactPresets.classic;
+import { dia, shapes } from "@joint/core";
 
 type LanNode = {
   id: string;
@@ -87,412 +81,552 @@ const roleColors: Record<LanNode["role"], string> = {
   endpoint: "#64748b",
 };
 
-// Types pour rete.js - Utilisation de ClassicScheme
-type Schemes = ClassicScheme;
-type AreaExtra = ReactArea2D<ClassicScheme>;
+const roleHierarchy: LanNode["role"][] = ["core", "distribution", "access", "endpoint"];
 
+// Créer un élément personnalisé avec icône
+const NetworkNode = shapes.standard.Rectangle.define("network.Node", {
+  attrs: {
+    body: {},
+    icon: {},
+    label: {},
+    siteLabel: {},
+    ipLabel: {},
+    statusIndicator: {},
+  },
+}, {
+  markup: [
+    {
+      tagName: "rect",
+      selector: "body",
+    },
+    {
+      tagName: "image",
+      selector: "icon",
+    },
+    {
+      tagName: "text",
+      selector: "label",
+    },
+    {
+      tagName: "text",
+      selector: "siteLabel",
+    },
+    {
+      tagName: "text",
+      selector: "ipLabel",
+    },
+    {
+      tagName: "circle",
+      selector: "statusIndicator",
+    },
+  ],
+});
 
-// Composant React pour afficher un nœud réseau avec sockets visibles
-function NetworkNodeComponent({ 
-  data, 
-  node, 
-  emit 
-}: { 
-  data: LanNode;
-  node: ClassicScheme['Node'];
-  emit?: any;
-}) {
-  const statusColor = statusColors[data.status] || statusColors.down;
-  const roleColor = roleColors[data.role] || roleColors.endpoint;
-  const { Node: ReteNode } = ReactPresets.classic;
+// Calculer les positions automatiques en étoile
+const computeAutoLayoutPositions = (nodes: LanNode[]) => {
+  const positions = new Map<string, { x: number; y: number }>();
+  const baseY = 50;
+  const rowSpacing = 150;
+  const rowWidth = 800;
+  const startX = 100;
 
-  return (
-    <ReteNode
-      data={node}
-      emit={emit}
-      styles={() => ({
-        background: "white",
-        border: `2px solid ${roleColor}`,
-        borderRadius: "12px",
-        boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
-        padding: "12px",
-        minWidth: "140px",
-      })}
-    />
-  );
-}
+  roleHierarchy.forEach((role, rowIndex) => {
+    const group = nodes.filter((node) => node.role === role);
+    if (!group.length) return;
+    const step = rowWidth / (group.length + 1);
+    group.forEach((node, idx) => {
+      const x = startX + (idx + 1) * step;
+      const y = baseY + rowIndex * rowSpacing;
+      positions.set(node.id, { x, y });
+    });
+  });
+
+  return positions;
+};
 
 const LanCartographyContent = () => {
   const [selectedTopologyId, setSelectedTopologyId] = useState(topologies[0]?.id || "");
+  const [selectedLink, setSelectedLink] = useState<LanLink | null>(null);
+  const [selectedNode, setSelectedNode] = useState<LanNode | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [sourceNodeId, setSourceNodeId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const editorRef = useRef<NodeEditor<Schemes> | null>(null);
-  const areaRef = useRef<AreaPlugin<Schemes, AreaExtra> | null>(null);
-  const connectionPluginRef = useRef<ConnectionPlugin<Schemes, AreaExtra> | null>(null);
+  const graphRef = useRef<dia.Graph | null>(null);
+  const paperRef = useRef<dia.Paper | null>(null);
+  const handleKeyDownRef = useRef<((evt: KeyboardEvent) => void) | null>(null);
 
   const topology = useMemo(
     () => topologies.find((lan) => lan.id === selectedTopologyId) ?? topologies[0],
     [selectedTopologyId],
   );
 
-  // Initialisation de rete.js
+  // Initialisation de JointJS
   useEffect(() => {
     if (!containerRef.current || !topology) return;
 
-    const initializeEditor = async () => {
-      const container = containerRef.current;
-      if (!container) return;
+    const container = containerRef.current;
+    
+    // Créer le graphique avec le namespace incluant notre élément personnalisé
+    const cellNamespace = { ...shapes, network: { Node: NetworkNode } };
+    const graph = new dia.Graph({}, { cellNamespace });
+    graphRef.current = graph;
 
-      // Créer le NodeEditor avec ClassicScheme
-      const editor = new NodeEditor<Schemes>();
-      editorRef.current = editor;
+    // Créer le papier avec une taille agrandie
+    const paper = new dia.Paper({
+      el: container,
+      model: graph,
+      width: 1400,
+      height: 1200,
+      gridSize: 10,
+      drawGrid: true,
+      background: {
+        color: "#f9fafb",
+      },
+      cellViewNamespace: cellNamespace,
+    });
+    paperRef.current = paper;
 
-      // Créer les plugins
-      const area = new AreaPlugin<Schemes, AreaExtra>(container);
-      const connection = new ConnectionPlugin<Schemes, AreaExtra>();
-      const render = new ReactPlugin<Schemes>();
+    // Implémenter le pan (déplacement du diagramme)
+    let isPanning = false;
+    let lastPanPoint: { x: number; y: number } | null = null;
+    let spacePressed = false;
 
-      areaRef.current = area;
-      connectionPluginRef.current = connection;
+    // Détecter si la touche Espace est enfoncée
+    const handlePanKeyDown = (evt: KeyboardEvent) => {
+      if (evt.code === 'Space') {
+        spacePressed = true;
+        container.style.cursor = 'grab';
+      }
+    };
 
-      // Ajouter les plugins à l'éditeur
-      editor.use(area);
-      area.use(connection);
-      area.use(render);
+    const handlePanKeyUp = (evt: KeyboardEvent) => {
+      if (evt.code === 'Space') {
+        spacePressed = false;
+        isPanning = false;
+        container.style.cursor = 'default';
+      }
+    };
 
-      // Ajouter les presets pour les styles de connexion et de rendu
-      connection.addPreset(ConnectionPresets.classic.setup());
+    const handlePanStart = (evt: MouseEvent) => {
+      // Démarrer le pan avec clic droit, molette, ou clic gauche + Espace
+      if (evt.button === 2 || evt.button === 1 || (evt.button === 0 && spacePressed)) {
+        isPanning = true;
+        lastPanPoint = { x: evt.clientX, y: evt.clientY };
+        container.style.cursor = 'grabbing';
+        evt.preventDefault();
+      }
+    };
 
-      // Écouter les événements de création de connexion pour ajouter des données personnalisées
-      editor.addPipe((context) => {
-        if (context.type === "connectioncreated") {
-          const conn = context.data as ClassicPreset.Connection<ClassicPreset.Node, ClassicPreset.Node>;
-          // Créer des données de liaison par défaut pour les nouvelles connexions
-          const sourceNode = editor.getNode(conn.source) as ClassicPreset.Node;
-          const targetNode = editor.getNode(conn.target) as ClassicPreset.Node;
-          if (sourceNode && targetNode) {
-            const linkData: LanLink = {
-              id: conn.id || `link-${Date.now()}`,
-              from: sourceNode.id || "",
-              to: targetNode.id || "",
+    const handlePanMove = (evt: MouseEvent) => {
+      if (isPanning && lastPanPoint) {
+        const dx = evt.clientX - lastPanPoint.x;
+        const dy = evt.clientY - lastPanPoint.y;
+        const currentTranslate = paper.translate();
+        paper.translate(currentTranslate.tx + dx, currentTranslate.ty + dy);
+        lastPanPoint = { x: evt.clientX, y: evt.clientY };
+        evt.preventDefault();
+      }
+    };
+
+    const handlePanEnd = () => {
+      isPanning = false;
+      lastPanPoint = null;
+      if (!spacePressed) {
+        container.style.cursor = 'default';
+      } else {
+        container.style.cursor = 'grab';
+      }
+    };
+
+    // Gérer le zoom avec la molette
+    const handleWheel = (evt: WheelEvent) => {
+      if (evt.ctrlKey || evt.metaKey) {
+        evt.preventDefault();
+        const delta = evt.deltaY > 0 ? 0.9 : 1.1;
+        const currentScale = paper.scale();
+        const newScale = Math.max(0.1, Math.min(3, currentScale.sx * delta));
+        paper.scale(newScale, newScale);
+      }
+    };
+
+    // Ajouter les événements
+    window.addEventListener('keydown', handlePanKeyDown);
+    window.addEventListener('keyup', handlePanKeyUp);
+    container.addEventListener('mousedown', handlePanStart);
+    container.addEventListener('mousemove', handlePanMove);
+    container.addEventListener('mouseup', handlePanEnd);
+    container.addEventListener('mouseleave', handlePanEnd);
+    container.addEventListener('wheel', handleWheel, { passive: false });
+    container.addEventListener('contextmenu', (e) => e.preventDefault()); // Désactiver le menu contextuel pour le clic droit
+
+    // Calculer les positions
+    const layoutPositions = computeAutoLayoutPositions(topology.nodes);
+
+    // Créer les éléments pour chaque nœud
+    const nodeMap = new Map<string, dia.Element>();
+    
+    topology.nodes.forEach((nodeData) => {
+      const position = layoutPositions.get(nodeData.id) || { x: 100, y: 100 };
+      const roleColor = roleColors[nodeData.role] || roleColors.endpoint;
+      const statusColor = statusColors[nodeData.status] || statusColors.down;
+
+      // Créer un élément rectangle personnalisé avec icône
+      const rect = new NetworkNode({
+        position: { x: position.x, y: position.y },
+        size: { width: 160, height: 120 },
+        attrs: {
+          body: {
+            fill: "#ffffff",
+            stroke: roleColor,
+            strokeWidth: 2,
+            rx: 8,
+            ry: 8,
+          },
+          icon: {
+            ref: "body",
+            refX: "50%",
+            refY: 20,
+            refX2: -24,
+            refY2: -24,
+            width: 48,
+            height: 48,
+            "xlink:href": nodeData.icon || "/placeholder.svg",
+            preserveAspectRatio: "xMidYMid meet",
+          },
+          label: {
+            text: nodeData.name,
+            fill: "#1f2937",
+            fontSize: 12,
+            fontWeight: "bold",
+            refY: 75,
+            textAnchor: "middle",
+            refX: "50%",
+          },
+          siteLabel: {
+            text: nodeData.site,
+            fill: "#6b7280",
+            fontSize: 10,
+            refY: 95,
+            textAnchor: "middle",
+            refX: "50%",
+          },
+          ipLabel: {
+            text: nodeData.ip,
+            fill: "#6b7280",
+            fontSize: 9,
+            fontFamily: "monospace",
+            refY: 110,
+            textAnchor: "middle",
+            refX: "50%",
+          },
+          statusIndicator: {
+            ref: "body",
+            refX: "100%",
+            refY: 0,
+            refX2: -12,
+            refY2: 4,
+            r: 4,
+            fill: statusColor,
+            stroke: "#ffffff",
+            strokeWidth: 1,
+          },
+        },
+      });
+
+      // Stocker les données du nœud
+      (rect as any).nodeData = nodeData;
+      rect.set("id", nodeData.id);
+
+      graph.addCell(rect);
+      nodeMap.set(nodeData.id, rect);
+    });
+
+    // Créer les liens
+    topology.links.forEach((linkData) => {
+      const sourceNode = nodeMap.get(linkData.from);
+      const targetNode = nodeMap.get(linkData.to);
+
+      if (!sourceNode || !targetNode) return;
+
+      const strokeColor =
+        linkData.status === "up"
+          ? "#10b981"
+          : linkData.status === "warn"
+            ? "#f59e0b"
+            : "#ef4444";
+      const strokeWidth = linkData.type === "fiber" ? 3 : linkData.type === "copper" ? 2 : 1.5;
+      const strokeDasharray = linkData.type === "wireless" ? "6 4" : undefined;
+
+      const labels: any[] = [];
+      
+      // Ajouter le label du port source
+      if (linkData.fromPort) {
+        labels.push({
+          position: {
+            distance: 0.1,
+            offset: -15,
+          },
+          attrs: {
+            text: {
+              text: linkData.fromPort,
+              fill: "#1f2937",
+              fontSize: 10,
+              fontWeight: "bold",
+              fontFamily: "monospace",
+              textAnchor: "middle",
+              textVerticalAnchor: "middle",
+            },
+            rect: {
+              fill: "#ffffff",
+              stroke: "#e5e7eb",
+              strokeWidth: 1,
+              rx: 3,
+              ry: 3,
+            },
+          },
+        });
+      }
+
+      // Ajouter le label du port cible
+      if (linkData.toPort) {
+        labels.push({
+          position: {
+            distance: 0.9,
+            offset: -15,
+          },
+          attrs: {
+            text: {
+              text: linkData.toPort,
+              fill: "#1f2937",
+              fontSize: 10,
+              fontWeight: "bold",
+              fontFamily: "monospace",
+              textAnchor: "middle",
+              textVerticalAnchor: "middle",
+            },
+            rect: {
+              fill: "#ffffff",
+              stroke: "#e5e7eb",
+              strokeWidth: 1,
+              rx: 3,
+              ry: 3,
+            },
+          },
+        });
+      }
+
+      const link = new shapes.standard.Link({
+        source: { id: sourceNode.id },
+        target: { id: targetNode.id },
+        labels: labels,
+        attrs: {
+          line: {
+            stroke: strokeColor,
+            strokeWidth: strokeWidth,
+            strokeDasharray: strokeDasharray,
+            strokeLinecap: "round",
+            strokeLinejoin: "round",
+            connection: true,
+            targetMarker: null,
+            sourceMarker: null,
+          },
+        },
+        router: {
+          name: "orthogonal",
+          args: {
+            padding: 10,
+          },
+        },
+        connector: {
+          name: "rounded",
+        },
+      });
+
+      // Stocker les données du lien
+      (link as any).linkData = linkData;
+      link.set("id", linkData.id);
+
+      // Ajouter un événement de clic sur le lien
+      link.on("pointerclick", () => {
+        setSelectedLink(linkData);
+      });
+
+      graph.addCell(link);
+    });
+
+    // Gérer la création de liens en mode édition
+    const handleNodeClick = (nodeView: dia.CellView, evt: dia.Event) => {
+      if (!isEditMode) return;
+      
+      const nodeId = nodeView.model.id as string;
+      
+      if (!sourceNodeId) {
+        // Sélectionner le nœud source
+        setSourceNodeId(nodeId);
+        nodeView.highlight();
+      } else if (sourceNodeId !== nodeId) {
+        // Créer un lien entre le nœud source et le nœud cible
+        const sourceNode = nodeMap.get(sourceNodeId);
+        const targetNode = nodeMap.get(nodeId);
+        
+        if (sourceNode && targetNode) {
+          // Vérifier si le lien existe déjà
+          const existingLink = graph.getLinks().find((link) => {
+            const source = link.getSourceElement();
+            const target = link.getTargetElement();
+            return source?.id === sourceNodeId && target?.id === nodeId;
+          });
+
+          if (!existingLink) {
+            // Créer un nouveau lien
+            const newLinkData: LanLink = {
+              id: `link-${Date.now()}`,
+              from: sourceNodeId,
+              to: nodeId,
               type: "copper",
               vlan: topology.vlan,
               status: "up",
               bandwidth: "1 Gbps",
             };
-            (conn as any).linkData = linkData;
+
+            const newLink = new shapes.standard.Link({
+              source: { id: sourceNodeId },
+              target: { id: nodeId },
+              attrs: {
+                line: {
+                  stroke: "#10b981",
+                  strokeWidth: 2,
+                  strokeLinecap: "round",
+                  strokeLinejoin: "round",
+                  connection: true,
+                  targetMarker: null,
+                  sourceMarker: null,
+                },
+              },
+              router: {
+                name: "orthogonal",
+                args: {
+                  padding: 10,
+                },
+              },
+              connector: {
+                name: "rounded",
+              },
+            });
+
+            (newLink as any).linkData = newLinkData;
+            newLink.set("id", newLinkData.id);
+
+            newLink.on("pointerclick", () => {
+              setSelectedLink(newLinkData);
+            });
+
+            graph.addCell(newLink);
           }
         }
-        return context;
-      });
-      
-      // Configurer le preset React avec personnalisation des connexions uniquement
-      // Les nœuds utiliseront le rendu par défaut de rete.js avec les sockets visibles
-      const reactPreset = ReactPresets.classic.setup<Schemes, AreaExtra>({
-        customize: {
-          node: (data) => {
-            const node = data.payload;
-            const nodeData = (node as any).nodeData as LanNode | undefined;
-            if (nodeData) {
-              return (props: { data: ClassicScheme['Node']; emit: any }) => {
-                const { Node: ReteNode } = ReactPresets.classic;
-                const roleColor = roleColors[nodeData.role] || roleColors.endpoint;
-                
-                // Utiliser le composant Node de rete.js qui affiche automatiquement les sockets et controls
-                // Le contenu personnalisé sera affiché via un control
-                return (
-                  <ReteNode
-                    data={props.data}
-                    emit={props.emit}
-                    styles={() => ({
-                      background: "white",
-                      border: `2px solid ${roleColor}`,
-                      borderRadius: "12px",
-                      boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
-                      padding: "12px",
-                      minWidth: "140px",
-                    })}
-                  />
-                );
-              };
-            }
-            return null;
-          },
-          connection: (data) => {
-            const conn = data.payload;
-            const linkData = (conn as any).linkData as LanLink | undefined;
-            if (linkData) {
-              // Retourner un composant personnalisé qui utilise le composant Connection de rete-react-plugin avec des styles personnalisés
-              return (props: { data: ClassicScheme['Connection'] }) => {
-                const { Connection } = ReactPresets.classic;
-                const [isHovered, setIsHovered] = useState(false);
-                const strokeWidth = linkData.type === "fiber" ? 3 : linkData.type === "copper" ? 2 : 1.5;
-                const strokeColor =
-                  linkData.status === "up"
-                    ? "#10b981"
-                    : linkData.status === "warn"
-                      ? "#f59e0b"
-                      : "#ef4444";
-                const strokeDasharray = linkData.type === "wireless" ? "6 4" : undefined;
 
-                const customStyles = () => ({
-                  stroke: strokeColor,
-                  strokeWidth: strokeWidth,
-                  strokeDasharray: strokeDasharray,
-                });
-
-                // Récupérer les informations des nœuds source et destination depuis linkData
-                const sourceNodeData = topology.nodes.find(n => n.id === linkData.from);
-                const targetNodeData = topology.nodes.find(n => n.id === linkData.to);
-
-                return (
-                  <>
-                    <div
-                      style={{ cursor: "pointer" }}
-                      onMouseEnter={() => setIsHovered(true)}
-                      onMouseLeave={() => setIsHovered(false)}
-                    >
-                      <Connection data={props.data} styles={customStyles} />
-                    </div>
-                    <Dialog open={isHovered} onOpenChange={setIsHovered}>
-                      <DialogContent className="max-w-md" onMouseEnter={() => setIsHovered(true)} onMouseLeave={() => setIsHovered(false)}>
-                        <DialogHeader>
-                          <DialogTitle>Informations de la connexion</DialogTitle>
-                          <DialogDescription>Détails de la liaison entre les équipements</DialogDescription>
-                        </DialogHeader>
-                        <div className="space-y-4 mt-4">
-                          <div className="grid grid-cols-1 gap-4">
-                            <div className="space-y-2">
-                              <div className="text-sm font-semibold text-muted-foreground">Origine</div>
-                              <div className="flex items-center justify-between">
-                                <span className="font-medium">{sourceNodeData?.name || linkData.from}</span>
-                                {linkData.fromPort && (
-                                  <span className="text-sm text-muted-foreground bg-muted px-2 py-1 rounded">
-                                    Port: {linkData.fromPort}
-                                  </span>
-                                )}
-                              </div>
-                              {sourceNodeData?.ip && (
-                                <div className="text-sm text-muted-foreground font-mono">{sourceNodeData.ip}</div>
-                              )}
-                            </div>
-                            <div className="space-y-2">
-                              <div className="text-sm font-semibold text-muted-foreground">Destination</div>
-                              <div className="flex items-center justify-between">
-                                <span className="font-medium">{targetNodeData?.name || linkData.to}</span>
-                                {linkData.toPort && (
-                                  <span className="text-sm text-muted-foreground bg-muted px-2 py-1 rounded">
-                                    Port: {linkData.toPort}
-                                  </span>
-                                )}
-                              </div>
-                              {targetNodeData?.ip && (
-                                <div className="text-sm text-muted-foreground font-mono">{targetNodeData.ip}</div>
-                              )}
-                            </div>
-                          </div>
-                          <div className="pt-4 border-t space-y-3">
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm font-semibold text-muted-foreground">Type</span>
-                              <span className="capitalize font-medium">{linkData.type}</span>
-                            </div>
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm font-semibold text-muted-foreground">VLAN</span>
-                              <span className="font-medium">{linkData.vlan}</span>
-                            </div>
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm font-semibold text-muted-foreground">Bande passante</span>
-                              <span className="font-medium">{linkData.bandwidth}</span>
-                            </div>
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm font-semibold text-muted-foreground">Statut</span>
-                              <span
-                                className={`px-2 py-1 rounded text-xs font-medium ${
-                                  linkData.status === "up"
-                                    ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                                    : linkData.status === "warn"
-                                      ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
-                                      : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
-                                }`}
-                              >
-                                {linkData.status === "up" ? "Actif" : linkData.status === "warn" ? "Avertissement" : "Inactif"}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </DialogContent>
-                    </Dialog>
-                  </>
-                );
-              };
-            }
-            return null;
-          },
-          socket: (data) => {
-            // Personnaliser le rendu des sockets pour qu'ils soient bien visibles
-            return (props: any) => {
-              const { Socket } = ReactPresets.classic;
-              return <Socket {...props} />;
-            };
-          },
-          control: (data) => {
-            // Personnaliser le rendu des controls pour afficher les icônes des équipements
-            const control = data.payload;
-            const nodeData = (control as any).nodeData as LanNode | undefined;
-            
-            // Si c'est notre contrôle personnalisé avec des données de nœud, afficher l'icône
-            if (nodeData) {
-              return (props: { data: ClassicPreset.Control }) => {
-                const statusColor = statusColors[nodeData.status] || statusColors.down;
-                return (
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="relative">
-                      <img
-                        src={nodeData.icon}
-                        alt={nodeData.name}
-                        style={{
-                          width: "56px",
-                          height: "56px",
-                          objectFit: "contain",
-                        }}
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src = "/placeholder.svg";
-                        }}
-                      />
-                      <span
-                        style={{
-                          position: "absolute",
-                          top: "-4px",
-                          right: "-4px",
-                          width: "12px",
-                          height: "12px",
-                          borderRadius: "50%",
-                          backgroundColor: statusColor,
-                          border: "2px solid white",
-                        }}
-                      />
-                    </div>
-                    <div className="text-center">
-                      <p
-                        style={{
-                          fontSize: "13px",
-                          fontWeight: "600",
-                          margin: "4px 0 2px 0",
-                        }}
-                      >
-                        {nodeData.name}
-                      </p>
-                      <p
-                        style={{
-                          fontSize: "10px",
-                          color: "#6b7280",
-                          margin: "2px 0",
-                        }}
-                      >
-                        {nodeData.site}
-                      </p>
-                      <p
-                        style={{
-                          fontSize: "10px",
-                          fontFamily: "monospace",
-                          color: "#6b7280",
-                          margin: "2px 0",
-                        }}
-                      >
-                        {nodeData.ip}
-                      </p>
-                    </div>
-                  </div>
-                );
-              };
-            }
-            // Sinon, utiliser le rendu par défaut des controls
-            return null;
-          },
-        },
-      });
-      render.addPreset(reactPreset as any);
-
-      // Créer un socket pour les connexions
-      const socket = new ClassicPreset.Socket("socket");
-
-      // Ajouter les nœuds à l'éditeur
-      const nodeMap = new Map<string, ClassicPreset.Node>();
-
-      for (const nodeData of topology.nodes) {
-        const node = new ClassicPreset.Node(nodeData.name);
-        node.id = nodeData.id;
-
-        // Stocker les données du nœud dans un champ personnalisé
-        (node as any).nodeData = nodeData;
-
-        // Créer des sockets pour les connexions (visibles pour permettre les connexions)
-        node.addInput(
-          "input",
-          new ClassicPreset.Input(socket, "In", true)
-        );
-        node.addOutput(
-          "output",
-          new ClassicPreset.Output(socket, "Out", true)
-        );
-
-        // Ajouter un contrôle personnalisé pour afficher le contenu du nœud (image, nom, IP)
-        // Les sockets seront automatiquement visibles grâce au composant Node de rete.js
-        const customControl = new ClassicPreset.Control();
-        // Stocker les données du nœud dans le control pour le rendu personnalisé
-        (customControl as any).nodeData = nodeData;
-        node.addControl("content", customControl);
-
-        // Ajouter le nœud à l'éditeur
-        await editor.addNode(node);
-        
-        // Positionner le nœud
-        await area.translate(node.id, {
-          x: nodeData.position.x * 10,
-          y: nodeData.position.y * 10,
-        });
-
-        nodeMap.set(nodeData.id, node);
+        // Réinitialiser la sélection
+        const sourceView = paper.findViewByModel(sourceNodeId);
+        if (sourceView) {
+          sourceView.unhighlight();
+        }
+        setSourceNodeId(null);
+      } else {
+        // Désélectionner si on clique sur le même nœud
+        nodeView.unhighlight();
+        setSourceNodeId(null);
       }
+    };
 
-      // Ajouter les connexions
-      for (const link of topology.links) {
-        const fromNode = nodeMap.get(link.from);
-        const toNode = nodeMap.get(link.to);
+    // Ajouter les événements sur les nœuds
+    nodeMap.forEach((node) => {
+      const nodeView = paper.findViewByModel(node.id);
+      if (nodeView) {
+        nodeView.on("pointerclick", (evt: dia.Event) => {
+          if (isEditMode) {
+            handleNodeClick(nodeView, evt);
+            return;
+          }
+          setSelectedLink(null);
+          setSelectedNode((nodeView.model as any).nodeData ?? null);
+        });
+      }
+    });
 
-        if (fromNode && toNode) {
-          const conn = new ClassicPreset.Connection(
-            fromNode,
-            "output",
-            toNode,
-            "input"
-          );
-          conn.id = link.id;
-
-          // Stocker les données de la liaison dans la connexion pour le rendu personnalisé
-          (conn as any).linkData = link;
-
-          await editor.addConnection(conn);
+    // Gérer la suppression de liens avec la touche Suppr
+    handleKeyDownRef.current = (evt: KeyboardEvent) => {
+      if ((evt.key === "Delete" || evt.key === "Backspace") && isEditMode) {
+        const selectedLinks: dia.Link[] = [];
+        if (graphRef.current) {
+          graphRef.current.getLinks().forEach((link) => {
+            if (paperRef.current) {
+              const linkView = paperRef.current.findViewByModel(link.id);
+              if (linkView && (linkView as any).isSelected?.()) {
+                selectedLinks.push(link);
+              }
+            }
+          });
+          if (selectedLinks.length > 0) {
+            graphRef.current.removeCells(selectedLinks);
+          }
         }
       }
-
-      // Configurer le zoom et le pan
-      await AreaExtensions.zoomAt(area, editor.getNodes());
     };
 
-    initializeEditor();
+    // Gérer le clic droit pour supprimer un lien
+    const handleLinkContextMenu = (evt: MouseEvent, link: dia.Link) => {
+      evt.preventDefault();
+      if (confirm("Voulez-vous supprimer ce lien ?")) {
+        graph.removeCells([link]);
+      }
+    };
+
+    // Ajouter les événements sur les liens pour le menu contextuel et la sélection
+    graph.getLinks().forEach((link) => {
+      const linkView = paper.findViewByModel(link.id);
+      if (linkView) {
+        linkView.on("contextmenu", (evt: dia.Event) => {
+          handleLinkContextMenu(evt as any, link);
+        });
+        if (isEditMode) {
+          linkView.on("pointerclick", () => {
+            // Marquer le lien comme sélectionné visuellement
+            link.attr("line/strokeWidth", (link.attr("line/strokeWidth") || 2) + 1);
+          });
+        }
+      }
+    });
+
+    if (handleKeyDownRef.current) {
+      window.addEventListener("keydown", handleKeyDownRef.current);
+    }
+
+    // Ajuster la vue pour voir tous les éléments
+    paper.scaleContentToFit({ padding: 20, minScale: 0.5, maxScale: 1 });
 
     return () => {
-      if (areaRef.current) {
-        areaRef.current.destroy();
-        areaRef.current = null;
+      // Nettoyer les événements de pan
+      window.removeEventListener('keydown', handlePanKeyDown);
+      window.removeEventListener('keyup', handlePanKeyUp);
+      container.removeEventListener('mousedown', handlePanStart);
+      container.removeEventListener('mousemove', handlePanMove);
+      container.removeEventListener('mouseup', handlePanEnd);
+      container.removeEventListener('mouseleave', handlePanEnd);
+      container.removeEventListener('wheel', handleWheel);
+      
+      if (handleKeyDownRef.current) {
+        window.removeEventListener("keydown", handleKeyDownRef.current);
       }
-      if (editorRef.current) {
-        editorRef.current.clear();
-        editorRef.current = null;
+      if (paperRef.current) {
+        paperRef.current.remove();
+        paperRef.current = null;
+      }
+      if (graphRef.current) {
+        graphRef.current.clear();
+        graphRef.current = null;
       }
     };
-  }, [topology]);
+  }, [topology, isEditMode, sourceNodeId]);
 
   const exportTopology = useCallback(
     (format: "csv" | "pdf") => {
@@ -599,161 +733,283 @@ const LanCartographyContent = () => {
 
   return (
     <div className="space-y-6">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Cartographie des LANs</h1>
-            <p className="text-muted-foreground">
-              Visualisation interactive des équipements et de leurs interconnexions réseau avec rete.js
-            </p>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap justify-end">
-            <Button
-              variant={isEditMode ? "default" : "outline"}
-              size="sm"
-              onClick={() => setIsEditMode(!isEditMode)}
-              className="gap-2"
-            >
-              <Plus className="h-4 w-4" />
-              {isEditMode ? "Mode édition" : "Mode visualisation"}
-            </Button>
-            <Select value={selectedTopologyId} onValueChange={setSelectedTopologyId}>
-              <SelectTrigger className="w-[220px]">
-                <SelectValue placeholder="Sélectionner un LAN" />
-              </SelectTrigger>
-              <SelectContent>
-                {topologies.map((lan) => (
-                  <SelectItem key={lan.id} value={lan.id}>
-                    {lan.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={async () => {
-                if (areaRef.current && editorRef.current) {
-                  await AreaExtensions.zoomAt(areaRef.current, editorRef.current.getNodes());
-                }
-              }}
-            >
-              <RefreshCcw className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" size="sm" className="gap-2" onClick={() => exportTopology("csv")}>
-              <FileSpreadsheet className="h-4 w-4" />
-              Export CSV
-            </Button>
-            <Button variant="outline" size="sm" className="gap-2" onClick={() => exportTopology("pdf")}>
-              <FileDown className="h-4 w-4" />
-              Export PDF
-            </Button>
-          </div>
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Cartographie des LANs</h1>
+          <p className="text-muted-foreground">
+            Visualisation interactive des équipements et de leurs interconnexions réseau avec JointJS
+          </p>
         </div>
+        <div className="flex items-center gap-2 flex-wrap justify-end">
+          <Select value={selectedTopologyId} onValueChange={setSelectedTopologyId}>
+            <SelectTrigger className="w-[220px]">
+              <SelectValue placeholder="Sélectionner un LAN" />
+            </SelectTrigger>
+            <SelectContent>
+              {topologies.map((lan) => (
+                <SelectItem key={lan.id} value={lan.id}>
+                  {lan.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            variant={isEditMode ? "default" : "outline"}
+            size="sm"
+            onClick={() => {
+              setIsEditMode(!isEditMode);
+              setSourceNodeId(null);
+            }}
+            className="gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            {isEditMode ? "Mode édition" : "Mode visualisation"}
+          </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => {
+              if (paperRef.current && graphRef.current) {
+                const cells = graphRef.current.getCells();
+                if (cells.length > 0) {
+                  paperRef.current.scaleContentToFit({ padding: 20, minScale: 0.5, maxScale: 1 });
+                }
+              }
+            }}
+          >
+            <RefreshCcw className="h-4 w-4" />
+          </Button>
+          <Button variant="outline" size="sm" className="gap-2" onClick={() => exportTopology("csv")}>
+            <FileSpreadsheet className="h-4 w-4" />
+            Export CSV
+          </Button>
+          <Button variant="outline" size="sm" className="gap-2" onClick={() => exportTopology("pdf")}>
+            <FileDown className="h-4 w-4" />
+            Export PDF
+          </Button>
+        </div>
+      </div>
 
-        <div className="grid grid-cols-1">
+      <div className="grid grid-cols-1">
+        <Card>
+          <CardHeader>
+            <CardTitle>{topology?.name}</CardTitle>
+            <CardDescription>
+              {topology?.description} — {topology?.subnet} ({topology?.vlan})
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex justify-center overflow-auto">
+            <div
+              ref={containerRef}
+              style={{
+                width: "100%",
+                maxWidth: "1400px",
+                margin: "0 auto",
+                height: "1200px",
+                minHeight: "1200px",
+                border: "1px solid #e5e7eb",
+                borderRadius: "8px",
+                backgroundColor: "#f9fafb",
+                position: "relative",
+                overflow: "auto",
+              }}
+            />
+          </CardContent>
+        </Card>
+      </div>
+
+      <Tabs defaultValue="legend" className="w-full">
+        <TabsList>
+          <TabsTrigger value="legend">Légende</TabsTrigger>
+          <TabsTrigger value="actions">Actions rapides</TabsTrigger>
+        </TabsList>
+        <TabsContent value="legend" className="mt-4">
           <Card>
-            <CardHeader>
-              <CardTitle>{topology?.name}</CardTitle>
-              <CardDescription>
-                {topology?.description} — {topology?.subnet} ({topology?.vlan})
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div
-                ref={containerRef}
-                style={{
-                  width: "100%",
-                  height: "600px",
-                  border: "1px dashed #e5e7eb",
-                  borderRadius: "8px",
-                  backgroundColor: "#f9fafb",
-                  position: "relative",
-                }}
-              />
-              <style>
-                {`
-                  /* Styles pour rendre les sockets visibles */
-                  [data-socket] {
-                    background: #3b82f6 !important;
-                    border: 2px solid white !important;
-                    width: 16px !important;
-                    height: 16px !important;
-                    border-radius: 50% !important;
-                    cursor: pointer !important;
-                    box-shadow: 0 2px 4px rgba(0,0,0,0.2) !important;
-                    transition: all 0.2s ease !important;
-                  }
-                  [data-socket]:hover {
-                    background: #2563eb !important;
-                    transform: scale(1.2) !important;
-                    box-shadow: 0 4px 8px rgba(0,0,0,0.3) !important;
-                  }
-                  [data-socket-input] {
-                    left: -8px !important;
-                  }
-                  [data-socket-output] {
-                    right: -8px !important;
-                  }
-                `}
-              </style>
+            <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-6 text-sm">
+              <div>
+                <p className="font-semibold">Rôles</p>
+                <p className="text-muted-foreground">Core (Bleu), Distribution (Bleu foncé), Access (Vert), Endpoint (Gris)</p>
+              </div>
+              <div>
+                <p className="font-semibold">Statuts</p>
+                <p className="text-muted-foreground">Vert = up, Orange = instable, Rouge = down, Gris = maintenance</p>
+              </div>
+              <div>
+                <p className="font-semibold">Types de lien</p>
+                <p className="text-muted-foreground">Fibre (épais), Cuivre (moyen), Sans-fil (pointillé)</p>
+              </div>
             </CardContent>
           </Card>
-        </div>
+        </TabsContent>
+        <TabsContent value="actions" className="mt-4">
+          <Card>
+            <CardContent className="pt-6">
+              <p className="text-sm text-muted-foreground mb-2">
+                <strong>Contrôles JointJS :</strong>
+              </p>
+              <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                <li>Glisser-déposer : Déplacer les nœuds en cliquant dessus et en les déplaçant</li>
+                <li>Déplacer le diagramme : Maintenir la touche <strong>Espace</strong> + clic gauche, ou utiliser le clic droit ou la molette pour déplacer tout le diagramme</li>
+                <li>Zoom : Maintenir <strong>Ctrl</strong> (ou <strong>Cmd</strong> sur Mac) + molette de la souris pour zoomer</li>
+                <li>Connexions : Les connexions sont automatiquement mises à jour lors du déplacement des nœuds</li>
+                <li>Cliquer sur un lien : Afficher les détails de la connexion</li>
+              </ul>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
-        <Tabs defaultValue="legend" className="w-full">
-          <TabsList>
-            <TabsTrigger value="legend">Légende</TabsTrigger>
-            <TabsTrigger value="actions">Actions rapides</TabsTrigger>
-          </TabsList>
-          <TabsContent value="legend" className="mt-4">
-            <Card>
-              <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-6 text-sm">
-                <div>
-                  <p className="font-semibold">Rôles</p>
-                  <p className="text-muted-foreground">Core (Bleu), Distribution (Bleu foncé), Access (Vert), Endpoint (Gris)</p>
+      <Dialog open={!!selectedLink} onOpenChange={(open) => !open && setSelectedLink(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Informations de la connexion</DialogTitle>
+            <DialogDescription>Détails de la liaison entre les équipements</DialogDescription>
+          </DialogHeader>
+          {selectedLink && (
+            <div className="space-y-4 mt-4">
+              <div className="grid grid-cols-1 gap-4">
+                <div className="space-y-2">
+                  <div className="text-sm font-semibold text-muted-foreground">Origine</div>
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium">
+                      {topology.nodes.find((n) => n.id === selectedLink.from)?.name || selectedLink.from}
+                    </span>
+                    {selectedLink.fromPort && (
+                      <span className="text-sm text-muted-foreground bg-muted px-2 py-1 rounded">
+                        Port: {selectedLink.fromPort}
+                      </span>
+                    )}
+                  </div>
+                  {topology.nodes.find((n) => n.id === selectedLink.from)?.ip && (
+                    <div className="text-sm text-muted-foreground font-mono">
+                      {topology.nodes.find((n) => n.id === selectedLink.from)?.ip}
+                    </div>
+                  )}
                 </div>
-                <div>
-                  <p className="font-semibold">Statuts</p>
-                  <p className="text-muted-foreground">Vert = up, Orange = instable, Rouge = down, Gris = maintenance</p>
+                <div className="space-y-2">
+                  <div className="text-sm font-semibold text-muted-foreground">Destination</div>
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium">
+                      {topology.nodes.find((n) => n.id === selectedLink.to)?.name || selectedLink.to}
+                    </span>
+                    {selectedLink.toPort && (
+                      <span className="text-sm text-muted-foreground bg-muted px-2 py-1 rounded">
+                        Port: {selectedLink.toPort}
+                      </span>
+                    )}
+                  </div>
+                  {topology.nodes.find((n) => n.id === selectedLink.to)?.ip && (
+                    <div className="text-sm text-muted-foreground font-mono">
+                      {topology.nodes.find((n) => n.id === selectedLink.to)?.ip}
+                    </div>
+                  )}
                 </div>
-                <div>
-                  <p className="font-semibold">Types de lien</p>
-                  <p className="text-muted-foreground">Fibre (épais), Cuivre (moyen), Sans-fil (pointillé)</p>
+              </div>
+              <div className="pt-4 border-t space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold text-muted-foreground">Type</span>
+                  <span className="capitalize font-medium">{selectedLink.type}</span>
                 </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-          <TabsContent value="actions" className="mt-4">
-            <Card>
-              <CardContent className="pt-6">
-                <p className="text-sm text-muted-foreground mb-2">
-                  <strong>Contrôles rete.js :</strong>
-                </p>
-                <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
-                  <li>Glisser-déposer : Déplacer les nœuds en cliquant dessus et en les déplaçant</li>
-                  <li>Zoom : Utiliser la molette de la souris ou les contrôles de zoom</li>
-                  <li>Pan : Cliquer et glisser sur l&apos;arrière-plan pour déplacer la vue</li>
-                  <li>Connexions : Les connexions sont automatiquement mises à jour lors du déplacement des nœuds</li>
-                  <li>Ajouter un lien : Activez le mode édition, puis cliquez sur une sortie (output) d&apos;un nœud et faites glisser vers une entrée (input) d&apos;un autre nœud</li>
-                  <li>Supprimer un lien : En mode édition, cliquez sur une connexion pour la sélectionner, puis utilisez la touche Suppr ou le bouton de suppression</li>
-                </ul>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold text-muted-foreground">VLAN</span>
+                  <span className="font-medium">{selectedLink.vlan}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold text-muted-foreground">Bande passante</span>
+                  <span className="font-medium">{selectedLink.bandwidth}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold text-muted-foreground">Statut</span>
+                  <span
+                    className={`px-2 py-1 rounded text-xs font-medium ${
+                      selectedLink.status === "up"
+                        ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                        : selectedLink.status === "warn"
+                          ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
+                          : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+                    }`}
+                  >
+                    {selectedLink.status === "up" ? "Actif" : selectedLink.status === "warn" ? "Avertissement" : "Inactif"}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+      <Dialog open={!!selectedNode} onOpenChange={(open) => !open && setSelectedNode(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Informations de l'équipement</DialogTitle>
+            <DialogDescription>Détails du nœud sélectionné</DialogDescription>
+          </DialogHeader>
+          {selectedNode && (
+            <div className="space-y-4 mt-4 text-sm">
+              <div className="space-y-1">
+                <p className="text-lg font-semibold">{selectedNode.name}</p>
+                <p className="text-muted-foreground">{selectedNode.site}</p>
+              </div>
+              <div className="grid grid-cols-1 gap-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium">Rôle</span>
+                  <span className="capitalize">{selectedNode.role}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="font-medium">Statut</span>
+                  <span
+                    className={`px-2 py-1 rounded text-xs font-medium ${
+                      selectedNode.status === "up"
+                        ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                        : selectedNode.status === "warn"
+                          ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
+                          : selectedNode.status === "down"
+                            ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+                            : "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200"
+                    }`}
+                  >
+                    {selectedNode.status}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="font-medium">Adresse IP</span>
+                  <span className="font-mono">{selectedNode.ip}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="font-medium">Modèle</span>
+                  <span>{selectedNode.model}</span>
+                </div>
+              </div>
+              {selectedNode.notes && (
+                <div className="space-y-1">
+                  <span className="font-medium">Notes</span>
+                  <p className="text-muted-foreground">{selectedNode.notes}</p>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
 
 const LanCartography = () => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!isLoading && !isAuthenticated) {
       navigate("/login");
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, isLoading, navigate]);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-muted-foreground">Chargement...</div>
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     return null;
