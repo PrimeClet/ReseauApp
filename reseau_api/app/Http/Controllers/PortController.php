@@ -15,7 +15,7 @@ class PortController extends Controller
         if (!auth()->user()->isAdministrator()) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
-        $query = Port::all();
+        $query = Port::query();
 
         if ($request->has('status')) {
             $query->where('status', $request->status);
@@ -28,7 +28,10 @@ class PortController extends Controller
             });
         }
 
-        $zone = $query->orderBy('name')->paginate(15);
+        $perPage = (int) $request->get('per_page', 15);
+        $perPage = $perPage > 0 && $perPage <= 100 ? $perPage : 15;
+
+        $zone = $query->orderBy('device_name')->paginate($perPage);
 
         return response()->json($zone);
     }

@@ -12,7 +12,7 @@ class LiaisonController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Liaison::all();
+        $query = Liaison::query();
 
         if ($request->has('status')) {
             $query->where('status', $request->status);
@@ -25,7 +25,10 @@ class LiaisonController extends Controller
             });
         }
 
-        $liaisons = $query->orderBy('name')->paginate(15);
+        $perPage = (int) $request->get('per_page', 15);
+        $perPage = $perPage > 0 && $perPage <= 100 ? $perPage : 15;
+
+        $liaisons = $query->orderBy('label')->paginate($perPage);
 
         return response()->json($liaisons);
     }

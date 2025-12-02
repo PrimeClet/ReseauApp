@@ -1,0 +1,1019 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Reseau Inventaire App API",
+    "version": "1.0.0",
+    "description": "Documentation statique minimale de l'API d'inventaire et de cartographie réseau."
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:8002",
+      "description": "Serveur local Laravel"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Token généré par Laravel Sanctum (Authorization: Bearer {token})"
+      }
+    },
+    "schemas": {
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "name": { "type": "string" },
+          "surname": { "type": "string" },
+          "username": { "type": "string" },
+          "email": { "type": "string", "format": "email" },
+          "phone": { "type": "string" },
+          "role": { "type": "string" },
+          "is_active": { "type": "boolean" }
+        }
+      },
+      "Coffret": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "code": { "type": "string" },
+          "name": { "type": "string" },
+          "piece": { "type": "string" },
+          "long": { "type": "number", "format": "float" },
+          "lat": { "type": "number", "format": "float" },
+          "status": { "type": "string" }
+        }
+      },
+      "Equipement": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "equipement_code": { "type": "string" },
+          "name": { "type": "string" },
+          "type": { "type": "string" },
+          "description": { "type": "string", "nullable": true },
+          "direction_in_out": { "type": "string", "nullable": true },
+          "vlan": { "type": "string", "nullable": true },
+          "ip_address": { "type": "string", "nullable": true },
+          "coffret_id": { "type": "integer" },
+          "status": { "type": "string" }
+        }
+      },
+      "Port": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "port_label": { "type": "string" },
+          "device_name": { "type": "string" },
+          "poe_enabled": { "type": "boolean" },
+          "vlan": { "type": "string", "nullable": true },
+          "speed": { "type": "string", "nullable": true },
+          "connected_equipment_id": { "type": "integer", "nullable": true }
+        }
+      },
+      "Metric": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "name": { "type": "string" },
+          "type": { "type": "string" },
+          "description": { "type": "string", "nullable": true },
+          "last_value": { "type": "string", "nullable": true },
+          "coffret_id": { "type": "integer" },
+          "status": { "type": "boolean" }
+        }
+      },
+      "Liaison": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "from": { "type": "integer" },
+          "to": { "type": "integer" },
+          "label": { "type": "string" },
+          "media": { "type": "string" },
+          "length": { "type": "integer", "nullable": true },
+          "status": { "type": "boolean" }
+        }
+      },
+      "System": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "name": { "type": "string" },
+          "type": { "type": "string" },
+          "description": { "type": "string", "nullable": true },
+          "vendor": { "type": "string", "nullable": true },
+          "endpoint": { "type": "string", "nullable": true },
+          "monitored_scope": { "type": "string", "nullable": true },
+          "coffret_id": { "type": "integer" },
+          "status": { "type": "boolean" }
+        }
+      },
+      "LanNode": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "role": { "type": "string", "enum": ["core","distribution","access","endpoint"] },
+          "status": { "type": "string", "enum": ["up","warn","down","maintenance"] },
+          "position": {
+            "type": "object",
+            "properties": {
+              "x": { "type": "number" },
+              "y": { "type": "number" }
+            }
+          },
+          "site": { "type": "string" },
+          "ip": { "type": "string", "nullable": true },
+          "model": { "type": "string", "nullable": true },
+          "notes": { "type": "string", "nullable": true },
+          "icon": { "type": "string", "nullable": true }
+        }
+      },
+      "LanLink": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "from": { "type": "string" },
+          "to": { "type": "string" },
+          "type": { "type": "string", "enum": ["fiber","copper","wireless"] },
+          "vlan": { "type": "string", "nullable": true },
+          "status": { "type": "string", "enum": ["up","warn","down"] },
+          "bandwidth": { "type": "string", "nullable": true },
+          "fromPort": { "type": "string", "nullable": true },
+          "toPort": { "type": "string", "nullable": true }
+        }
+      },
+      "LanTopology": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "subnet": { "type": "string", "nullable": true },
+          "vlan": { "type": "string", "nullable": true },
+          "description": { "type": "string", "nullable": true },
+          "nodes": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/LanNode" }
+          },
+          "links": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/LanLink" }
+          }
+        }
+      }
+    }
+  },
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/api/auth/login": {
+      "post": {
+        "tags": ["Authentification"],
+        "summary": "Authentifier un utilisateur et récupérer un token",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["username", "password"],
+                "properties": {
+                  "username": { "type": "string" },
+                  "password": { "type": "string", "format": "password" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Connexion réussie ou informations invalides"
+          }
+        }
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "tags": ["Authentification"],
+        "summary": "Profil de l'utilisateur connecté",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Utilisateur connecté",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/User" }
+              }
+            }
+          },
+          "401": { "description": "Non authentifié" }
+        }
+      }
+    },
+    "/api/coffrets": {
+      "get": {
+        "tags": ["Coffrets"],
+        "summary": "Lister les coffrets",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "schema": { "type": "string" },
+            "required": false,
+            "description": "Filtrer par statut"
+          },
+          {
+            "in": "query",
+            "name": "search",
+            "schema": { "type": "string" },
+            "required": false,
+            "description": "Recherche par nom"
+          }
+        ],
+        "responses": {
+          "200": { "description": "Liste paginée de coffrets" },
+          "401": { "description": "Non authentifié" },
+          "403": { "description": "Non autorisé" }
+        }
+      },
+      "post": {
+        "tags": ["Coffrets"],
+        "summary": "Créer un coffret",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name", "piece", "long", "lat"],
+                "properties": {
+                  "name": { "type": "string" },
+                  "piece": { "type": "string" },
+                  "long": { "type": "number", "format": "float" },
+                  "lat": { "type": "number", "format": "float" },
+                  "status": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Coffret créé" },
+          "401": { "description": "Non authentifié" },
+          "403": { "description": "Non autorisé" },
+          "422": { "description": "Erreur de validation" }
+        }
+      }
+    },
+    "/api/coffrets/{id}": {
+      "get": {
+        "tags": ["Coffrets"],
+        "summary": "Afficher un coffret",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Coffret",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Coffret" }
+              }
+            }
+          },
+          "404": { "description": "Coffret introuvable" }
+        }
+      },
+      "put": {
+        "tags": ["Coffrets"],
+        "summary": "Mettre à jour un coffret",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "piece": { "type": "string" },
+                  "long": { "type": "number", "format": "float" },
+                  "lat": { "type": "number", "format": "float" },
+                  "status": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Coffret mis à jour" }
+        }
+      },
+      "delete": {
+        "tags": ["Coffrets"],
+        "summary": "Supprimer un coffret",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Coffret supprimé" }
+        }
+      }
+    },
+    "/api/equipements": {
+      "get": {
+        "tags": ["Equipements"],
+        "summary": "Lister les équipements",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "schema": { "type": "string" },
+            "required": false,
+            "description": "Filtrer par statut (active, inactive, maintenance)"
+          },
+          {
+            "in": "query",
+            "name": "search",
+            "schema": { "type": "string" },
+            "required": false,
+            "description": "Recherche par nom"
+          }
+        ],
+        "responses": {
+          "200": { "description": "Liste paginée d'équipements" },
+          "401": { "description": "Non authentifié" },
+          "403": { "description": "Non autorisé" }
+        }
+      },
+      "post": {
+        "tags": ["Equipements"],
+        "summary": "Créer un équipement",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["equipement_code","name","type","coffret_id","status"],
+                "properties": {
+                  "equipement_code": { "type": "string" },
+                  "name": { "type": "string" },
+                  "type": { "type": "string" },
+                  "description": { "type": "string" },
+                  "direction_in_out": { "type": "string" },
+                  "vlan": { "type": "string" },
+                  "ip_address": { "type": "string" },
+                  "coffret_id": { "type": "integer" },
+                  "status": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Équipement créé" },
+          "401": { "description": "Non authentifié" },
+          "403": { "description": "Non autorisé" },
+          "422": { "description": "Erreur de validation" }
+        }
+      }
+    },
+    "/api/equipements/{id}": {
+      "get": {
+        "tags": ["Equipements"],
+        "summary": "Afficher un équipement",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Équipement",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Equipement" }
+              }
+            }
+          },
+          "404": { "description": "Introuvable" }
+        }
+      },
+      "put": {
+        "tags": ["Equipements"],
+        "summary": "Mettre à jour un équipement",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "equipement_code": { "type": "string" },
+                  "name": { "type": "string" },
+                  "type": { "type": "string" },
+                  "description": { "type": "string" },
+                  "direction_in_out": { "type": "string" },
+                  "vlan": { "type": "string" },
+                  "ip_address": { "type": "string" },
+                  "coffret_id": { "type": "integer" },
+                  "status": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Équipement mis à jour" }
+        }
+      },
+      "delete": {
+        "tags": ["Equipements"],
+        "summary": "Supprimer un équipement",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Équipement supprimé" }
+        }
+      }
+    },
+    "/api/ports": {
+      "get": {
+        "tags": ["Ports"],
+        "summary": "Lister les ports",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "schema": { "type": "string" },
+            "required": false,
+            "description": "Filtrer par statut (si applicable)"
+          },
+          {
+            "in": "query",
+            "name": "search",
+            "schema": { "type": "string" },
+            "required": false,
+            "description": "Recherche par nom d'équipement"
+          }
+        ],
+        "responses": {
+          "200": { "description": "Liste paginée de ports" },
+          "401": { "description": "Non authentifié" },
+          "403": { "description": "Non autorisé" }
+        }
+      },
+      "post": {
+        "tags": ["Ports"],
+        "summary": "Créer un port",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["port_label","device_name","poe_enabled"],
+                "properties": {
+                  "port_label": { "type": "string" },
+                  "device_name": { "type": "string" },
+                  "poe_enabled": { "type": "boolean" },
+                  "vlan": { "type": "string" },
+                  "speed": { "type": "string" },
+                  "connected_equipment_id": { "type": "integer" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Port créé" },
+          "401": { "description": "Non authentifié" },
+          "403": { "description": "Non autorisé" },
+          "422": { "description": "Erreur de validation" }
+        }
+      }
+    },
+    "/api/ports/{id}": {
+      "get": {
+        "tags": ["Ports"],
+        "summary": "Afficher un port",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Port",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Port" }
+              }
+            }
+          },
+          "404": { "description": "Introuvable" }
+        }
+      },
+      "put": {
+        "tags": ["Ports"],
+        "summary": "Mettre à jour un port",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "port_label": { "type": "string" },
+                  "device_name": { "type": "string" },
+                  "poe_enabled": { "type": "boolean" },
+                  "vlan": { "type": "string" },
+                  "speed": { "type": "string" },
+                  "connected_equipment_id": { "type": "integer" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Port mis à jour" }
+        }
+      },
+      "delete": {
+        "tags": ["Ports"],
+        "summary": "Supprimer un port",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Port supprimé" }
+        }
+      }
+    },
+    "/api/metrics": {
+      "get": {
+        "tags": ["Metrics"],
+        "summary": "Lister les métriques",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Liste paginée de métriques" }
+        }
+      },
+      "post": {
+        "tags": ["Metrics"],
+        "summary": "Créer une métrique",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name","type","coffret_id","status"],
+                "properties": {
+                  "name": { "type": "string" },
+                  "type": { "type": "string" },
+                  "description": { "type": "string" },
+                  "last_value": { "type": "string" },
+                  "coffret_id": { "type": "integer" },
+                  "status": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Métrique créée" }
+        }
+      }
+    },
+    "/api/metrics/{id}": {
+      "get": {
+        "tags": ["Metrics"],
+        "summary": "Afficher une métrique",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Métrique",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Metric" }
+              }
+            }
+          },
+          "404": { "description": "Introuvable" }
+        }
+      },
+      "put": {
+        "tags": ["Metrics"],
+        "summary": "Mettre à jour une métrique",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "type": { "type": "string" },
+                  "description": { "type": "string" },
+                  "last_value": { "type": "string" },
+                  "coffret_id": { "type": "integer" },
+                  "status": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Métrique mise à jour" }
+        }
+      },
+      "delete": {
+        "tags": ["Metrics"],
+        "summary": "Supprimer une métrique",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Métrique supprimée" }
+        }
+      }
+    },
+    "/api/liaisons": {
+      "get": {
+        "tags": ["Liaisons"],
+        "summary": "Lister les liaisons",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Liste paginée de liaisons" }
+        }
+      },
+      "post": {
+        "tags": ["Liaisons"],
+        "summary": "Créer une liaison",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["from","to","label","media","status"],
+                "properties": {
+                  "from": { "type": "integer" },
+                  "to": { "type": "integer" },
+                  "label": { "type": "string" },
+                  "media": { "type": "string" },
+                  "length": { "type": "integer" },
+                  "status": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Liaison créée" }
+        }
+      }
+    },
+    "/api/liaisons/{id}": {
+      "get": {
+        "tags": ["Liaisons"],
+        "summary": "Afficher une liaison",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Liaison",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Liaison" }
+              }
+            }
+          },
+          "404": { "description": "Introuvable" }
+        }
+      },
+      "put": {
+        "tags": ["Liaisons"],
+        "summary": "Mettre à jour une liaison",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "from": { "type": "integer" },
+                  "to": { "type": "integer" },
+                  "label": { "type": "string" },
+                  "media": { "type": "string" },
+                  "length": { "type": "integer" },
+                  "status": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Liaison mise à jour" }
+        }
+      },
+      "delete": {
+        "tags": ["Liaisons"],
+        "summary": "Supprimer une liaison",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Liaison supprimée" }
+        }
+      }
+    },
+    "/api/systems": {
+      "get": {
+        "tags": ["Systems"],
+        "summary": "Lister les systèmes",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Liste paginée de systèmes" }
+        }
+      },
+      "post": {
+        "tags": ["Systems"],
+        "summary": "Créer un système",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name","type","coffret_id","status"],
+                "properties": {
+                  "name": { "type": "string" },
+                  "type": { "type": "string" },
+                  "description": { "type": "string" },
+                  "vendor": { "type": "string" },
+                  "endpoint": { "type": "string" },
+                  "monitored_scope": { "type": "string" },
+                  "coffret_id": { "type": "integer" },
+                  "status": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Système créé" }
+        }
+      }
+    },
+    "/api/systems/{id}": {
+      "get": {
+        "tags": ["Systems"],
+        "summary": "Afficher un système",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Système",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/System" }
+              }
+            }
+          },
+          "404": { "description": "Introuvable" }
+        }
+      },
+      "put": {
+        "tags": ["Systems"],
+        "summary": "Mettre à jour un système",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "type": { "type": "string" },
+                  "description": { "type": "string" },
+                  "vendor": { "type": "string" },
+                  "endpoint": { "type": "string" },
+                  "monitored_scope": { "type": "string" },
+                  "coffret_id": { "type": "integer" },
+                  "status": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Système mis à jour" }
+        }
+      },
+      "delete": {
+        "tags": ["Systems"],
+        "summary": "Supprimer un système",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Système supprimé" }
+        }
+      }
+    },
+    "/api/cartography/lans": {
+      "get": {
+        "tags": ["Cartography"],
+        "summary": "Lister les topologies LAN disponibles",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Liste des topologies",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/LanTopology" }
+                }
+              }
+            }
+          },
+          "401": { "description": "Non authentifié" },
+          "403": { "description": "Non autorisé" }
+        }
+      }
+    },
+    "/api/cartography/lans/{id}": {
+      "get": {
+        "tags": ["Cartography"],
+        "summary": "Afficher une topologie LAN",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Topologie détaillée",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/LanTopology" }
+              }
+            }
+          },
+          "404": { "description": "Topologie introuvable" }
+        }
+      }
+    }
+  }
+}
+
+

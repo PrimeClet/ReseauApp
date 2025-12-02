@@ -12,7 +12,7 @@ class SystemController extends Controller
      */
     public function index(Request $request)
     {
-        $query = System::all();
+        $query = System::query();
 
         if ($request->has('status')) {
             $query->where('status', $request->status);
@@ -25,13 +25,10 @@ class SystemController extends Controller
             });
         }
 
-        $count = 15;
+        $perPage = (int) $request->get('per_page', $request->get('count', 15));
+        $perPage = $perPage > 0 && $perPage <= 100 ? $perPage : 15;
 
-        if ($request->has('count')) {
-            $count = $request->count;
-        }
-
-        $systems = $query->orderBy('name')->paginate($count);
+        $systems = $query->orderBy('name')->paginate($perPage);
 
         return response()->json($systems);
     }

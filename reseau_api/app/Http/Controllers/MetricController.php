@@ -12,7 +12,7 @@ class MetricController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Metric::all();
+        $query = Metric::query();
 
         if ($request->has('status')) {
             $query->where('status', $request->status);
@@ -25,7 +25,10 @@ class MetricController extends Controller
             });
         }
 
-        $metrics = $query->orderBy('name')->paginate(15);
+        $perPage = (int) $request->get('per_page', 15);
+        $perPage = $perPage > 0 && $perPage <= 100 ? $perPage : 15;
+
+        $metrics = $query->orderBy('name')->paginate($perPage);
 
         return response()->json($metrics);
     }
