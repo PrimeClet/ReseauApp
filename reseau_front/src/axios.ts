@@ -2,12 +2,15 @@
 import axios from 'axios';
 import { store } from '@/store/store'; // ton Redux store
 
+// Configuration de l'URL de base de l'API
+// En développement, utiliser l'API locale Laravel
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
 const api = axios.create({
-  baseURL: 'https://bypass-api.jobs-conseil.tech/api',
+  baseURL: API_BASE_URL,
   headers: {
-    'Content-Type': 'application/x-www-form-urlencoded',
-     "ngrok-skip-browser-warning": "true" 
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
   },
 });
 

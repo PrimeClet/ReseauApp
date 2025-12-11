@@ -65,7 +65,7 @@ class CoffretController extends Controller
          *     )
          * )
          */
-        $query = Coffret::with('equipments', 'metrics')->get();
+        $query = Coffret::with('equipements', 'metrics');
 
          // Filtrage par statut et recherche par nom
 
@@ -76,13 +76,14 @@ class CoffretController extends Controller
         if ($request->has('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%");
+                $q->where('nom', 'like', "%{$search}%")
+                  ->orWhere('code', 'like', "%{$search}%");
             });
         }
 
-        $zone = $query->orderBy('name')->paginate(15);
+        $coffrets = $query->orderBy('nom')->paginate(15);
 
-        return response()->json($zone);
+        return response()->json($coffrets);
     }
 
     /**

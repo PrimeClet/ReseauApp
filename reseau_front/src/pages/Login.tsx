@@ -9,7 +9,7 @@ import { toast } from "@/hooks/use-toast";
 import { Loader2, Network } from "lucide-react";
 
 const Login = () => {
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
@@ -20,7 +20,7 @@ const Login = () => {
     setIsLoading(true);
 
     try {
-      const success = await login(email, password);
+      const success = await login(username, password);
       if (success) {
         toast({
           title: "Connexion réussie",
@@ -30,7 +30,7 @@ const Login = () => {
       } else {
         toast({
           title: "Erreur de connexion",
-          description: "Email ou mot de passe incorrect",
+          description: "Identifiant ou mot de passe incorrect",
           variant: "destructive",
         });
       }
@@ -60,13 +60,13 @@ const Login = () => {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="username">Identifiant (email ou username)</Label>
               <Input
-                id="email"
-                type="email"
-                placeholder="admin@telecom.fr"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                id="username"
+                type="text"
+                placeholder="admin ou admin@example.com"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 required
               />
             </div>
@@ -88,12 +88,9 @@ const Login = () => {
           </form>
           
           <div className="mt-6 p-4 bg-muted rounded-lg">
-            <p className="text-sm font-medium mb-2">Comptes de test :</p>
-            <div className="text-xs space-y-1">
-              <p><strong>Admin:</strong> admin@telecom.fr / admin123</p>
-              <p><strong>Technicien:</strong> tech@telecom.fr / tech123</p>
-              <p><strong>Utilisateur:</strong> user@telecom.fr / user123</p>
-            </div>
+            <p className="text-sm text-muted-foreground text-center">
+              Utilisez vos identifiants fournis par l'administrateur
+            </p>
           </div>
         </CardContent>
       </Card>

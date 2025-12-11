@@ -10,6 +10,7 @@ use App\Http\Controllers\LiaisonController;
 use App\Http\Controllers\SystemController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\CartographyController;
+use App\Http\Controllers\ImportController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -107,6 +108,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::middleware('permission:view_cartography')->group(function () {
             Route::get('/cartography/lans', [CartographyController::class, 'index']);
             Route::get('/cartography/lans/{id}', [CartographyController::class, 'show']);
+        });
+
+        // Import CSV
+        Route::middleware('permission:manage_inventory')->group(function () {
+            Route::post('/import', [ImportController::class, 'import']);
+            Route::get('/import/template/{type}', [ImportController::class, 'template']);
         });
 
         // Routes pour les utilisateurs (à activer si nécessaire)

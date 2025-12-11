@@ -19,6 +19,11 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Active la gestion des cookies / CSRF adaptée aux APIs stateful (Sanctum)
         $middleware->statefulApi();
+
+        // Ajouter le middleware CORS pour les requêtes API
+        $middleware->api(prepend: [
+            \Illuminate\Http\Middleware\HandleCors::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //
