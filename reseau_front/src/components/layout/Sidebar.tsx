@@ -115,20 +115,9 @@ export default function Sidebar({ activeSection, onSectionChange }: SidebarProps
   };
 
   return (
-    <div className="w-64 bg-nav-background border-r border-border flex flex-col overflow-hidden h-full">
-      {/* Header */}
-      <div className="p-6 border-b border-border">
-        <div className="flex items-center gap-2 text-primary">
-          <Server className="h-8 w-8" />
-          <div>
-            <h1 className="text-xl font-bold text-foreground">Réseau</h1>
-            <p className="text-sm text-muted-foreground">Tableau de bord</p>
-          </div>
-        </div>
-      </div>
-
+    <div className="flex flex-col h-full">
       {/* Navigation */}
-      <nav className="flex-1 px-4 overflow-y-auto">
+      <nav className="flex-1 px-3 py-4 overflow-y-auto">
         <div className="space-y-1">
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-3 pb-2">
             Navigation
@@ -299,13 +288,12 @@ export default function Sidebar({ activeSection, onSectionChange }: SidebarProps
       </nav>
 
       {/* Footer */}
-      <div className="p-4 border-t border-border">
+      <div className="p-3 border-t border-border">
         <div className="text-xs text-muted-foreground">
           <div className="flex items-center gap-2 mb-1">
             <div className="w-2 h-2 rounded-full bg-status-up"></div>
             <span>Système opérationnel</span>
           </div>
-          <div>Dernière synchro: il y a 5 min</div>
         </div>
       </div>
     </div>

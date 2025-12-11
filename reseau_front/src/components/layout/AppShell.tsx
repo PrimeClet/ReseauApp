@@ -43,16 +43,22 @@ export default function AppShell({
 
   return (
     <SidebarContext.Provider value={{ isSidebarOpen, toggleSidebar, setSidebarOpen }}>
-      <div className="flex h-screen bg-background flex-col overflow-hidden relative">
+      <div className="flex h-screen bg-background flex-col overflow-hidden">
+        {/* Fixed Navbar - full width */}
         <Navbar />
-        <div className="flex flex-1 min-h-0 overflow-hidden relative">
+
+        {/* Content area with sidebar */}
+        <div className="flex flex-1 min-h-0 overflow-hidden">
+          {/* Sidebar */}
           {isSidebarOpen && (
-            <div className="absolute top-0 left-0 z-40 h-full">
+            <aside className="w-64 shrink-0 border-r border-border bg-card overflow-y-auto">
               <Sidebar activeSection={activeSection} onSectionChange={onSectionChange} />
-            </div>
+            </aside>
           )}
-          <main className={`flex-1 overflow-auto min-w-0 transition-all duration-300 ${isSidebarOpen ? 'ml-64' : 'ml-0'}`}>
-            <div className="p-8">{children}</div>
+
+          {/* Main content */}
+          <main className="flex-1 overflow-auto min-w-0">
+            <div className="p-6">{children}</div>
           </main>
         </div>
       </div>

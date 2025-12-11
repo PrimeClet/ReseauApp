@@ -61,30 +61,33 @@ export default function Navbar() {
   };
 
   return (
-    <nav className={`h-16 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 relative z-50 transition-all duration-300 ${isSidebarOpen ? 'pl-64' : 'pl-0'}`}>
-      <div className="flex h-full items-center justify-between px-6">
-        {/* Left side - Logo and title */}
-        <div className="flex items-center gap-4">
+    <nav className="h-16 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 relative z-50">
+      <div className="flex h-full items-center px-4">
+        {/* Left side - Menu toggle and Logo */}
+        <div className="flex items-center gap-3">
           <Button
             variant="ghost"
             size="icon"
             onClick={toggleSidebar}
             title={isSidebarOpen ? "Masquer la sidebar" : "Afficher la sidebar"}
-            className="h-9 w-9"
+            className="h-9 w-9 shrink-0"
           >
             {isSidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </Button>
           <div className="flex items-center gap-2">
-            <Network className="h-6 w-6 text-primary" />
-            <div>
-              <h1 className="text-lg font-bold text-foreground">Réseau Inventaire</h1>
+            <Network className="h-6 w-6 text-primary shrink-0" />
+            <div className="hidden sm:block">
+              <h1 className="text-lg font-bold text-foreground leading-tight">Réseau Inventaire</h1>
               <p className="text-xs text-muted-foreground">Gestion de l'infrastructure réseau</p>
             </div>
           </div>
         </div>
 
+        {/* Spacer */}
+        <div className="flex-1" />
+
         {/* Right side - Status and user menu */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-4">
           {/* Notifications button */}
           <Button variant="ghost" size="icon" className="relative">
             <Bell className="h-5 w-5" />
