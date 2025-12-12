@@ -46,7 +46,20 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/20 via-background to-primary/10">
+    <div className="relative min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/20 via-background to-primary/10">
+      {isLoading && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/60 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-3 text-muted-foreground">
+            <div className="relative w-[200px] h-[200px] flex items-center justify-center">
+              <div className="absolute inset-0 rounded-full border-4 border-primary/30 border-t-primary animate-spin" />
+              <div className="w-[160px] h-[160px] bg-primary rounded-full flex items-center justify-center shadow-lg">
+                <Network className="w-[80px] h-[80px] text-primary-foreground" />
+              </div>
+            </div>
+            <span className="text-sm">Connexion en cours...</span>
+          </div>
+        </div>
+      )}
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="mx-auto mb-4 w-12 h-12 bg-primary rounded-full flex items-center justify-center">
