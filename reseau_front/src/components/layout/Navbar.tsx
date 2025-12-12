@@ -11,7 +11,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { Bell, LogOut, User, Network, Menu, X } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Bell, LogOut, User, Network, Menu, X, Search } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useSidebarToggle } from "@/components/layout/AppShell";
 
@@ -61,30 +62,65 @@ export default function Navbar() {
   };
 
   return (
-    <nav className={`h-16 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 relative z-50 transition-all duration-300 ${isSidebarOpen ? 'pl-64' : 'pl-0'}`}>
-      <div className="flex h-full items-center justify-between px-6">
-        {/* Left side - Logo and title */}
-        <div className="flex items-center gap-4">
+    <nav className="h-16 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 relative z-50">
+      <div className="flex h-full items-center px-4">
+        {/* Left side - Menu toggle */}
+        <div className="flex items-center gap-3">
           <Button
             variant="ghost"
             size="icon"
             onClick={toggleSidebar}
             title={isSidebarOpen ? "Masquer la sidebar" : "Afficher la sidebar"}
-            className="h-9 w-9"
+            className="h-9 w-9 shrink-0 hover:bg-muted transition-colors"
           >
-            {isSidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 20 20"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              className="stroke-current"
+            >
+              <rect
+                x="2"
+                y="3"
+                width="16"
+                height="14"
+                rx="1"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <line
+                x1="7"
+                y1="3"
+                x2="7"
+                y2="17"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
           </Button>
-          <div className="flex items-center gap-2">
-            <Network className="h-6 w-6 text-primary" />
-            <div>
-              <h1 className="text-lg font-bold text-foreground">Réseau Inventaire</h1>
-              <p className="text-xs text-muted-foreground">Gestion de l'infrastructure réseau</p>
-            </div>
+        </div>
+
+        {/* Search field */}
+        <div className="flex-1 max-w-md mx-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="search"
+              placeholder="Rechercher..."
+              className="pl-9 h-9 w-full"
+            />
           </div>
         </div>
 
+        {/* Spacer */}
+        <div className="flex-1" />
+
         {/* Right side - Status and user menu */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-4">
           {/* Notifications button */}
           <Button variant="ghost" size="icon" className="relative">
             <Bell className="h-5 w-5" />

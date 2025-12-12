@@ -11,6 +11,7 @@ import NotFound from "./pages/NotFound";
 import Profile from "./pages/Profile";
 import Batiments from "./pages/Batiments";
 import Salles from "./pages/Salles";
+import Armoires from "./pages/Armoires";
 import Roles from "./pages/Roles";
 import Permissions from "./pages/Permissions";
 import Lans from "./pages/Lans";
@@ -32,6 +33,7 @@ const App = () => (
               <Route path="/profile" element={<Profile />} />
               <Route path="/batiments" element={<Batiments />} />
               <Route path="/salles" element={<Salles />} />
+              <Route path="/armoires" element={<Armoires />} />
               <Route path="/roles" element={<Roles />} />
               <Route path="/permissions" element={<Permissions />} />
               <Route path="/lans" element={<Lans />} />

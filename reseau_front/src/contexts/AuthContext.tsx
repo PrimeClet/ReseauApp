@@ -1,15 +1,22 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { login as loginAction, logout as logoutAction } from '@/store/users';
+import { authService } from '@/services';
+import type { RootState } from '@/store/store';
 
 interface User {
-  id: string;
+  id: number;
   email: string;
   name: string;
-  role: 'admin' | 'user' | 'technician';
+  surname?: string;
+  username: string;
+  role: string;
+  is_active: boolean;
 }
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, password: string) => Promise<boolean>;
+  login: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
   isAuthenticated: boolean;
   isLoading: boolean;
@@ -17,77 +24,97 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Mock users data
-const mockUsers: (User & { password: string })[] = [
-  {
-    id: '1',
-    email: 'admin@telecom.fr',
-    password: 'admin123',
-    name: 'Administrateur',
-    role: 'admin'
-  },
-  {
-    id: '2',
-    email: 'tech@telecom.fr',
-    password: 'tech123',
-    name: 'Technicien Réseau',
-    role: 'technician'
-  },
-  {
-    id: '3',
-    email: 'user@telecom.fr',
-    password: 'user123',
-    name: 'Utilisateur',
-    role: 'user'
-  }
-];
-
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const dispatch = useDispatch();
+  const { user: reduxUser, token, isLogin } = useSelector((state: RootState) => state.user);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Map redux user to AuthContext user format
+  const user: User | null = reduxUser ? {
+    id: reduxUser.id,
+    email: reduxUser.email,
+    name: reduxUser.full_name || reduxUser.username,
+    username: reduxUser.username,
+    role: reduxUser.role,
+    is_active: reduxUser.is_active === 1
+  } : null;
+
   useEffect(() => {
-    // Check if user is stored in localStorage
-    const storedUser = localStorage.getItem('currentUser');
-    if (storedUser) {
-      try {
-        const parsedUser = JSON.parse(storedUser);
-        setUser(parsedUser);
-      } catch (error) {
-        console.error('Error parsing stored user:', error);
-        localStorage.removeItem('currentUser');
+    // Vérifier si l'utilisateur est connecté via le token Redux (persisté)
+    const checkAuth = async () => {
+      if (token && !reduxUser) {
+        try {
+          // Récupérer les infos utilisateur si on a un token mais pas d'user
+          const userData = await authService.me();
+          dispatch(loginAction({
+            user: {
+              id: userData.id,
+              username: userData.username,
+              email: userData.email,
+              full_name: `${userData.name} ${userData.surname}`,
+              role: userData.role,
+              is_active: userData.is_active ? 1 : 0
+            },
+            token: token
+          }));
+        } catch (error) {
+          // Token invalide, déconnecter
+          console.error('Token invalide:', error);
+          dispatch(logoutAction());
+        }
       }
-    }
-    setIsLoading(false);
-  }, []);
+      setIsLoading(false);
+    };
 
-  const login = async (email: string, password: string): Promise<boolean> => {
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const foundUser = mockUsers.find(u => u.email === email && u.password === password);
-    
-    if (foundUser) {
-      const userWithoutPassword = {
-        id: foundUser.id,
-        email: foundUser.email,
-        name: foundUser.name,
-        role: foundUser.role
-      };
-      setUser(userWithoutPassword);
-      localStorage.setItem('currentUser', JSON.stringify(userWithoutPassword));
-      return true;
+    checkAuth();
+  }, [token, reduxUser, dispatch]);
+
+  const login = async (username: string, password: string): Promise<boolean> => {
+    try {
+      const response = await authService.login({ username, password });
+
+      // Vérifier si la connexion a réussi (data n'est pas un tableau vide)
+      if (response.status === 200 && response.data && !Array.isArray(response.data)) {
+        const { user: apiUser, token: apiToken } = response.data;
+
+        // Dispatcher l'action Redux pour stocker l'utilisateur et le token
+        dispatch(loginAction({
+          user: {
+            id: apiUser.id,
+            username: apiUser.username,
+            email: apiUser.email,
+            full_name: `${apiUser.name} ${apiUser.surname}`,
+            role: apiUser.role,
+            is_active: apiUser.is_active ? 1 : 0
+          },
+          token: apiToken
+        }));
+
+        return true;
+      }
+
+      return false;
+    } catch (error) {
+      console.error('Erreur de connexion:', error);
+      return false;
     }
-    
-    return false;
   };
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem('currentUser');
+  const logout = async () => {
+    try {
+      // Appeler l'API de déconnexion si on a un token
+      if (token) {
+        await authService.logout();
+      }
+    } catch (error) {
+      console.error('Erreur lors de la déconnexion:', error);
+    } finally {
+      // Toujours déconnecter localement
+      dispatch(logoutAction());
+    }
   };
 
-  const isAuthenticated = !!user;
+  const isAuthenticated = !!isLogin && !!user;
 
   return (
     <AuthContext.Provider value={{ user, login, logout, isAuthenticated, isLoading }}>

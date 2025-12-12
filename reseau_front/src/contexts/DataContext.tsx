@@ -1,5 +1,43 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  coffretService,
+  equipementService,
+  portService,
+  liaisonService,
+  systemService,
+  lanService,
+  batimentService,
+  salleService,
+  maintenanceService,
+  statistiqueService
+} from '@/services';
+import type {
+  Coffret,
+  CoffretCreateData,
+  Equipement,
+  EquipementCreateData,
+  Port,
+  PortCreateData,
+  Liaison,
+  LiaisonCreateData,
+  System,
+  SystemCreateData,
+  Lan,
+  LanCreateData,
+  Batiment,
+  BatimentCreateData,
+  Salle,
+  SalleCreateData,
+  Maintenance,
+  MaintenanceCreateData,
+  GlobalStats
+} from '@/services';
 
+// Re-export types for compatibility
+export type { Coffret, Equipement, Port, Liaison, System, Lan, Batiment, Salle, Maintenance };
+
+// Legacy interfaces for backwards compatibility
 export interface Armoire {
   id: string;
   nom: string;
@@ -11,37 +49,19 @@ export interface Armoire {
   dateInstallation: string;
 }
 
-export interface Port {
+// Legacy Maintenance interface - deprecated, use Maintenance from @/services instead
+export interface MaintenanceLegacy {
   id: string;
-  nom: string;
+  equipement: string;
   type: string;
-  vitesse: string;
-  etat: string;
-  armoire: string;
-  vlan: string;
+  date: string;
+  heure: string;
+  duree: string;
+  technicien: string;
+  priorite: string;
   description: string;
-}
-
-export interface Liaison {
-  id: string;
-  nom: string;
-  type: string;
-  origine: string;
-  destination: string;
-  etat: string;
-  bande: string;
-  latence: string;
-}
-
-export interface Systeme {
-  id: string;
-  nom: string;
-  type: string;
-  version: string;
-  etat: string;
-  cpu: string;
-  memoire: string;
-  stockage: string;
+  statut: string;
+  dateCreation: string;
 }
 
 export interface Equipment {
@@ -56,263 +76,612 @@ export interface Equipment {
   description?: string;
 }
 
-export interface Maintenance {
+export interface Systeme {
   id: string;
-  equipement: string;
+  nom: string;
   type: string;
-  date: string;
-  heure: string;
-  duree: string;
-  technicien: string;
-  priorite: string;
-  description: string;
-  statut: string;
-  dateCreation: string;
+  version: string;
+  etat: string;
+  cpu: string;
+  memoire: string;
+  stockage: string;
 }
 
 interface DataContextType {
-  armoires: Armoire[];
+  // API Data
+  coffrets: Coffret[];
+  equipements: Equipement[];
   ports: Port[];
   liaisons: Liaison[];
-  systemes: Systeme[];
-  equipments: Equipment[];
+  systems: System[];
+  lans: Lan[];
+  batiments: Batiment[];
+  salles: Salle[];
   maintenances: Maintenance[];
+  globalStats: GlobalStats | null;
+
+  // Loading states
+  isLoadingCoffrets: boolean;
+  isLoadingEquipements: boolean;
+  isLoadingPorts: boolean;
+  isLoadingLiaisons: boolean;
+  isLoadingSystems: boolean;
+  isLoadingLans: boolean;
+  isLoadingBatiments: boolean;
+  isLoadingSalles: boolean;
+  isLoadingMaintenances: boolean;
+  isLoadingStats: boolean;
+
+  // Error states
+  coffretError: Error | null;
+  equipementError: Error | null;
+  portError: Error | null;
+  liaisonError: Error | null;
+  systemError: Error | null;
+  lanError: Error | null;
+  batimentError: Error | null;
+  salleError: Error | null;
+  maintenanceError: Error | null;
+
+  // CRUD operations
+  addCoffret: (data: CoffretCreateData) => Promise<Coffret>;
+  updateCoffret: (id: number, data: Partial<CoffretCreateData>) => Promise<Coffret>;
+  deleteCoffret: (id: number) => Promise<void>;
+
+  addEquipement: (data: EquipementCreateData) => Promise<Equipement>;
+  updateEquipement: (id: number, data: Partial<EquipementCreateData>) => Promise<Equipement>;
+  deleteEquipement: (id: number) => Promise<void>;
+
+  addPort: (data: PortCreateData) => Promise<Port>;
+  updatePort: (id: number, data: Partial<PortCreateData>) => Promise<Port>;
+  deletePort: (id: number) => Promise<void>;
+
+  addLiaison: (data: LiaisonCreateData) => Promise<Liaison>;
+  updateLiaison: (id: number, data: Partial<LiaisonCreateData>) => Promise<Liaison>;
+  deleteLiaison: (id: number) => Promise<void>;
+
+  addSystem: (data: SystemCreateData) => Promise<System>;
+  updateSystem: (id: number, data: Partial<SystemCreateData>) => Promise<System>;
+  deleteSystem: (id: number) => Promise<void>;
+
+  addLan: (data: LanCreateData) => Promise<Lan>;
+  updateLan: (id: number, data: Partial<LanCreateData>) => Promise<Lan>;
+  deleteLan: (id: number) => Promise<void>;
+
+  addBatiment: (data: BatimentCreateData) => Promise<Batiment>;
+  updateBatiment: (id: number, data: Partial<BatimentCreateData>) => Promise<Batiment>;
+  deleteBatiment: (id: number) => Promise<void>;
+
+  addSalle: (data: SalleCreateData) => Promise<Salle>;
+  updateSalle: (id: number, data: Partial<SalleCreateData>) => Promise<Salle>;
+  deleteSalle: (id: number) => Promise<void>;
+
+  addMaintenance: (data: MaintenanceCreateData) => Promise<Maintenance>;
+  updateMaintenance: (id: number, data: Partial<MaintenanceCreateData>) => Promise<Maintenance>;
+  deleteMaintenance: (id: number) => Promise<void>;
+
+  // Refresh functions
+  refetchCoffrets: () => void;
+  refetchEquipements: () => void;
+  refetchPorts: () => void;
+  refetchLiaisons: () => void;
+  refetchSystems: () => void;
+  refetchLans: () => void;
+  refetchBatiments: () => void;
+  refetchSalles: () => void;
+  refetchMaintenances: () => void;
+  refetchStats: () => void;
+
+  // Legacy compatibility (will be removed later)
+  armoires: Armoire[];
+  maintenancesLegacy: MaintenanceLegacy[];
+  equipments: Equipment[];
+  systemes: Systeme[];
   addArmoire: (armoire: Omit<Armoire, 'id'>) => void;
-  addPort: (port: Omit<Port, 'id'>) => void;
-  addLiaison: (liaison: Omit<Liaison, 'id'>) => void;
-  addSysteme: (systeme: Omit<Systeme, 'id'>) => void;
+  addMaintenanceLegacy: (maintenance: Omit<MaintenanceLegacy, 'id'>) => void;
   addEquipment: (equipment: Omit<Equipment, 'id'>) => void;
-  addMaintenance: (maintenance: Omit<Maintenance, 'id'>) => void;
+  addSysteme: (systeme: Omit<Systeme, 'id'>) => void;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
-// Mock initial data
-const initialArmoires: Armoire[] = [
-  {
-    id: '1',
-    nom: 'ARM-001',
-    emplacement: 'Salle serveur A',
-    type: '42U',
-    capacite: '80%',
-    temperature: '22°C',
-    etat: 'Actif',
-    dateInstallation: '2023-01-15'
-  },
-  {
-    id: '2',
-    nom: 'ARM-002',
-    emplacement: 'Salle serveur B',
-    type: '36U',
-    capacite: '65%',
-    temperature: '24°C',
-    etat: 'Actif',
-    dateInstallation: '2023-02-20'
-  }
-];
-
-const initialPorts: Port[] = [
-  {
-    id: '1',
-    nom: 'Port-01',
-    type: 'RJ45',
-    vitesse: '1 Gbps',
-    etat: 'Actif',
-    armoire: 'ARM-001',
-    vlan: 'VLAN-100',
-    description: 'Port principal'
-  },
-  {
-    id: '2',
-    nom: 'Port-02',
-    type: 'Fibre',
-    vitesse: '10 Gbps',
-    etat: 'Actif',
-    armoire: 'ARM-001',
-    vlan: 'VLAN-200',
-    description: 'Port backbone'
-  }
-];
-
-const initialLiaisons: Liaison[] = [
-  {
-    id: '1',
-    nom: 'LIA-001',
-    type: 'Fibre optique',
-    origine: 'Site A',
-    destination: 'Site B',
-    etat: 'Actif',
-    bande: '100 Mbps',
-    latence: '5ms'
-  },
-  {
-    id: '2',
-    nom: 'LIA-002',
-    type: 'MPLS',
-    origine: 'Site B',
-    destination: 'Site C',
-    etat: 'Actif',
-    bande: '50 Mbps',
-    latence: '12ms'
-  }
-];
-
-const initialSystemes: Systeme[] = [
-  {
-    id: '1',
-    nom: 'SRV-001',
-    type: 'Serveur Web',
-    version: 'Ubuntu 22.04',
-    etat: 'En ligne',
-    cpu: '45%',
-    memoire: '68%',
-    stockage: '34%'
-  },
-  {
-    id: '2',
-    nom: 'SRV-002',
-    type: 'Base de données',
-    version: 'PostgreSQL 15',
-    etat: 'En ligne',
-    cpu: '32%',
-    memoire: '78%',
-    stockage: '56%'
-  }
-];
-
-const initialEquipments: Equipment[] = [
-  {
-    id: 'EQ-001',
-    nom: 'Switch-001',
-    type: 'switch',
-    modele: 'Cisco C9300-24P',
-    armoire: 'ARM-001',
-    etat: 'actif',
-    ip: '192.168.1.10',
-    uptime: '45j 12h'
-  },
-  {
-    id: 'EQ-002',
-    nom: 'Router-001',
-    type: 'routeur',
-    modele: 'Juniper MX204',
-    armoire: 'ARM-002',
-    etat: 'actif',
-    ip: '192.168.1.1',
-    uptime: '72j 8h'
-  },
-  {
-    id: 'EQ-003',
-    nom: 'Switch-002',
-    type: 'switch',
-    modele: 'HP 2930F',
-    armoire: 'ARM-003',
-    etat: 'maintenance',
-    ip: '192.168.1.11',
-    uptime: '0j 0h'
-  }
-];
-
-const initialMaintenances: Maintenance[] = [
-  {
-    id: 'MAINT-001',
-    equipement: 'ARM-002',
-    type: 'preventive',
-    date: '2024-03-15',
-    heure: '14:00',
-    duree: '2h',
-    technicien: 'Jean Dupont',
-    priorite: 'moyenne',
-    description: 'Maintenance préventive standard',
-    statut: 'planifiee',
-    dateCreation: '2024-03-10'
-  },
-  {
-    id: 'MAINT-002',
-    equipement: 'LIA-001',
-    type: 'corrective',
-    date: '2024-03-11',
-    heure: '09:00',
-    duree: '4h',
-    technicien: 'Marie Martin',
-    priorite: 'haute',
-    description: 'Réparation liaison défaillante',
-    statut: 'en-cours',
-    dateCreation: '2024-03-08'
-  }
-];
-
 export const DataProvider = ({ children }: { children: React.ReactNode }) => {
-  const [armoires, setArmoires] = useState<Armoire[]>(initialArmoires);
-  const [ports, setPorts] = useState<Port[]>(initialPorts);
-  const [liaisons, setLiaisons] = useState<Liaison[]>(initialLiaisons);
-  const [systemes, setSystemes] = useState<Systeme[]>(initialSystemes);
-  const [equipments, setEquipments] = useState<Equipment[]>(initialEquipments);
-  const [maintenances, setMaintenances] = useState<Maintenance[]>(initialMaintenances);
+  const queryClient = useQueryClient();
 
-  const addArmoire = (armoire: Omit<Armoire, 'id'>) => {
-    const newArmoire = {
-      ...armoire,
-      id: Date.now().toString()
-    };
-    setArmoires(prev => [...prev, newArmoire]);
+  // Queries
+  const {
+    data: coffretData,
+    isLoading: isLoadingCoffrets,
+    error: coffretError,
+    refetch: refetchCoffrets
+  } = useQuery({
+    queryKey: ['coffrets'],
+    queryFn: () => coffretService.getAll(),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    retry: 1, // Réessayer seulement 1 fois en cas d'erreur
+    retryDelay: 1000, // Attendre 1 seconde avant de réessayer
+  });
+
+  const {
+    data: equipementData,
+    isLoading: isLoadingEquipements,
+    error: equipementError,
+    refetch: refetchEquipements
+  } = useQuery({
+    queryKey: ['equipements'],
+    queryFn: () => equipementService.getAll(),
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+    retryDelay: 1000,
+  });
+
+  const {
+    data: portData,
+    isLoading: isLoadingPorts,
+    error: portError,
+    refetch: refetchPorts
+  } = useQuery({
+    queryKey: ['ports'],
+    queryFn: () => portService.getAll(),
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+    retryDelay: 1000,
+  });
+
+  const {
+    data: liaisonData,
+    isLoading: isLoadingLiaisons,
+    error: liaisonError,
+    refetch: refetchLiaisons
+  } = useQuery({
+    queryKey: ['liaisons'],
+    queryFn: () => liaisonService.getAll(),
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+    retryDelay: 1000,
+  });
+
+  const {
+    data: systemData,
+    isLoading: isLoadingSystems,
+    error: systemError,
+    refetch: refetchSystems
+  } = useQuery({
+    queryKey: ['systems'],
+    queryFn: () => systemService.getAll(),
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+    retryDelay: 1000,
+  });
+
+  const {
+    data: lanData,
+    isLoading: isLoadingLans,
+    error: lanError,
+    refetch: refetchLans
+  } = useQuery({
+    queryKey: ['lans'],
+    queryFn: () => lanService.getAll(),
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+    retryDelay: 1000,
+  });
+
+  const {
+    data: batimentData,
+    isLoading: isLoadingBatiments,
+    error: batimentError,
+    refetch: refetchBatiments
+  } = useQuery({
+    queryKey: ['batiments'],
+    queryFn: () => batimentService.getAll(),
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+    retryDelay: 1000,
+  });
+
+  const {
+    data: salleData,
+    isLoading: isLoadingSalles,
+    error: salleError,
+    refetch: refetchSalles
+  } = useQuery({
+    queryKey: ['salles'],
+    queryFn: () => salleService.getAll(),
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+    retryDelay: 1000,
+  });
+
+  const {
+    data: maintenanceData,
+    isLoading: isLoadingMaintenances,
+    error: maintenanceError,
+    refetch: refetchMaintenances
+  } = useQuery({
+    queryKey: ['maintenances'],
+    queryFn: () => maintenanceService.getAll(),
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+    retryDelay: 1000,
+  });
+
+  const {
+    data: globalStats,
+    isLoading: isLoadingStats,
+    refetch: refetchStats
+  } = useQuery({
+    queryKey: ['globalStats'],
+    queryFn: () => statistiqueService.getGlobalStats(),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Mutations - Coffrets
+  const createCoffretMutation = useMutation({
+    mutationFn: coffretService.create,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['coffrets'] }),
+  });
+
+  const updateCoffretMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: Partial<CoffretCreateData> }) =>
+      coffretService.update(id, data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['coffrets'] }),
+  });
+
+  const deleteCoffretMutation = useMutation({
+    mutationFn: coffretService.delete,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['coffrets'] }),
+  });
+
+  // Mutations - Equipements
+  const createEquipementMutation = useMutation({
+    mutationFn: equipementService.create,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['equipements'] }),
+  });
+
+  const updateEquipementMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: Partial<EquipementCreateData> }) =>
+      equipementService.update(id, data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['equipements'] }),
+  });
+
+  const deleteEquipementMutation = useMutation({
+    mutationFn: equipementService.delete,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['equipements'] }),
+  });
+
+  // Mutations - Ports
+  const createPortMutation = useMutation({
+    mutationFn: portService.create,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['ports'] }),
+  });
+
+  const updatePortMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: Partial<PortCreateData> }) =>
+      portService.update(id, data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['ports'] }),
+  });
+
+  const deletePortMutation = useMutation({
+    mutationFn: portService.delete,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['ports'] }),
+  });
+
+  // Mutations - Liaisons
+  const createLiaisonMutation = useMutation({
+    mutationFn: liaisonService.create,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['liaisons'] }),
+  });
+
+  const updateLiaisonMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: Partial<LiaisonCreateData> }) =>
+      liaisonService.update(id, data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['liaisons'] }),
+  });
+
+  const deleteLiaisonMutation = useMutation({
+    mutationFn: liaisonService.delete,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['liaisons'] }),
+  });
+
+  // Mutations - Systems
+  const createSystemMutation = useMutation({
+    mutationFn: systemService.create,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['systems'] }),
+  });
+
+  const updateSystemMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: Partial<SystemCreateData> }) =>
+      systemService.update(id, data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['systems'] }),
+  });
+
+  const deleteSystemMutation = useMutation({
+    mutationFn: systemService.delete,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['systems'] }),
+  });
+
+  // Mutations - LANs
+  const createLanMutation = useMutation({
+    mutationFn: lanService.create,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['lans'] }),
+  });
+
+  const updateLanMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: Partial<LanCreateData> }) =>
+      lanService.update(id, data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['lans'] }),
+  });
+
+  const deleteLanMutation = useMutation({
+    mutationFn: lanService.delete,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['lans'] }),
+  });
+
+  // Mutations - Batiments
+  const createBatimentMutation = useMutation({
+    mutationFn: batimentService.create,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['batiments'] }),
+  });
+
+  const updateBatimentMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: Partial<BatimentCreateData> }) =>
+      batimentService.update(id, data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['batiments'] }),
+  });
+
+  const deleteBatimentMutation = useMutation({
+    mutationFn: batimentService.delete,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['batiments'] }),
+  });
+
+  // Mutations - Salles
+  const createSalleMutation = useMutation({
+    mutationFn: salleService.create,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['salles'] }),
+  });
+
+  const updateSalleMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: Partial<SalleCreateData> }) =>
+      salleService.update(id, data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['salles'] }),
+  });
+
+  const deleteSalleMutation = useMutation({
+    mutationFn: salleService.delete,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['salles'] }),
+  });
+
+  // Mutations - Maintenances
+  const createMaintenanceMutation = useMutation({
+    mutationFn: maintenanceService.create,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['maintenances'] }),
+  });
+
+  const updateMaintenanceMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: Partial<MaintenanceCreateData> }) =>
+      maintenanceService.update(id, data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['maintenances'] }),
+  });
+
+  const deleteMaintenanceMutation = useMutation({
+    mutationFn: maintenanceService.delete,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['maintenances'] }),
+  });
+
+  // Helper functions
+  const addCoffret = async (data: CoffretCreateData) => {
+    return createCoffretMutation.mutateAsync(data);
   };
 
-  const addPort = (port: Omit<Port, 'id'>) => {
-    const newPort = {
-      ...port,
-      id: Date.now().toString()
-    };
-    setPorts(prev => [...prev, newPort]);
+  const updateCoffret = async (id: number, data: Partial<CoffretCreateData>) => {
+    return updateCoffretMutation.mutateAsync({ id, data });
   };
 
-  const addLiaison = (liaison: Omit<Liaison, 'id'>) => {
-    const newLiaison = {
-      ...liaison,
-      id: Date.now().toString()
-    };
-    setLiaisons(prev => [...prev, newLiaison]);
+  const deleteCoffret = async (id: number) => {
+    return deleteCoffretMutation.mutateAsync(id);
   };
 
-  const addSysteme = (systeme: Omit<Systeme, 'id'>) => {
-    const newSysteme = {
-      ...systeme,
-      id: Date.now().toString()
-    };
-    setSystemes(prev => [...prev, newSysteme]);
+  const addEquipement = async (data: EquipementCreateData) => {
+    return createEquipementMutation.mutateAsync(data);
   };
 
-  const addEquipment = (equipment: Omit<Equipment, 'id'>) => {
-    const newEquipment = {
-      ...equipment,
-      id: Date.now().toString()
-    };
-    setEquipments(prev => [...prev, newEquipment]);
+  const updateEquipement = async (id: number, data: Partial<EquipementCreateData>) => {
+    return updateEquipementMutation.mutateAsync({ id, data });
   };
 
-  const addMaintenance = (maintenance: Omit<Maintenance, 'id'>) => {
-    const newMaintenance = {
-      ...maintenance,
-      id: Date.now().toString()
-    };
-    setMaintenances(prev => [...prev, newMaintenance]);
+  const deleteEquipement = async (id: number) => {
+    return deleteEquipementMutation.mutateAsync(id);
+  };
+
+  const addPort = async (data: PortCreateData) => {
+    return createPortMutation.mutateAsync(data);
+  };
+
+  const updatePort = async (id: number, data: Partial<PortCreateData>) => {
+    return updatePortMutation.mutateAsync({ id, data });
+  };
+
+  const deletePort = async (id: number) => {
+    return deletePortMutation.mutateAsync(id);
+  };
+
+  const addLiaison = async (data: LiaisonCreateData) => {
+    return createLiaisonMutation.mutateAsync(data);
+  };
+
+  const updateLiaison = async (id: number, data: Partial<LiaisonCreateData>) => {
+    return updateLiaisonMutation.mutateAsync({ id, data });
+  };
+
+  const deleteLiaison = async (id: number) => {
+    return deleteLiaisonMutation.mutateAsync(id);
+  };
+
+  const addSystem = async (data: SystemCreateData) => {
+    return createSystemMutation.mutateAsync(data);
+  };
+
+  const updateSystem = async (id: number, data: Partial<SystemCreateData>) => {
+    return updateSystemMutation.mutateAsync({ id, data });
+  };
+
+  const deleteSystem = async (id: number) => {
+    return deleteSystemMutation.mutateAsync(id);
+  };
+
+  const addLan = async (data: LanCreateData) => {
+    return createLanMutation.mutateAsync(data);
+  };
+
+  const updateLan = async (id: number, data: Partial<LanCreateData>) => {
+    return updateLanMutation.mutateAsync({ id, data });
+  };
+
+  const deleteLan = async (id: number) => {
+    return deleteLanMutation.mutateAsync(id);
+  };
+
+  const addBatiment = async (data: BatimentCreateData) => {
+    return createBatimentMutation.mutateAsync(data);
+  };
+
+  const updateBatiment = async (id: number, data: Partial<BatimentCreateData>) => {
+    return updateBatimentMutation.mutateAsync({ id, data });
+  };
+
+  const deleteBatiment = async (id: number) => {
+    return deleteBatimentMutation.mutateAsync(id);
+  };
+
+  const addSalle = async (data: SalleCreateData) => {
+    return createSalleMutation.mutateAsync(data);
+  };
+
+  const updateSalle = async (id: number, data: Partial<SalleCreateData>) => {
+    return updateSalleMutation.mutateAsync({ id, data });
+  };
+
+  const deleteSalle = async (id: number) => {
+    return deleteSalleMutation.mutateAsync(id);
+  };
+
+  const addMaintenance = async (data: MaintenanceCreateData) => {
+    return createMaintenanceMutation.mutateAsync(data);
+  };
+
+  const updateMaintenance = async (id: number, data: Partial<MaintenanceCreateData>) => {
+    return updateMaintenanceMutation.mutateAsync({ id, data });
+  };
+
+  const deleteMaintenance = async (id: number) => {
+    return deleteMaintenanceMutation.mutateAsync(id);
+  };
+
+  // Legacy compatibility functions (no-op for now)
+  const addArmoire = () => {
+    console.warn('addArmoire is deprecated, use addCoffret instead');
+  };
+  const addMaintenanceLegacy = () => {
+    console.warn('addMaintenanceLegacy is deprecated, use addMaintenance instead');
+  };
+  const addEquipment = () => {
+    console.warn('addEquipment is deprecated, use addEquipement instead');
+  };
+  const addSysteme = () => {
+    console.warn('addSysteme is deprecated, use addSystem instead');
+  };
+
+  const value: DataContextType = {
+    // API Data
+    coffrets: coffretData?.data || [],
+    equipements: equipementData?.data || [],
+    ports: portData?.data || [],
+    liaisons: liaisonData?.data || [],
+    systems: systemData?.data || [],
+    lans: lanData?.data || [],
+    batiments: batimentData?.data || [],
+    salles: salleData?.data || [],
+    maintenances: maintenanceData?.data || [],
+    globalStats: globalStats || null,
+
+    // Loading states
+    isLoadingCoffrets,
+    isLoadingEquipements,
+    isLoadingPorts,
+    isLoadingLiaisons,
+    isLoadingSystems,
+    isLoadingLans,
+    isLoadingBatiments,
+    isLoadingSalles,
+    isLoadingMaintenances,
+    isLoadingStats,
+
+    // Error states
+    coffretError: coffretError as Error | null,
+    equipementError: equipementError as Error | null,
+    portError: portError as Error | null,
+    liaisonError: liaisonError as Error | null,
+    systemError: systemError as Error | null,
+    lanError: lanError as Error | null,
+    batimentError: batimentError as Error | null,
+    salleError: salleError as Error | null,
+    maintenanceError: maintenanceError as Error | null,
+
+    // CRUD operations
+    addCoffret,
+    updateCoffret,
+    deleteCoffret,
+    addEquipement,
+    updateEquipement,
+    deleteEquipement,
+    addPort,
+    updatePort,
+    deletePort,
+    addLiaison,
+    updateLiaison,
+    deleteLiaison,
+    addSystem,
+    updateSystem,
+    deleteSystem,
+    addLan,
+    updateLan,
+    deleteLan,
+    addBatiment,
+    updateBatiment,
+    deleteBatiment,
+    addSalle,
+    updateSalle,
+    deleteSalle,
+    addMaintenance,
+    updateMaintenance,
+    deleteMaintenance,
+
+    // Refresh functions
+    refetchCoffrets,
+    refetchEquipements,
+    refetchPorts,
+    refetchLiaisons,
+    refetchSystems,
+    refetchLans,
+    refetchBatiments,
+    refetchSalles,
+    refetchMaintenances,
+    refetchStats,
+
+    // Legacy compatibility
+    armoires: [],
+    maintenancesLegacy: [],
+    equipments: [],
+    systemes: [],
+    addArmoire,
+    addMaintenanceLegacy,
+    addEquipment,
+    addSysteme,
   };
 
   return (
-    <DataContext.Provider value={{
-      armoires,
-      ports,
-      liaisons,
-      systemes,
-      equipments,
-      maintenances,
-      addArmoire,
-      addPort,
-      addLiaison,
-      addSysteme,
-      addEquipment,
-      addMaintenance
-    }}>
+    <DataContext.Provider value={value}>
       {children}
     </DataContext.Provider>
   );

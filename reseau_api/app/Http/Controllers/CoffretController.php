@@ -65,7 +65,7 @@ class CoffretController extends Controller
          *     )
          * )
          */
-        $query = Coffret::with('equipments', 'metrics')->get();
+        $query = Coffret::with('equipements', 'metrics', 'batiment', 'salle');
 
          // Filtrage par statut et recherche par nom
 
@@ -76,13 +76,14 @@ class CoffretController extends Controller
         if ($request->has('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%");
+                $q->where('nom', 'like', "%{$search}%")
+                  ->orWhere('code', 'like', "%{$search}%");
             });
         }
 
-        $zone = $query->orderBy('name')->paginate(15);
+        $coffrets = $query->orderBy('nom')->paginate(15);
 
-        return response()->json($zone);
+        return response()->json($coffrets);
     }
 
     /**
@@ -131,25 +132,36 @@ class CoffretController extends Controller
         }
 
         $request->validate([
-            'name' => 'required|string|max:255',
-            'piece' => 'required|string',
-            'long' => 'required|numeric',
-            'lat' => 'required|numeric',
+            'nom' => 'required|string|max:255',
+            'piece' => 'required|string|max:255',
+            'long' => 'nullable|numeric',
+            'lat' => 'nullable|numeric',
+            'batiment_id' => 'nullable|exists:batiments,id',
+            'salle_id' => 'nullable|exists:salles,id',
             'status' => 'sometimes|in:active,inactive,maintenance',
         ]);
 
+        // Générer automatiquement le code si non fourni
+        $code = $request->code;
+        if (empty($code)) {
+            $code = $this->generateCoffretCode();
+        }
+
         $coffret = Coffret::create([
-            'name' => $request->name,
+            'code' => $code,
+            'nom' => $request->nom,
             'piece' => $request->piece,
-            'long' => $request->long,
-            'lat' => $request->lat,
-            'status' => $request->status ?? 'active', // Valeur par défaut si non fournie
+            'long' => $request->long ?? 0,
+            'lat' => $request->lat ?? 0,
+            'batiment_id' => $request->batiment_id,
+            'salle_id' => $request->salle_id,
+            'status' => $request->status ?? 'active',
         ]);
     
         // Retourner une réponse JSON
         return response()->json([
             'message' => 'Coffret créé avec succès.',
-            'coffret' => $coffret,
+            'data' => $coffret,
         ], 201);
 
     }
@@ -182,7 +194,38 @@ class CoffretController extends Controller
          *     )
          * )
          */
-        return response()->json($coffret);
+        return response()->json([
+            'data' => $coffret->load('equipements', 'metrics', 'batiment', 'salle')
+        ]);
+    }
+
+    /**
+     * Génère un code coffret unique au format CF-001, CF-002, etc.
+     */
+    private function generateCoffretCode(): string
+    {
+        // Récupérer tous les coffrets avec un code au format CF-XXX
+        $coffrets = Coffret::where('code', 'like', 'CF-%')
+            ->get();
+
+        $maxNumber = 0;
+        
+        foreach ($coffrets as $coffret) {
+            // Extraire le numéro du code (après "CF-")
+            $code = $coffret->code;
+            if (preg_match('/^CF-(\d+)$/', $code, $matches)) {
+                $number = (int) $matches[1];
+                if ($number > $maxNumber) {
+                    $maxNumber = $number;
+                }
+            }
+        }
+
+        // Incrémenter pour obtenir le prochain numéro
+        $newNumber = $maxNumber + 1;
+
+        // Formater avec des zéros à gauche (CF-001, CF-002, etc.)
+        return 'CF-' . str_pad($newNumber, 3, '0', STR_PAD_LEFT);
     }
 
     /**
@@ -224,20 +267,23 @@ class CoffretController extends Controller
         
          // Validation des données
         $request->validate([
-            'name' => 'sometimes|string|max:255',
-            'piece' => 'sometimes|string',
+            'code' => 'sometimes|string|max:255|unique:coffrets,code,' . $coffret->id,
+            'nom' => 'sometimes|string|max:255',
+            'piece' => 'sometimes|string|max:255',
             'long' => 'sometimes|numeric',
             'lat' => 'sometimes|numeric',
+            'batiment_id' => 'nullable|exists:batiments,id',
+            'salle_id' => 'nullable|exists:salles,id',
             'status' => 'sometimes|in:active,inactive,maintenance',
         ]);
 
         // Mise à jour des champs fournis
-        $coffret->update($request->only(['name', 'piece', 'long', 'lat', 'status']));
+        $coffret->update($request->only(['code', 'nom', 'piece', 'long', 'lat', 'batiment_id', 'salle_id', 'status']));
 
         // Retourner une réponse JSON
         return response()->json([
             'message' => 'Coffret mis à jour avec succès.',
-            'coffret' => $coffret,
+            'data' => $coffret,
         ], 200);
     }
 

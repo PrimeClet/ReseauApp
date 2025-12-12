@@ -22,19 +22,32 @@ class Liaison extends Model
     ];
 
     /**
-     * Relation avec le modèle Equipement (source).
+     * Relation avec le modèle Port (source).
      */
-    public function fromEquipement()
+    public function fromPort()
     {
-        return $this->belongsTo(Equipement::class, 'from');
+        return $this->belongsTo(Port::class, 'from');
     }
 
     /**
-     * Relation avec le modèle Equipement (destination).
+     * Relation avec le modèle Port (destination).
      */
+    public function toPort()
+    {
+        return $this->belongsTo(Port::class, 'to');
+    }
+
+    /**
+     * Relations avec les équipements via les ports (pour compatibilité).
+     */
+    public function fromEquipement()
+    {
+        return $this->hasOneThrough(Equipement::class, Port::class, 'id', 'id', 'from', 'equipement_id');
+    }
+
     public function toEquipement()
     {
-        return $this->belongsTo(Equipement::class, 'to');
+        return $this->hasOneThrough(Equipement::class, Port::class, 'id', 'id', 'to', 'equipement_id');
     }
 
     

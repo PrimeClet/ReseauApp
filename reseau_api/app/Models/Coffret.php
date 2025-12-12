@@ -10,10 +10,10 @@ class Coffret extends Model
     use HasFactory;
     
     protected $fillable = [
-        'code', 'nom', 'piece', 'long', 'lat', 'status'
+        'code', 'nom', 'piece', 'long', 'lat', 'status', 'batiment_id', 'salle_id'
     ];
 
-    public function equipments()
+    public function equipements()
     {
         return $this->hasMany(Equipement::class);
     }
@@ -21,5 +21,15 @@ class Coffret extends Model
     public function metrics()
     {
         return $this->hasMany(Metric::class);
+    }
+
+    public function batiment()
+    {
+        return $this->belongsTo(Batiment::class);
+    }
+
+    public function salle()
+    {
+        return $this->belongsTo(Salle::class);
     }
 }

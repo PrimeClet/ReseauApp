@@ -43,8 +43,20 @@ export default function LiaisonsSection() {
 
       <DataTableEnhanced
         title={`${liaisons.length} liaisons configurées`}
-        columns={["nom", "type", "origine", "destination", "etat", "bande", "latence"]}
-        data={liaisons}
+        columns={["Label", "Média", "Port origine", "Port destination", "Longueur", "Statut"]}
+        data={liaisons.map((liaison) => ({
+          id: liaison.id,
+          Label: liaison.label || '-',
+          Média: liaison.media || '-',
+          "Port origine": liaison.from_port 
+            ? `${liaison.from_port.port_label} - ${liaison.from_port.device_name}${liaison.from_port.equipement ? ` (${liaison.from_port.equipement.name})` : ''}`
+            : '-',
+          "Port destination": liaison.to_port
+            ? `${liaison.to_port.port_label} - ${liaison.to_port.device_name}${liaison.to_port.equipement ? ` (${liaison.to_port.equipement.name})` : ''}`
+            : '-',
+          Longueur: liaison.length ? `${liaison.length} m` : '-',
+          Statut: liaison.status ? 'Actif' : 'Inactif',
+        }))}
         onRowClick={handleRowClick}
         onEdit={handleEdit}
       />

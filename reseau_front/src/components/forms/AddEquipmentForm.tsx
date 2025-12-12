@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -9,18 +9,21 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { useData, Equipment } from "@/contexts/DataContext";
+import { useData } from "@/contexts/DataContext";
 import { Plus } from "lucide-react";
+import { EquipementCreateData } from "@/services/equipementService";
 
 const equipmentSchema = z.object({
-  nom: z.string().min(1, "Le nom est requis"),
+  name: z.string().min(1, "Le nom est requis"),
   type: z.string().min(1, "Le type est requis"),
-  modele: z.string().min(1, "Le modèle est requis"),
-  armoire: z.string().min(1, "L'armoire est requise"),
-  ip: z.string().min(1, "L'adresse IP est requise"),
-  etat: z.string().min(1, "L'état est requis"),
-  uptime: z.string().default("0j 0h"),
   description: z.string().optional(),
+  direction_in_out: z.string().optional(),
+  vlan: z.string().optional(),
+  ip_address: z.string().optional(),
+  coffret_id: z.number().min(1, "Le coffret est requis"),
+  batiment_id: z.number().optional().nullable(),
+  salle_id: z.number().optional().nullable(),
+  status: z.enum(["active", "inactive", "maintenance"]),
 });
 
 type EquipmentFormData = z.infer<typeof equipmentSchema>;
@@ -28,32 +31,73 @@ type EquipmentFormData = z.infer<typeof equipmentSchema>;
 export default function AddEquipmentForm() {
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
-  const { armoires, addEquipment } = useData();
+  const { coffrets, batiments, salles, addEquipement, isLoadingCoffrets, isLoadingBatiments, isLoadingSalles } = useData();
+  const [filteredSalles, setFilteredSalles] = useState(salles || []);
 
   const form = useForm<EquipmentFormData>({
     resolver: zodResolver(equipmentSchema),
     defaultValues: {
-      nom: "",
+      name: "",
       type: "",
-      modele: "",
-      armoire: "",
-      ip: "",
-      etat: "actif",
-      uptime: "0j 0h",
       description: "",
+      direction_in_out: "",
+      vlan: "",
+      ip_address: "",
+      coffret_id: undefined,
+      batiment_id: undefined,
+      salle_id: undefined,
+      status: "active",
     },
   });
 
-  const onSubmit = (data: EquipmentFormData) => {
-    addEquipment(data as Omit<Equipment, 'id'>);
-    
-    toast({
-      title: "Équipement ajouté",
-      description: "L'équipement a été ajouté avec succès",
-    });
-    
-    form.reset();
-    setOpen(false);
+  const selectedBatimentId = form.watch("batiment_id");
+
+  // Filtrer les salles selon le bâtiment sélectionné
+  useEffect(() => {
+    if (selectedBatimentId && salles) {
+      const filtered = salles.filter((salle) => salle.batiment_id === selectedBatimentId);
+      setFilteredSalles(filtered);
+      // Réinitialiser la salle si elle n'appartient pas au nouveau bâtiment
+      const currentSalleId = form.getValues("salle_id");
+      if (currentSalleId && !filtered.find((s) => s.id === currentSalleId)) {
+        form.setValue("salle_id", undefined);
+      }
+    } else {
+      setFilteredSalles(salles || []);
+    }
+  }, [selectedBatimentId, salles, form]);
+
+  const onSubmit = async (data: EquipmentFormData) => {
+    try {
+      const equipementData: EquipementCreateData = {
+        name: data.name,
+        type: data.type,
+        description: data.description || undefined,
+        direction_in_out: data.direction_in_out || undefined,
+        vlan: data.vlan || undefined,
+        ip_address: data.ip_address || undefined,
+        coffret_id: data.coffret_id,
+        batiment_id: data.batiment_id || undefined,
+        salle_id: data.salle_id || undefined,
+        status: data.status,
+      };
+
+      await addEquipement(equipementData);
+      
+      toast({
+        title: "Équipement ajouté",
+        description: "L'équipement a été ajouté avec succès",
+      });
+      
+      form.reset();
+      setOpen(false);
+    } catch (error: any) {
+      toast({
+        title: "Erreur",
+        description: error?.response?.data?.message || "Une erreur est survenue lors de l'ajout de l'équipement",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -64,32 +108,33 @@ export default function AddEquipmentForm() {
           Ajouter équipement
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Ajouter un nouvel équipement</DialogTitle>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Nom *</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Ex: Switch-001" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="nom"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Nom</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Ex: Switch-001" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
               <FormField
                 control={form.control}
                 name="type"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Type</FormLabel>
+                    <FormLabel>Type *</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger>
@@ -109,38 +154,26 @@ export default function AddEquipmentForm() {
                   </FormItem>
                 )}
               />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
-                name="modele"
+                name="coffret_id"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Modèle</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Ex: Cisco C9300-24P" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="armoire"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Armoire</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormLabel>Coffret *</FormLabel>
+                    <Select
+                      onValueChange={(value) => field.onChange(parseInt(value))}
+                      value={field.value?.toString()}
+                      disabled={isLoadingCoffrets}
+                    >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Sélectionner l'armoire" />
+                          <SelectValue placeholder="Sélectionner le coffret" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {armoires.map((armoire) => (
-                          <SelectItem key={armoire.id} value={armoire.nom}>
-                            {armoire.nom}
+                        {coffrets?.map((coffret) => (
+                          <SelectItem key={coffret.id} value={coffret.id.toString()}>
+                            {coffret.nom || coffret.code}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -154,7 +187,80 @@ export default function AddEquipmentForm() {
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
-                name="ip"
+                name="batiment_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Bâtiment</FormLabel>
+                    <Select
+                      onValueChange={(value) => {
+                        if (value === "none") {
+                          field.onChange(undefined);
+                        } else {
+                          field.onChange(parseInt(value));
+                        }
+                      }}
+                      value={field.value?.toString() || "none"}
+                      disabled={isLoadingBatiments}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Sélectionner le bâtiment (optionnel)" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">Aucun</SelectItem>
+                        {batiments?.map((batiment) => (
+                          <SelectItem key={batiment.id} value={batiment.id.toString()}>
+                            {batiment.nom}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="salle_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Salle</FormLabel>
+                    <Select
+                      onValueChange={(value) => {
+                        if (value === "none") {
+                          field.onChange(undefined);
+                        } else {
+                          field.onChange(parseInt(value));
+                        }
+                      }}
+                      value={field.value?.toString() || "none"}
+                      disabled={isLoadingSalles || !selectedBatimentId}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder={selectedBatimentId ? "Sélectionner la salle (optionnel)" : "Sélectionnez d'abord un bâtiment"} />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">Aucune</SelectItem>
+                        {filteredSalles?.map((salle) => (
+                          <SelectItem key={salle.id} value={salle.id.toString()}>
+                            {salle.nom}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+              <FormField
+                control={form.control}
+                name="ip_address"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Adresse IP</FormLabel>
@@ -167,10 +273,23 @@ export default function AddEquipmentForm() {
               />
               <FormField
                 control={form.control}
-                name="etat"
+                name="vlan"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>État</FormLabel>
+                    <FormLabel>VLAN</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Ex: VLAN-10" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="status"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>État *</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger>
@@ -178,10 +297,9 @@ export default function AddEquipmentForm() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="actif">Actif</SelectItem>
-                        <SelectItem value="inactif">Inactif</SelectItem>
+                        <SelectItem value="active">Actif</SelectItem>
+                        <SelectItem value="inactive">Inactif</SelectItem>
                         <SelectItem value="maintenance">Maintenance</SelectItem>
-                        <SelectItem value="erreur">Erreur</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />

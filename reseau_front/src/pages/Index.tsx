@@ -1,9 +1,5 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import AppShell from "@/components/layout/AppShell";
 import DashboardOverview from "@/components/dashboard/DashboardOverview";
@@ -14,9 +10,6 @@ import PortsSection from "@/components/sections/PortsSection";
 import MaintenanceSection from "@/components/sections/MaintenanceSection";
 import ParametresSection from "@/components/sections/ParametresSection";
 import UsersSection from "@/components/sections/UsersSection";
-import TypesSection from "@/components/sections/TypesSection";
-
-const queryClient = new QueryClient();
 
 const Index = () => {
   const [activeSection, setActiveSection] = useState("dashboard");
@@ -66,23 +59,15 @@ const Index = () => {
         return <ParametresSection />;
       case "users":
         return <UsersSection />;
-      case "types":
-        return <TypesSection />;
       default:
         return <DashboardOverview />;
     }
   };
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <AppShell activeSection={activeSection} onSectionChange={setActiveSection}>
-          {renderContent()}
-        </AppShell>
-      </TooltipProvider>
-    </QueryClientProvider>
+    <AppShell activeSection={activeSection} onSectionChange={setActiveSection}>
+      {renderContent()}
+    </AppShell>
   );
 };
 

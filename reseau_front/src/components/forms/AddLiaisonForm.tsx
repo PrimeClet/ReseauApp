@@ -5,57 +5,64 @@ import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Switch } from "@/components/ui/switch";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useData } from "@/contexts/DataContext";
 import { toast } from "@/hooks/use-toast";
 import { Plus } from "lucide-react";
 
 const liaisonSchema = z.object({
-  nom: z.string().min(1, "Le nom est requis"),
-  type: z.string().min(1, "Le type est requis"),
-  origine: z.string().min(1, "L'origine est requise"),
-  destination: z.string().min(1, "La destination est requise"),
-  etat: z.string().min(1, "L'état est requis"),
-  bande: z.string().min(1, "La bande passante est requise"),
-  latence: z.string().min(1, "La latence est requise")
+  label: z.string().min(1, "Le label est requis"),
+  media: z.string().min(1, "Le média est requis"),
+  from: z.number().min(1, "Le port d'origine est requis"),
+  to: z.number().min(1, "Le port de destination est requis"),
+  length: z.number().optional().nullable(),
+  status: z.boolean().default(true),
 });
 
 type LiaisonFormData = z.infer<typeof liaisonSchema>;
 
 const AddLiaisonForm = () => {
   const [open, setOpen] = useState(false);
-  const { addLiaison } = useData();
+  const { addLiaison, refetchLiaisons, ports, isLoadingPorts } = useData();
 
   const form = useForm<LiaisonFormData>({
     resolver: zodResolver(liaisonSchema),
     defaultValues: {
-      nom: "",
-      type: "",
-      origine: "",
-      destination: "",
-      etat: "Actif",
-      bande: "",
-      latence: ""
+      label: "",
+      media: "",
+      from: undefined,
+      to: undefined,
+      length: undefined,
+      status: true,
     }
   });
 
-  const onSubmit = (data: LiaisonFormData) => {
-    addLiaison({
-      nom: data.nom!,
-      type: data.type!,
-      origine: data.origine!,
-      destination: data.destination!,
-      etat: data.etat!,
-      bande: data.bande!,
-      latence: data.latence!
-    });
-    toast({
-      title: "Liaison ajoutée",
-      description: `La liaison ${data.nom} a été ajoutée avec succès`,
-    });
-    form.reset();
-    setOpen(false);
+  const onSubmit = async (data: LiaisonFormData) => {
+    try {
+      await addLiaison({
+        label: data.label,
+        media: data.media,
+        from: data.from,
+        to: data.to,
+        length: data.length || undefined,
+        status: data.status,
+      });
+      toast({
+        title: "Liaison ajoutée",
+        description: `La liaison ${data.label} a été ajoutée avec succès`,
+      });
+      form.reset();
+      setOpen(false);
+      refetchLiaisons();
+    } catch (error: any) {
+      toast({
+        title: "Erreur",
+        description: error.response?.data?.message || "Une erreur est survenue lors de l'ajout de la liaison",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -77,12 +84,12 @@ const AddLiaisonForm = () => {
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField
               control={form.control}
-              name="nom"
+              name="label"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Nom</FormLabel>
+                  <FormLabel>Label *</FormLabel>
                   <FormControl>
-                    <Input placeholder="LIA-003" {...field} />
+                    <Input placeholder="Ex: LIA-001" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -91,17 +98,18 @@ const AddLiaisonForm = () => {
             
             <FormField
               control={form.control}
-              name="type"
+              name="media"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Type</FormLabel>
+                  <FormLabel>Média *</FormLabel>
                   <FormControl>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Sélectionner le type" />
+                        <SelectValue placeholder="Sélectionner le média" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="Fibre optique">Fibre optique</SelectItem>
+                        <SelectItem value="Cuivre">Cuivre</SelectItem>
                         <SelectItem value="MPLS">MPLS</SelectItem>
                         <SelectItem value="VPN">VPN</SelectItem>
                         <SelectItem value="Ethernet">Ethernet</SelectItem>
@@ -116,51 +124,28 @@ const AddLiaisonForm = () => {
 
             <FormField
               control={form.control}
-              name="origine"
+              name="from"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Origine</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Site D" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="destination"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Destination</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Site E" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="etat"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>État</FormLabel>
-                  <FormControl>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormLabel>Port d'origine *</FormLabel>
+                  <Select
+                    onValueChange={(value) => field.onChange(parseInt(value))}
+                    value={field.value?.toString()}
+                    disabled={isLoadingPorts}
+                  >
+                    <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Sélectionner l'état" />
+                        <SelectValue placeholder="Sélectionner le port d'origine" />
                       </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Actif">Actif</SelectItem>
-                        <SelectItem value="Inactif">Inactif</SelectItem>
-                        <SelectItem value="Maintenance">Maintenance</SelectItem>
-                        <SelectItem value="Erreur">Erreur</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </FormControl>
+                    </FormControl>
+                    <SelectContent>
+                      {ports?.map((port) => (
+                        <SelectItem key={port.id} value={port.id.toString()}>
+                          {port.port_label} - {port.device_name} {port.equipement ? `(${port.equipement.name})` : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
@@ -168,24 +153,47 @@ const AddLiaisonForm = () => {
 
             <FormField
               control={form.control}
-              name="bande"
+              name="to"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Bande passante</FormLabel>
-                  <FormControl>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormLabel>Port de destination *</FormLabel>
+                  <Select
+                    onValueChange={(value) => field.onChange(parseInt(value))}
+                    value={field.value?.toString()}
+                    disabled={isLoadingPorts}
+                  >
+                    <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Sélectionner la bande passante" />
+                        <SelectValue placeholder="Sélectionner le port de destination" />
                       </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="10 Mbps">10 Mbps</SelectItem>
-                        <SelectItem value="50 Mbps">50 Mbps</SelectItem>
-                        <SelectItem value="100 Mbps">100 Mbps</SelectItem>
-                        <SelectItem value="500 Mbps">500 Mbps</SelectItem>
-                        <SelectItem value="1 Gbps">1 Gbps</SelectItem>
-                        <SelectItem value="10 Gbps">10 Gbps</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    </FormControl>
+                    <SelectContent>
+                      {ports?.map((port) => (
+                        <SelectItem key={port.id} value={port.id.toString()}>
+                          {port.port_label} - {port.device_name} {port.equipement ? `(${port.equipement.name})` : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="length"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Longueur (mètres)</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      placeholder="Ex: 100"
+                      {...field}
+                      onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
+                      value={field.value ?? ""}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -194,14 +202,23 @@ const AddLiaisonForm = () => {
 
             <FormField
               control={form.control}
-              name="latence"
+              name="status"
               render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Latence</FormLabel>
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                  <div className="space-y-0.5">
+                    <FormLabel className="text-base">
+                      Statut actif
+                    </FormLabel>
+                    <div className="text-sm text-muted-foreground">
+                      La liaison est-elle active ?
+                    </div>
+                  </div>
                   <FormControl>
-                    <Input placeholder="8ms" {...field} />
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
                   </FormControl>
-                  <FormMessage />
                 </FormItem>
               )}
             />

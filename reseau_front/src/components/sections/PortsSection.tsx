@@ -4,25 +4,63 @@ import DetailsModal from "@/components/ui/details-modal";
 import EditModal from "@/components/ui/edit-modal";
 import AddPortForm from "@/components/forms/AddPortForm";
 import { useData } from "@/contexts/DataContext";
+import { useToast } from "@/hooks/use-toast";
 
 export default function PortsSection() {
-  const { ports } = useData();
+  const { ports, updatePort, refetchPorts } = useData();
+  const { toast } = useToast();
   const [selectedPort, setSelectedPort] = useState<any>(null);
+  const [selectedPortOriginal, setSelectedPortOriginal] = useState<any>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
 
   const handleRowClick = (port: any) => {
+    // Trouver le port original à partir de l'ID
+    const originalPort = ports.find(p => p.id === port.id);
+    setSelectedPortOriginal(originalPort || port);
     setSelectedPort(port);
     setIsDetailsOpen(true);
   };
 
   const handleEdit = (port: any) => {
+    // Trouver le port original à partir de l'ID
+    const originalPort = ports.find(p => p.id === port.id);
+    setSelectedPortOriginal(originalPort || port);
     setSelectedPort(port);
     setIsEditOpen(true);
   };
 
-  const handleSave = (updatedPort: any) => {
-    console.log('Saving port:', updatedPort);
+  const handleSave = async (updatedPort: any) => {
+    try {
+      // Convertir les données du formulaire vers le format API
+      const portData: any = {
+        port_label: updatedPort.port_label || updatedPort.Label,
+        device_name: updatedPort.device_name || updatedPort.Appareil,
+        speed: updatedPort.speed || updatedPort.Vitesse,
+        poe_enabled: updatedPort.poe_enabled !== undefined 
+          ? updatedPort.poe_enabled 
+          : updatedPort.PoE === 'Oui',
+        vlan: updatedPort.vlan || updatedPort.VLAN,
+        equipement_id: updatedPort.equipement_id,
+        connected_equipment_id: updatedPort.connected_equipment_id,
+      };
+      
+      if (selectedPortOriginal?.id) {
+        await updatePort(selectedPortOriginal.id, portData);
+        toast({
+          title: "Port mis à jour",
+          description: "Le port a été mis à jour avec succès.",
+        });
+        setIsEditOpen(false);
+        refetchPorts();
+      }
+    } catch (error: any) {
+      toast({
+        title: "Erreur",
+        description: error.response?.data?.message || "Une erreur est survenue lors de la mise à jour du port.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -39,8 +77,16 @@ export default function PortsSection() {
 
       <DataTableEnhanced
         title={`${ports.length} ports configurés`}
-        columns={["nom", "type", "vitesse", "etat", "armoire", "vlan", "description"]}
-        data={ports}
+        columns={["Label", "Appareil", "Vitesse", "PoE", "Équipement", "VLAN"]}
+        data={ports.map((port) => ({
+          id: port.id,
+          Label: port.port_label,
+          Appareil: port.device_name,
+          Vitesse: port.speed || '-',
+          PoE: port.poe_enabled ? 'Oui' : 'Non',
+          Équipement: port.equipement ? `${port.equipement.name} (${port.equipement.equipement_code})` : '-',
+          VLAN: port.vlan || '-',
+        }))}
         onRowClick={handleRowClick}
         onEdit={handleEdit}
       />
@@ -49,7 +95,7 @@ export default function PortsSection() {
         open={isDetailsOpen}
         onOpenChange={setIsDetailsOpen}
         title="Détails du port"
-        data={selectedPort}
+        data={selectedPortOriginal}
         onEdit={() => {
           setIsDetailsOpen(false);
           setIsEditOpen(true);
@@ -60,7 +106,7 @@ export default function PortsSection() {
         open={isEditOpen}
         onOpenChange={setIsEditOpen}
         title="Modifier le port"
-        data={selectedPort}
+        data={selectedPortOriginal}
         onSave={handleSave}
       />
     </div>

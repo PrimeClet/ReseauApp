@@ -1,3 +1,4 @@
+import { useState, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -5,11 +6,89 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Save, User, Bell, Shield, Database, Palette, Globe } from "lucide-react";
+import { Save, User, Bell, Shield, Database, Palette, Globe, Upload, Download, FileSpreadsheet, AlertCircle, CheckCircle, Loader2 } from "lucide-react";
+import { importService, type ImportType } from "@/services";
+import { toast } from "@/hooks/use-toast";
+
+const importTypes: { value: ImportType; label: string; description: string }[] = [
+  { value: 'coffrets', label: 'Coffrets', description: 'Armoires et baies réseau' },
+  { value: 'equipements', label: 'Équipements', description: 'Switchs, routeurs, serveurs' },
+  { value: 'ports', label: 'Ports', description: 'Ports réseau' },
+  { value: 'liaisons', label: 'Liaisons', description: 'Connexions entre équipements' },
+  { value: 'systems', label: 'Systèmes', description: 'Systèmes informatiques' },
+];
 
 export default function ParametresSection() {
+  const [selectedImportType, setSelectedImportType] = useState<ImportType>('coffrets');
+  const [isImporting, setIsImporting] = useState(false);
+  const [importResult, setImportResult] = useState<{
+    success: boolean;
+    message: string;
+    imported?: number;
+    errors?: string[];
+    total?: number;
+  } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsImporting(true);
+    setImportResult(null);
+
+    try {
+      const result = await importService.importCsv(file, selectedImportType);
+      setImportResult(result);
+
+      if (result.success) {
+        toast({
+          title: "Import réussi",
+          description: `${result.imported} éléments importés sur ${result.total}`,
+        });
+      } else {
+        toast({
+          title: "Erreur d'import",
+          description: result.message,
+          variant: "destructive",
+        });
+      }
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Une erreur est survenue";
+      setImportResult({
+        success: false,
+        message: errorMessage,
+      });
+      toast({
+        title: "Erreur",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setIsImporting(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleDownloadTemplate = async (type: ImportType) => {
+    try {
+      await importService.downloadTemplate(type);
+      toast({
+        title: "Téléchargement",
+        description: `Modèle ${type} téléchargé`,
+      });
+    } catch {
+      toast({
+        title: "Erreur",
+        description: "Impossible de télécharger le modèle",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -23,8 +102,9 @@ export default function ParametresSection() {
         </Button>
       </div>
 
-      <Tabs defaultValue="general" className="space-y-4">
+      <Tabs defaultValue="import" className="space-y-4">
         <TabsList className="bg-muted">
+          <TabsTrigger value="import">Import CSV</TabsTrigger>
           <TabsTrigger value="general">Général</TabsTrigger>
           <TabsTrigger value="users">Utilisateurs</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
@@ -32,6 +112,144 @@ export default function ParametresSection() {
           <TabsTrigger value="database">Base de données</TabsTrigger>
           <TabsTrigger value="appearance">Apparence</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="import" className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Upload className="h-5 w-5" />
+                  Importer des données CSV
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Type de données à importer</Label>
+                  <Select value={selectedImportType} onValueChange={(v) => setSelectedImportType(v as ImportType)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {importTypes.map((type) => (
+                        <SelectItem key={type.value} value={type.value}>
+                          {type.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-sm text-muted-foreground">
+                    {importTypes.find(t => t.value === selectedImportType)?.description}
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Fichier CSV</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".csv,.txt"
+                      onChange={handleFileSelect}
+                      disabled={isImporting}
+                      className="flex-1"
+                    />
+                    <Button
+                      variant="outline"
+                      onClick={() => handleDownloadTemplate(selectedImportType)}
+                      title="Télécharger le modèle"
+                    >
+                      <Download className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Format CSV avec en-têtes. Max 10MB.
+                  </p>
+                </div>
+
+                {isImporting && (
+                  <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span className="text-sm">Import en cours...</span>
+                  </div>
+                )}
+
+                {importResult && (
+                  <div className={`p-4 rounded-lg border ${
+                    importResult.success
+                      ? 'bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800'
+                      : 'bg-red-50 border-red-200 dark:bg-red-950 dark:border-red-800'
+                  }`}>
+                    <div className="flex items-start gap-2">
+                      {importResult.success ? (
+                        <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400 shrink-0 mt-0.5" />
+                      ) : (
+                        <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+                      )}
+                      <div className="space-y-1">
+                        <p className={`font-medium ${
+                          importResult.success ? 'text-green-800 dark:text-green-200' : 'text-red-800 dark:text-red-200'
+                        }`}>
+                          {importResult.message}
+                        </p>
+                        {importResult.success && (
+                          <p className="text-sm text-green-700 dark:text-green-300">
+                            {importResult.imported} / {importResult.total} éléments importés
+                          </p>
+                        )}
+                        {importResult.errors && importResult.errors.length > 0 && (
+                          <div className="mt-2 space-y-1">
+                            <p className="text-sm font-medium text-red-700 dark:text-red-300">Erreurs:</p>
+                            <ul className="text-xs text-red-600 dark:text-red-400 list-disc list-inside max-h-32 overflow-y-auto">
+                              {importResult.errors.map((err, i) => (
+                                <li key={i}>{err}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileSpreadsheet className="h-5 w-5" />
+                  Modèles CSV disponibles
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {importTypes.map((type) => (
+                    <div
+                      key={type.value}
+                      className="flex items-center justify-between p-3 border border-border rounded-lg hover:bg-muted/50 transition-colors"
+                    >
+                      <div>
+                        <div className="font-medium text-foreground">{type.label}</div>
+                        <div className="text-sm text-muted-foreground">{type.description}</div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDownloadTemplate(type.value)}
+                      >
+                        <Download className="h-4 w-4 mr-1" />
+                        Modèle
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-4 text-xs text-muted-foreground">
+                  Téléchargez un modèle pour voir le format attendu pour chaque type de données.
+                  Les fichiers doivent être encodés en UTF-8.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
 
         <TabsContent value="general" className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
