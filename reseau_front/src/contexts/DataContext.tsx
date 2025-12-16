@@ -6,6 +6,10 @@ import {
   portService,
   liaisonService,
   systemService,
+  lanService,
+  batimentService,
+  salleService,
+  maintenanceService,
   statistiqueService
 } from '@/services';
 import type {
@@ -19,11 +23,19 @@ import type {
   LiaisonCreateData,
   System,
   SystemCreateData,
+  Lan,
+  LanCreateData,
+  Batiment,
+  BatimentCreateData,
+  Salle,
+  SalleCreateData,
+  Maintenance,
+  MaintenanceCreateData,
   GlobalStats
 } from '@/services';
 
 // Re-export types for compatibility
-export type { Coffret, Equipement, Port, Liaison, System };
+export type { Coffret, Equipement, Port, Liaison, System, Lan, Batiment, Salle, Maintenance };
 
 // Legacy interfaces for backwards compatibility
 export interface Armoire {
@@ -37,7 +49,8 @@ export interface Armoire {
   dateInstallation: string;
 }
 
-export interface Maintenance {
+// Legacy Maintenance interface - deprecated, use Maintenance from @/services instead
+export interface MaintenanceLegacy {
   id: string;
   equipement: string;
   type: string;
@@ -81,6 +94,10 @@ interface DataContextType {
   ports: Port[];
   liaisons: Liaison[];
   systems: System[];
+  lans: Lan[];
+  batiments: Batiment[];
+  salles: Salle[];
+  maintenances: Maintenance[];
   globalStats: GlobalStats | null;
 
   // Loading states
@@ -89,6 +106,10 @@ interface DataContextType {
   isLoadingPorts: boolean;
   isLoadingLiaisons: boolean;
   isLoadingSystems: boolean;
+  isLoadingLans: boolean;
+  isLoadingBatiments: boolean;
+  isLoadingSalles: boolean;
+  isLoadingMaintenances: boolean;
   isLoadingStats: boolean;
 
   // Error states
@@ -97,6 +118,10 @@ interface DataContextType {
   portError: Error | null;
   liaisonError: Error | null;
   systemError: Error | null;
+  lanError: Error | null;
+  batimentError: Error | null;
+  salleError: Error | null;
+  maintenanceError: Error | null;
 
   // CRUD operations
   addCoffret: (data: CoffretCreateData) => Promise<Coffret>;
@@ -119,21 +144,41 @@ interface DataContextType {
   updateSystem: (id: number, data: Partial<SystemCreateData>) => Promise<System>;
   deleteSystem: (id: number) => Promise<void>;
 
+  addLan: (data: LanCreateData) => Promise<Lan>;
+  updateLan: (id: number, data: Partial<LanCreateData>) => Promise<Lan>;
+  deleteLan: (id: number) => Promise<void>;
+
+  addBatiment: (data: BatimentCreateData) => Promise<Batiment>;
+  updateBatiment: (id: number, data: Partial<BatimentCreateData>) => Promise<Batiment>;
+  deleteBatiment: (id: number) => Promise<void>;
+
+  addSalle: (data: SalleCreateData) => Promise<Salle>;
+  updateSalle: (id: number, data: Partial<SalleCreateData>) => Promise<Salle>;
+  deleteSalle: (id: number) => Promise<void>;
+
+  addMaintenance: (data: MaintenanceCreateData) => Promise<Maintenance>;
+  updateMaintenance: (id: number, data: Partial<MaintenanceCreateData>) => Promise<Maintenance>;
+  deleteMaintenance: (id: number) => Promise<void>;
+
   // Refresh functions
   refetchCoffrets: () => void;
   refetchEquipements: () => void;
   refetchPorts: () => void;
   refetchLiaisons: () => void;
   refetchSystems: () => void;
+  refetchLans: () => void;
+  refetchBatiments: () => void;
+  refetchSalles: () => void;
+  refetchMaintenances: () => void;
   refetchStats: () => void;
 
   // Legacy compatibility (will be removed later)
   armoires: Armoire[];
-  maintenances: Maintenance[];
+  maintenancesLegacy: MaintenanceLegacy[];
   equipments: Equipment[];
   systemes: Systeme[];
   addArmoire: (armoire: Omit<Armoire, 'id'>) => void;
-  addMaintenance: (maintenance: Omit<Maintenance, 'id'>) => void;
+  addMaintenanceLegacy: (maintenance: Omit<MaintenanceLegacy, 'id'>) => void;
   addEquipment: (equipment: Omit<Equipment, 'id'>) => void;
   addSysteme: (systeme: Omit<Systeme, 'id'>) => void;
 }
@@ -153,6 +198,8 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
     queryKey: ['coffrets'],
     queryFn: () => coffretService.getAll(),
     staleTime: 5 * 60 * 1000, // 5 minutes
+    retry: 1, // Réessayer seulement 1 fois en cas d'erreur
+    retryDelay: 1000, // Attendre 1 seconde avant de réessayer
   });
 
   const {
@@ -164,6 +211,8 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
     queryKey: ['equipements'],
     queryFn: () => equipementService.getAll(),
     staleTime: 5 * 60 * 1000,
+    retry: 1,
+    retryDelay: 1000,
   });
 
   const {
@@ -175,6 +224,8 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
     queryKey: ['ports'],
     queryFn: () => portService.getAll(),
     staleTime: 5 * 60 * 1000,
+    retry: 1,
+    retryDelay: 1000,
   });
 
   const {
@@ -186,6 +237,8 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
     queryKey: ['liaisons'],
     queryFn: () => liaisonService.getAll(),
     staleTime: 5 * 60 * 1000,
+    retry: 1,
+    retryDelay: 1000,
   });
 
   const {
@@ -197,6 +250,60 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
     queryKey: ['systems'],
     queryFn: () => systemService.getAll(),
     staleTime: 5 * 60 * 1000,
+    retry: 1,
+    retryDelay: 1000,
+  });
+
+  const {
+    data: lanData,
+    isLoading: isLoadingLans,
+    error: lanError,
+    refetch: refetchLans
+  } = useQuery({
+    queryKey: ['lans'],
+    queryFn: () => lanService.getAll(),
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+    retryDelay: 1000,
+  });
+
+  const {
+    data: batimentData,
+    isLoading: isLoadingBatiments,
+    error: batimentError,
+    refetch: refetchBatiments
+  } = useQuery({
+    queryKey: ['batiments'],
+    queryFn: () => batimentService.getAll(),
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+    retryDelay: 1000,
+  });
+
+  const {
+    data: salleData,
+    isLoading: isLoadingSalles,
+    error: salleError,
+    refetch: refetchSalles
+  } = useQuery({
+    queryKey: ['salles'],
+    queryFn: () => salleService.getAll(),
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+    retryDelay: 1000,
+  });
+
+  const {
+    data: maintenanceData,
+    isLoading: isLoadingMaintenances,
+    error: maintenanceError,
+    refetch: refetchMaintenances
+  } = useQuery({
+    queryKey: ['maintenances'],
+    queryFn: () => maintenanceService.getAll(),
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+    retryDelay: 1000,
   });
 
   const {
@@ -294,6 +401,74 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['systems'] }),
   });
 
+  // Mutations - LANs
+  const createLanMutation = useMutation({
+    mutationFn: lanService.create,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['lans'] }),
+  });
+
+  const updateLanMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: Partial<LanCreateData> }) =>
+      lanService.update(id, data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['lans'] }),
+  });
+
+  const deleteLanMutation = useMutation({
+    mutationFn: lanService.delete,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['lans'] }),
+  });
+
+  // Mutations - Batiments
+  const createBatimentMutation = useMutation({
+    mutationFn: batimentService.create,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['batiments'] }),
+  });
+
+  const updateBatimentMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: Partial<BatimentCreateData> }) =>
+      batimentService.update(id, data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['batiments'] }),
+  });
+
+  const deleteBatimentMutation = useMutation({
+    mutationFn: batimentService.delete,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['batiments'] }),
+  });
+
+  // Mutations - Salles
+  const createSalleMutation = useMutation({
+    mutationFn: salleService.create,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['salles'] }),
+  });
+
+  const updateSalleMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: Partial<SalleCreateData> }) =>
+      salleService.update(id, data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['salles'] }),
+  });
+
+  const deleteSalleMutation = useMutation({
+    mutationFn: salleService.delete,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['salles'] }),
+  });
+
+  // Mutations - Maintenances
+  const createMaintenanceMutation = useMutation({
+    mutationFn: maintenanceService.create,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['maintenances'] }),
+  });
+
+  const updateMaintenanceMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: Partial<MaintenanceCreateData> }) =>
+      maintenanceService.update(id, data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['maintenances'] }),
+  });
+
+  const deleteMaintenanceMutation = useMutation({
+    mutationFn: maintenanceService.delete,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['maintenances'] }),
+  });
+
   // Helper functions
   const addCoffret = async (data: CoffretCreateData) => {
     return createCoffretMutation.mutateAsync(data);
@@ -355,12 +530,60 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
     return deleteSystemMutation.mutateAsync(id);
   };
 
+  const addLan = async (data: LanCreateData) => {
+    return createLanMutation.mutateAsync(data);
+  };
+
+  const updateLan = async (id: number, data: Partial<LanCreateData>) => {
+    return updateLanMutation.mutateAsync({ id, data });
+  };
+
+  const deleteLan = async (id: number) => {
+    return deleteLanMutation.mutateAsync(id);
+  };
+
+  const addBatiment = async (data: BatimentCreateData) => {
+    return createBatimentMutation.mutateAsync(data);
+  };
+
+  const updateBatiment = async (id: number, data: Partial<BatimentCreateData>) => {
+    return updateBatimentMutation.mutateAsync({ id, data });
+  };
+
+  const deleteBatiment = async (id: number) => {
+    return deleteBatimentMutation.mutateAsync(id);
+  };
+
+  const addSalle = async (data: SalleCreateData) => {
+    return createSalleMutation.mutateAsync(data);
+  };
+
+  const updateSalle = async (id: number, data: Partial<SalleCreateData>) => {
+    return updateSalleMutation.mutateAsync({ id, data });
+  };
+
+  const deleteSalle = async (id: number) => {
+    return deleteSalleMutation.mutateAsync(id);
+  };
+
+  const addMaintenance = async (data: MaintenanceCreateData) => {
+    return createMaintenanceMutation.mutateAsync(data);
+  };
+
+  const updateMaintenance = async (id: number, data: Partial<MaintenanceCreateData>) => {
+    return updateMaintenanceMutation.mutateAsync({ id, data });
+  };
+
+  const deleteMaintenance = async (id: number) => {
+    return deleteMaintenanceMutation.mutateAsync(id);
+  };
+
   // Legacy compatibility functions (no-op for now)
   const addArmoire = () => {
     console.warn('addArmoire is deprecated, use addCoffret instead');
   };
-  const addMaintenance = () => {
-    console.warn('addMaintenance is deprecated');
+  const addMaintenanceLegacy = () => {
+    console.warn('addMaintenanceLegacy is deprecated, use addMaintenance instead');
   };
   const addEquipment = () => {
     console.warn('addEquipment is deprecated, use addEquipement instead');
@@ -376,6 +599,10 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
     ports: portData?.data || [],
     liaisons: liaisonData?.data || [],
     systems: systemData?.data || [],
+    lans: lanData?.data || [],
+    batiments: batimentData?.data || [],
+    salles: salleData?.data || [],
+    maintenances: maintenanceData?.data || [],
     globalStats: globalStats || null,
 
     // Loading states
@@ -384,6 +611,10 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
     isLoadingPorts,
     isLoadingLiaisons,
     isLoadingSystems,
+    isLoadingLans,
+    isLoadingBatiments,
+    isLoadingSalles,
+    isLoadingMaintenances,
     isLoadingStats,
 
     // Error states
@@ -392,6 +623,10 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
     portError: portError as Error | null,
     liaisonError: liaisonError as Error | null,
     systemError: systemError as Error | null,
+    lanError: lanError as Error | null,
+    batimentError: batimentError as Error | null,
+    salleError: salleError as Error | null,
+    maintenanceError: maintenanceError as Error | null,
 
     // CRUD operations
     addCoffret,
@@ -409,6 +644,18 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
     addSystem,
     updateSystem,
     deleteSystem,
+    addLan,
+    updateLan,
+    deleteLan,
+    addBatiment,
+    updateBatiment,
+    deleteBatiment,
+    addSalle,
+    updateSalle,
+    deleteSalle,
+    addMaintenance,
+    updateMaintenance,
+    deleteMaintenance,
 
     // Refresh functions
     refetchCoffrets,
@@ -416,15 +663,19 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
     refetchPorts,
     refetchLiaisons,
     refetchSystems,
+    refetchLans,
+    refetchBatiments,
+    refetchSalles,
+    refetchMaintenances,
     refetchStats,
 
     // Legacy compatibility
     armoires: [],
-    maintenances: [],
+    maintenancesLegacy: [],
     equipments: [],
     systemes: [],
     addArmoire,
-    addMaintenance,
+    addMaintenanceLegacy,
     addEquipment,
     addSysteme,
   };

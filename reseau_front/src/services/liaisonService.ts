@@ -2,23 +2,33 @@ import api from '@/axios';
 
 export interface Liaison {
   id: number;
-  from: number;
-  to: number;
+  from: number; // ID du port source
+  to: number; // ID du port destination
   label?: string;
   media?: string;
   length?: number;
   status: boolean;
   created_at?: string;
   updated_at?: string;
-  from_equipment?: {
+  from_port?: {
     id: number;
-    name: string;
-    equipement_code: string;
+    port_label: string;
+    device_name: string;
+    equipement?: {
+      id: number;
+      name: string;
+      equipement_code: string;
+    };
   };
-  to_equipment?: {
+  to_port?: {
     id: number;
-    name: string;
-    equipement_code: string;
+    port_label: string;
+    device_name: string;
+    equipement?: {
+      id: number;
+      name: string;
+      equipement_code: string;
+    };
   };
 }
 

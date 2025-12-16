@@ -10,12 +10,22 @@ export interface Equipement {
   vlan?: string;
   ip_address?: string;
   coffret_id: number;
+  batiment_id?: number;
+  salle_id?: number;
   status: string;
   created_at?: string;
   updated_at?: string;
   coffret?: {
     id: number;
     code: string;
+    nom: string;
+  };
+  batiment?: {
+    id: number;
+    nom: string;
+  };
+  salle?: {
+    id: number;
     nom: string;
   };
   ports?: Port[];
@@ -39,7 +49,7 @@ export interface EquipementListResponse {
 }
 
 export interface EquipementCreateData {
-  equipement_code: string;
+  equipement_code?: string;
   name: string;
   type: string;
   description?: string;
@@ -47,6 +57,8 @@ export interface EquipementCreateData {
   vlan?: string;
   ip_address?: string;
   coffret_id: number;
+  batiment_id?: number;
+  salle_id?: number;
   status?: string;
 }
 

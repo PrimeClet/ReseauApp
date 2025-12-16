@@ -9,20 +9,20 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { useData, Maintenance } from "@/contexts/DataContext";
+import { useData } from "@/contexts/DataContext";
 import { Calendar } from "lucide-react";
+import type { MaintenanceCreateData } from "@/services/maintenanceService";
 
 const maintenanceSchema = z.object({
-  equipement: z.string().min(1, "L'équipement est requis"),
+  equipement_id: z.number().optional().nullable(),
   type: z.string().min(1, "Le type est requis"),
-  date: z.string().min(1, "La date est requise"),
-  heure: z.string().min(1, "L'heure est requise"),
+  date_debut: z.string().min(1, "La date est requise"),
+  heure_debut: z.string().min(1, "L'heure est requise"),
   duree: z.string().min(1, "La durée est requise"),
   technicien: z.string().min(1, "Le technicien est requis"),
-  priorite: z.string().min(1, "La priorité est requise"),
+  priorite: z.enum(['basse', 'moyenne', 'haute', 'critique']),
   description: z.string().min(1, "La description est requise"),
-  statut: z.string().default("planifiee"),
-  dateCreation: z.string().default(() => new Date().toISOString().split('T')[0]),
+  statut: z.enum(['planifiee', 'en_cours', 'terminee', 'annulee']).default('planifiee'),
 });
 
 type MaintenanceFormData = z.infer<typeof maintenanceSchema>;
@@ -30,34 +30,59 @@ type MaintenanceFormData = z.infer<typeof maintenanceSchema>;
 export default function AddMaintenanceForm() {
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
-  const { addMaintenance } = useData();
+  const { addMaintenance, refetchMaintenances, equipements, isLoadingEquipements } = useData();
 
   const form = useForm<MaintenanceFormData>({
     resolver: zodResolver(maintenanceSchema),
     defaultValues: {
-      equipement: "",
+      equipement_id: undefined,
       type: "",
-      date: "",
-      heure: "",
+      date_debut: "",
+      heure_debut: "",
       duree: "",
       technicien: "",
       priorite: "moyenne",
       description: "",
       statut: "planifiee",
-      dateCreation: new Date().toISOString().split('T')[0],
     },
   });
 
-  const onSubmit = (data: MaintenanceFormData) => {
-    addMaintenance(data as Omit<Maintenance, 'id'>);
-    
-    toast({
-      title: "Maintenance planifiée",
-      description: "La maintenance a été planifiée avec succès",
-    });
-    
-    form.reset();
-    setOpen(false);
+  const onSubmit = async (data: MaintenanceFormData) => {
+    try {
+      // Formater l'heure au format H:i (sans secondes si présentes)
+      const heureFormatee = data.heure_debut.length > 5 
+        ? data.heure_debut.substring(0, 5) 
+        : data.heure_debut;
+      
+      const maintenanceData: MaintenanceCreateData = {
+        equipement_id: data.equipement_id && data.equipement_id > 0 ? data.equipement_id : undefined,
+        type: data.type,
+        date_debut: data.date_debut,
+        heure_debut: heureFormatee,
+        duree: data.duree,
+        technicien: data.technicien,
+        priorite: data.priorite,
+        description: data.description,
+        statut: data.statut || 'planifiee',
+      };
+      
+      await addMaintenance(maintenanceData);
+      
+      toast({
+        title: "Maintenance planifiée",
+        description: "La maintenance a été planifiée avec succès",
+      });
+      
+      form.reset();
+      setOpen(false);
+      refetchMaintenances();
+    } catch (error: any) {
+      toast({
+        title: "Erreur",
+        description: error.response?.data?.message || "Une erreur est survenue lors de la planification de la maintenance",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -77,22 +102,30 @@ export default function AddMaintenanceForm() {
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
-                name="equipement"
+                name="equipement_id"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Équipement</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormLabel>Équipement (optionnel)</FormLabel>
+                    <Select
+                      onValueChange={(value) => {
+                        const numericValue = value === "none" ? undefined : parseInt(value);
+                        field.onChange(numericValue);
+                      }}
+                      value={field.value?.toString() || "none"}
+                      disabled={isLoadingEquipements}
+                    >
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Sélectionner l'équipement" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="ARM-001">ARM-001 - Armoire principale</SelectItem>
-                        <SelectItem value="ARM-002">ARM-002 - Armoire secondaire</SelectItem>
-                        <SelectItem value="LIA-001">LIA-001 - Liaison fibre</SelectItem>
-                        <SelectItem value="Switch-001">Switch-001 - Switch principal</SelectItem>
-                        <SelectItem value="Router-001">Router-001 - Routeur edge</SelectItem>
+                        <SelectItem value="none">Aucun</SelectItem>
+                        {equipements?.map((equipement) => (
+                          <SelectItem key={equipement.id} value={equipement.id.toString()}>
+                            {equipement.name} ({equipement.equipement_code})
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -105,7 +138,7 @@ export default function AddMaintenanceForm() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Type de maintenance</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Sélectionner le type" />
@@ -127,10 +160,10 @@ export default function AddMaintenanceForm() {
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
-                name="date"
+                name="date_debut"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Date</FormLabel>
+                    <FormLabel>Date début *</FormLabel>
                     <FormControl>
                       <Input type="date" {...field} />
                     </FormControl>
@@ -140,10 +173,10 @@ export default function AddMaintenanceForm() {
               />
               <FormField
                 control={form.control}
-                name="heure"
+                name="heure_debut"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Heure</FormLabel>
+                    <FormLabel>Heure début *</FormLabel>
                     <FormControl>
                       <Input type="time" {...field} />
                     </FormControl>
@@ -160,7 +193,7 @@ export default function AddMaintenanceForm() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Durée estimée</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Sélectionner la durée" />
@@ -185,7 +218,7 @@ export default function AddMaintenanceForm() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Technicien assigné</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Assigner un technicien" />
@@ -210,7 +243,7 @@ export default function AddMaintenanceForm() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Priorité</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Sélectionner la priorité" />

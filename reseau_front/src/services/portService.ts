@@ -7,9 +7,15 @@ export interface Port {
   poe_enabled: boolean;
   vlan?: string;
   speed?: string;
+  equipement_id: number;
   connected_equipment_id?: number;
   created_at?: string;
   updated_at?: string;
+  equipement?: {
+    id: number;
+    name: string;
+    equipement_code: string;
+  };
   connected_equipment?: {
     id: number;
     name: string;
@@ -31,6 +37,7 @@ export interface PortCreateData {
   poe_enabled?: boolean;
   vlan?: string;
   speed?: string;
+  equipement_id: number;
   connected_equipment_id?: number;
 }
 

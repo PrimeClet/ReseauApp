@@ -59,9 +59,22 @@ export default function ArmoiresSection() {
   };
 
   // Filtrer les équipements du coffret sélectionné
+  // Utiliser d'abord les équipements de la relation, sinon filtrer depuis la liste globale
   const coffretEquipements = selectedCoffret
-    ? equipements.filter(e => e.coffret_id === selectedCoffret.id)
+    ? (selectedCoffret.equipements && Array.isArray(selectedCoffret.equipements) && selectedCoffret.equipements.length > 0
+        ? selectedCoffret.equipements
+        : equipements.filter(e => e && e.coffret_id === selectedCoffret.id))
     : [];
+
+  // Debug: vérifier les équipements
+  useEffect(() => {
+    if (selectedCoffret) {
+      console.log('Selected coffret:', selectedCoffret);
+      console.log('Coffret equipements (from relation):', selectedCoffret.equipements);
+      console.log('All equipements:', equipements);
+      console.log('Filtered equipements:', coffretEquipements);
+    }
+  }, [selectedCoffret, equipements, coffretEquipements]);
 
   // Filtrer les systèmes du coffret sélectionné
   const coffretSystems = selectedCoffret

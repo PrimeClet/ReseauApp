@@ -28,7 +28,7 @@ class LiaisonController extends Controller
         $perPage = (int) $request->get('per_page', 15);
         $perPage = $perPage > 0 && $perPage <= 100 ? $perPage : 15;
 
-        $liaisons = $query->orderBy('label')->paginate($perPage);
+        $liaisons = $query->with(['fromPort.equipement', 'toPort.equipement'])->orderBy('label')->paginate($perPage);
 
         return response()->json($liaisons);
     }
@@ -43,8 +43,8 @@ class LiaisonController extends Controller
         }
         
         $request->validate([
-            'from' => 'required|exists:equipements,id',
-            'to' => 'required|exists:equipements,id',
+            'from' => 'required|exists:ports,id',
+            'to' => 'required|exists:ports,id',
             'label' => 'required|string|max:255',
             'media' => 'required|string|max:255',
             'length' => 'nullable|integer',
@@ -55,7 +55,7 @@ class LiaisonController extends Controller
 
         return response()->json([
             'message' => 'Liaison créée avec succès.',
-            'liaison' => $liaison,
+            'data' => $liaison->load(['fromPort.equipement', 'toPort.equipement']),
         ], 201);
     }
 
@@ -64,8 +64,10 @@ class LiaisonController extends Controller
      */
     public function show(Liaison $liaison)
     {
-        $liaison->load(['fromEquipement', 'toEquipement']);
-        return response()->json($liaison);
+        $liaison->load(['fromPort.equipement', 'toPort.equipement']);
+        return response()->json([
+            'data' => $liaison
+        ]);
     }
 
     /**
@@ -78,8 +80,8 @@ class LiaisonController extends Controller
         }
 
         $request->validate([
-            'from' => 'sometimes|exists:equipements,id',
-            'to' => 'sometimes|exists:equipements,id',
+            'from' => 'sometimes|exists:ports,id',
+            'to' => 'sometimes|exists:ports,id',
             'label' => 'sometimes|string|max:255',
             'media' => 'sometimes|string|max:255',
             'length' => 'nullable|integer',
@@ -90,7 +92,7 @@ class LiaisonController extends Controller
 
         return response()->json([
             'message' => 'Liaison mise à jour avec succès.',
-            'liaison' => $liaison,
+            'data' => $liaison->load(['fromPort.equipement', 'toPort.equipement']),
         ], 200);
     }
 

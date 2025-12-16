@@ -8,6 +8,10 @@ use App\Http\Controllers\PortController;
 use App\Http\Controllers\MetricController;
 use App\Http\Controllers\LiaisonController;
 use App\Http\Controllers\SystemController;
+use App\Http\Controllers\BatimentController;
+use App\Http\Controllers\SalleController;
+use App\Http\Controllers\LanController;
+use App\Http\Controllers\MaintenanceController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\CartographyController;
 use App\Http\Controllers\ImportController;
@@ -69,6 +73,22 @@ Route::middleware('auth:sanctum')->group(function () {
             // Systèmes
             Route::get('/systems', [SystemController::class, 'index']);
             Route::get('/systems/{system}', [SystemController::class, 'show']);
+
+            // Bâtiments
+            Route::get('/batiments', [BatimentController::class, 'index']);
+            Route::get('/batiments/{batiment}', [BatimentController::class, 'show']);
+
+            // Salles
+            Route::get('/salles', [SalleController::class, 'index']);
+            Route::get('/salles/{salle}', [SalleController::class, 'show']);
+
+            // LANs
+            Route::get('/lans', [LanController::class, 'index']);
+            Route::get('/lans/{lan}', [LanController::class, 'show']);
+
+            // Maintenances
+            Route::get('/maintenances', [MaintenanceController::class, 'index']);
+            Route::get('/maintenances/{maintenance}', [MaintenanceController::class, 'show']);
         });
 
         // INVENTAIRE : écriture (création / modification / suppression)
@@ -102,12 +122,41 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/systems', [SystemController::class, 'store']);
             Route::put('/systems/{system}', [SystemController::class, 'update']);
             Route::delete('/systems/{system}', [SystemController::class, 'destroy']);
+
+            // Bâtiments
+            Route::post('/batiments', [BatimentController::class, 'store']);
+            Route::put('/batiments/{batiment}', [BatimentController::class, 'update']);
+            Route::delete('/batiments/{batiment}', [BatimentController::class, 'destroy']);
+
+            // Salles
+            Route::post('/salles', [SalleController::class, 'store']);
+            Route::put('/salles/{salle}', [SalleController::class, 'update']);
+            Route::delete('/salles/{salle}', [SalleController::class, 'destroy']);
+
+            // LANs
+            Route::post('/lans', [LanController::class, 'store']);
+            Route::put('/lans/{lan}', [LanController::class, 'update']);
+            Route::delete('/lans/{lan}', [LanController::class, 'destroy']);
+
+            // Maintenances
+            Route::post('/maintenances', [MaintenanceController::class, 'store']);
+            Route::put('/maintenances/{maintenance}', [MaintenanceController::class, 'update']);
+            Route::delete('/maintenances/{maintenance}', [MaintenanceController::class, 'destroy']);
         });
 
         // Exemple futur : routes pour la cartographie (LANs)
         Route::middleware('permission:view_cartography')->group(function () {
             Route::get('/cartography/lans', [CartographyController::class, 'index']);
             Route::get('/cartography/lans/{id}', [CartographyController::class, 'show']);
+            Route::get('/cartography/topology', [CartographyController::class, 'getTopology']);
+            Route::get('/cartography/batiments', [CartographyController::class, 'getBatiments']);
+            Route::get('/cartography/salles', [CartographyController::class, 'getSalles']);
+        });
+
+        // Import CSV
+        Route::middleware('permission:manage_inventory')->group(function () {
+            Route::post('/import', [ImportController::class, 'import']);
+            Route::get('/import/template/{type}', [ImportController::class, 'template']);
         });
 
         // Import CSV

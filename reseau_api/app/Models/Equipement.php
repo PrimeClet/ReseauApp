@@ -18,6 +18,8 @@ class Equipement extends Model
         'vlan',
         'ip_address',
         'coffret_id',
+        'batiment_id',
+        'salle_id',
         'status'
     ];
 
@@ -26,8 +28,18 @@ class Equipement extends Model
         return $this->belongsTo(Coffret::class);
     }
 
+    public function batiment()
+    {
+        return $this->belongsTo(Batiment::class);
+    }
+
+    public function salle()
+    {
+        return $this->belongsTo(Salle::class);
+    }
+
     public function ports()
     {
-        return $this->hasMany(Port::class);
+        return $this->hasMany(Port::class, 'equipement_id');
     }
 }

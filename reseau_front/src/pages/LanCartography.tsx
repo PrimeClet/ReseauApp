@@ -18,7 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { RefreshCcw, FileDown, FileSpreadsheet, Plus } from "lucide-react";
+import { RefreshCcw, FileDown, FileSpreadsheet, Plus, Loader2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -27,7 +27,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { jsPDF } from "jspdf";
-import lanTopologies from "@/data/lan_topologies.json";
+import { cartographyService } from "@/services";
 import { dia, shapes } from "@joint/core";
 
 type LanNode = {
@@ -41,6 +41,14 @@ type LanNode = {
   model: string;
   notes?: string;
   icon: string;
+  ports?: Array<{
+    id: string;
+    label: string;
+    device_name: string;
+    vlan?: string;
+    speed?: string;
+    poe_enabled?: boolean;
+  }>;
 };
 
 type LanLink = {
@@ -65,7 +73,7 @@ type LanTopology = {
   links: LanLink[];
 };
 
-const topologies: LanTopology[] = (lanTopologies.topologies as LanTopology[]) ?? [];
+// Les topologies seront chargées depuis l'API
 
 const statusColors: Record<string, string> = {
   up: "#10b981",
@@ -145,7 +153,18 @@ const computeAutoLayoutPositions = (nodes: LanNode[]) => {
 };
 
 const LanCartographyContent = () => {
-  const [selectedTopologyId, setSelectedTopologyId] = useState(topologies[0]?.id || "");
+  const [lans, setLans] = useState<LanTopology[]>([]);
+  const [batiments, setBatiments] = useState<Array<{ id: number; nom: string }>>([]);
+  const [salles, setSalles] = useState<Array<{ id: number; nom: string; batiment_id: number }>>([]);
+  const [selectedBatimentId, setSelectedBatimentId] = useState<number | undefined>(undefined);
+  const [selectedSalleId, setSelectedSalleId] = useState<number | undefined>(undefined);
+  const [selectedTopologyId, setSelectedTopologyId] = useState<string>("");
+  const [filterMode, setFilterMode] = useState<"lan" | "batiment" | "salle">("lan");
+  const [topology, setTopology] = useState<LanTopology | null>(null);
+  const [isLoadingLans, setIsLoadingLans] = useState(true);
+  const [isLoadingBatiments, setIsLoadingBatiments] = useState(false);
+  const [isLoadingSalles, setIsLoadingSalles] = useState(false);
+  const [isLoadingTopology, setIsLoadingTopology] = useState(false);
   const [selectedLink, setSelectedLink] = useState<LanLink | null>(null);
   const [selectedNode, setSelectedNode] = useState<LanNode | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -155,14 +174,105 @@ const LanCartographyContent = () => {
   const paperRef = useRef<dia.Paper | null>(null);
   const handleKeyDownRef = useRef<((evt: KeyboardEvent) => void) | null>(null);
 
-  const topology = useMemo(
-    () => topologies.find((lan) => lan.id === selectedTopologyId) ?? topologies[0],
-    [selectedTopologyId],
-  );
+  // Charger la liste des LANs
+  useEffect(() => {
+    const loadLans = async () => {
+      try {
+        setIsLoadingLans(true);
+        const lansList = await cartographyService.getLans();
+        const topologiesList: LanTopology[] = lansList.map((lan: any) => ({
+          id: lan.id,
+          name: lan.name,
+          subnet: lan.subnet || '',
+          vlan: lan.vlan || '',
+          description: lan.description || '',
+          nodes: [],
+          links: [],
+        }));
+        setLans(topologiesList);
+        if (topologiesList.length > 0 && !selectedTopologyId && filterMode === "lan") {
+          setSelectedTopologyId(topologiesList[0].id);
+        }
+      } catch (error) {
+        console.error('Erreur lors du chargement des LANs:', error);
+      } finally {
+        setIsLoadingLans(false);
+      }
+    };
+
+    loadLans();
+  }, []);
+
+  // Charger la liste des bâtiments
+  useEffect(() => {
+    const loadBatiments = async () => {
+      try {
+        setIsLoadingBatiments(true);
+        const batimentsList = await cartographyService.getBatiments();
+        setBatiments(batimentsList);
+      } catch (error) {
+        console.error('Erreur lors du chargement des bâtiments:', error);
+      } finally {
+        setIsLoadingBatiments(false);
+      }
+    };
+
+    loadBatiments();
+  }, []);
+
+  // Charger la liste des salles selon le bâtiment sélectionné
+  useEffect(() => {
+    const loadSalles = async () => {
+      try {
+        setIsLoadingSalles(true);
+        const sallesList = await cartographyService.getSalles(selectedBatimentId);
+        setSalles(sallesList);
+        // Réinitialiser la salle sélectionnée si elle n'appartient plus au bâtiment
+        if (selectedSalleId && !sallesList.find(s => s.id === selectedSalleId)) {
+          setSelectedSalleId(undefined);
+        }
+      } catch (error) {
+        console.error('Erreur lors du chargement des salles:', error);
+      } finally {
+        setIsLoadingSalles(false);
+      }
+    };
+
+    loadSalles();
+  }, [selectedBatimentId]);
+
+  // Charger la topologie selon le mode de filtrage
+  useEffect(() => {
+    const loadTopology = async () => {
+      try {
+        setIsLoadingTopology(true);
+        let response: LanTopology;
+
+        if (filterMode === "lan" && selectedTopologyId) {
+          response = await cartographyService.getLanTopology(selectedTopologyId);
+        } else if (filterMode === "salle" && selectedSalleId) {
+          response = await cartographyService.getLanTopology(undefined, { salle_id: selectedSalleId });
+        } else if (filterMode === "batiment" && selectedBatimentId) {
+          response = await cartographyService.getLanTopology(undefined, { batiment_id: selectedBatimentId });
+        } else {
+          return;
+        }
+
+        setTopology(response);
+      } catch (error) {
+        console.error('Erreur lors du chargement de la topologie:', error);
+        setTopology(null);
+      } finally {
+        setIsLoadingTopology(false);
+      }
+    };
+
+    loadTopology();
+  }, [filterMode, selectedTopologyId, selectedBatimentId, selectedSalleId]);
 
   // Initialisation de JointJS
   useEffect(() => {
-    if (!containerRef.current || !topology) return;
+    if (!containerRef.current || !topology || isLoadingTopology) return;
 
     const container = containerRef.current;
     
@@ -626,7 +736,7 @@ const LanCartographyContent = () => {
         graphRef.current = null;
       }
     };
-  }, [topology, isEditMode, sourceNodeId]);
+  }, [topology, isEditMode, sourceNodeId, isLoadingTopology]);
 
   const exportTopology = useCallback(
     (format: "csv" | "pdf") => {
@@ -741,18 +851,95 @@ const LanCartographyContent = () => {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap justify-end">
-          <Select value={selectedTopologyId} onValueChange={setSelectedTopologyId}>
-            <SelectTrigger className="w-[220px]">
-              <SelectValue placeholder="Sélectionner un LAN" />
+          <Select value={filterMode} onValueChange={(value) => {
+            setFilterMode(value as "lan" | "batiment" | "salle");
+            setSelectedTopologyId("");
+            setSelectedBatimentId(undefined);
+            setSelectedSalleId(undefined);
+          }}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Mode de filtrage" />
             </SelectTrigger>
             <SelectContent>
-              {topologies.map((lan) => (
-                <SelectItem key={lan.id} value={lan.id}>
-                  {lan.name}
-                </SelectItem>
-              ))}
+              <SelectItem value="lan">Par LAN</SelectItem>
+              <SelectItem value="batiment">Par Bâtiment</SelectItem>
+              <SelectItem value="salle">Par Salle</SelectItem>
             </SelectContent>
           </Select>
+
+          {filterMode === "lan" && (
+            <Select value={selectedTopologyId} onValueChange={setSelectedTopologyId} disabled={isLoadingLans}>
+              <SelectTrigger className="w-[220px]">
+                <SelectValue placeholder={isLoadingLans ? "Chargement..." : "Sélectionner un LAN"} />
+              </SelectTrigger>
+              <SelectContent>
+                {lans.map((lan) => (
+                  <SelectItem key={lan.id} value={lan.id}>
+                    {lan.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          {filterMode === "batiment" && (
+            <Select 
+              value={selectedBatimentId?.toString()} 
+              onValueChange={(value) => setSelectedBatimentId(value ? parseInt(value) : undefined)}
+              disabled={isLoadingBatiments}
+            >
+              <SelectTrigger className="w-[220px]">
+                <SelectValue placeholder={isLoadingBatiments ? "Chargement..." : "Sélectionner un bâtiment"} />
+              </SelectTrigger>
+              <SelectContent>
+                {batiments.map((batiment) => (
+                  <SelectItem key={batiment.id} value={batiment.id.toString()}>
+                    {batiment.nom}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          {filterMode === "salle" && (
+            <>
+              <Select 
+                value={selectedBatimentId?.toString()} 
+                onValueChange={(value) => {
+                  setSelectedBatimentId(value ? parseInt(value) : undefined);
+                  setSelectedSalleId(undefined);
+                }}
+                disabled={isLoadingBatiments}
+              >
+                <SelectTrigger className="w-[220px]">
+                  <SelectValue placeholder={isLoadingBatiments ? "Chargement..." : "Sélectionner un bâtiment"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {batiments.map((batiment) => (
+                    <SelectItem key={batiment.id} value={batiment.id.toString()}>
+                      {batiment.nom}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select 
+                value={selectedSalleId?.toString()} 
+                onValueChange={(value) => setSelectedSalleId(value ? parseInt(value) : undefined)}
+                disabled={isLoadingSalles || !selectedBatimentId}
+              >
+                <SelectTrigger className="w-[220px]">
+                  <SelectValue placeholder={!selectedBatimentId ? "Sélectionnez d'abord un bâtiment" : isLoadingSalles ? "Chargement..." : "Sélectionner une salle"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {salles.map((salle) => (
+                    <SelectItem key={salle.id} value={salle.id.toString()}>
+                      {salle.nom}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </>
+          )}
           <Button
             variant={isEditMode ? "default" : "outline"}
             size="sm"
@@ -793,27 +980,34 @@ const LanCartographyContent = () => {
       <div className="grid grid-cols-1">
         <Card>
           <CardHeader>
-            <CardTitle>{topology?.name}</CardTitle>
+            <CardTitle>{topology?.name || 'Chargement...'}</CardTitle>
             <CardDescription>
-              {topology?.description} — {topology?.subnet} ({topology?.vlan})
+              {topology?.description || ''} — {topology?.subnet || ''} ({topology?.vlan || ''})
             </CardDescription>
           </CardHeader>
           <CardContent className="flex justify-center overflow-auto">
-            <div
-              ref={containerRef}
-              style={{
-                width: "100%",
-                maxWidth: "1400px",
-                margin: "0 auto",
-                height: "1200px",
-                minHeight: "1200px",
-                border: "1px solid #e5e7eb",
-                borderRadius: "8px",
-                backgroundColor: "#f9fafb",
-                position: "relative",
-                overflow: "auto",
-              }}
-            />
+            {isLoadingTopology ? (
+              <div className="flex items-center justify-center h-[1200px]">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <span className="ml-2 text-muted-foreground">Chargement de la topologie...</span>
+              </div>
+            ) : (
+              <div
+                ref={containerRef}
+                style={{
+                  width: "100%",
+                  maxWidth: "1400px",
+                  margin: "0 auto",
+                  height: "1200px",
+                  minHeight: "1200px",
+                  border: "1px solid #e5e7eb",
+                  borderRadius: "8px",
+                  backgroundColor: "#f9fafb",
+                  position: "relative",
+                  overflow: "auto",
+                }}
+              />
+            )}
           </CardContent>
         </Card>
       </div>
@@ -907,12 +1101,20 @@ const LanCartographyContent = () => {
               </div>
               <div className="pt-4 border-t space-y-3">
                 <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold text-muted-foreground">Port origine</span>
+                  <span className="font-medium font-mono">{selectedLink.fromPort || 'N/A'}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold text-muted-foreground">Port destination</span>
+                  <span className="font-medium font-mono">{selectedLink.toPort || 'N/A'}</span>
+                </div>
+                <div className="flex items-center justify-between">
                   <span className="text-sm font-semibold text-muted-foreground">Type</span>
                   <span className="capitalize font-medium">{selectedLink.type}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-semibold text-muted-foreground">VLAN</span>
-                  <span className="font-medium">{selectedLink.vlan}</span>
+                  <span className="font-medium">{selectedLink.vlan || 'N/A'}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-semibold text-muted-foreground">Bande passante</span>
@@ -983,6 +1185,30 @@ const LanCartographyContent = () => {
                 <div className="space-y-1">
                   <span className="font-medium">Notes</span>
                   <p className="text-muted-foreground">{selectedNode.notes}</p>
+                </div>
+              )}
+              {selectedNode.ports && selectedNode.ports.length > 0 && (
+                <div className="space-y-2 pt-4 border-t">
+                  <span className="font-medium">Ports ({selectedNode.ports.length})</span>
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {selectedNode.ports.map((port) => (
+                      <div key={port.id} className="bg-muted/50 rounded-lg p-3 text-sm">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-medium font-mono">{port.label}</span>
+                          {port.poe_enabled && (
+                            <span className="text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 px-2 py-0.5 rounded">
+                              PoE
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-muted-foreground space-y-1">
+                          {port.device_name && <div>Appareil: {port.device_name}</div>}
+                          {port.vlan && <div>VLAN: {port.vlan}</div>}
+                          {port.speed && <div>Vitesse: {port.speed}</div>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>

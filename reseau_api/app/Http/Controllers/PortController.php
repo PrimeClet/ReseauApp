@@ -12,28 +12,44 @@ class PortController extends Controller
      */
     public function index(Request $request)
     {
-        if (!auth()->user()->isAdministrator()) {
-            return response()->json(['message' => 'Non autorisé'], 403);
-        }
         $query = Port::query();
-
-        if ($request->has('status')) {
-            $query->where('status', $request->status);
-        }
 
         if ($request->has('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%");
+                $q->where('port_label', 'like', "%{$search}%")
+                  ->orWhere('device_name', 'like', "%{$search}%");
             });
         }
 
         $perPage = (int) $request->get('per_page', 15);
         $perPage = $perPage > 0 && $perPage <= 100 ? $perPage : 15;
 
-        $zone = $query->orderBy('device_name')->paginate($perPage);
-
-        return response()->json($zone);
+        try {
+            $ports = $query->with(['equipement', 'connectedEquipment'])
+                ->orderBy('device_name')
+                ->paginate($perPage);
+            
+            return response()->json($ports);
+        } catch (\Exception $e) {
+            \Log::error('Error in PortController@index: ' . $e->getMessage());
+            \Log::error('File: ' . $e->getFile() . ' Line: ' . $e->getLine());
+            \Log::error('Stack trace: ' . $e->getTraceAsString());
+            
+            // Essayer sans relations pour voir si c'est le problème
+            try {
+                $ports = $query->orderBy('device_name')->paginate($perPage);
+                return response()->json($ports);
+            } catch (\Exception $e2) {
+                return response()->json([
+                    'message' => 'Erreur lors de la récupération des ports',
+                    'error' => $e->getMessage(),
+                    'error2' => $e2->getMessage(),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine()
+                ], 500);
+            }
+        }
     }
 
     /**
@@ -51,14 +67,26 @@ class PortController extends Controller
             'poe_enabled' => 'required|boolean',
             'vlan' => 'nullable|string|max:255',
             'speed' => 'nullable|string|max:255',
+            'equipement_id' => 'required|exists:equipements,id',
             'connected_equipment_id' => 'nullable|exists:equipements,id',
         ]);
 
-        $port = Port::create($request->all());
+        $portData = $request->all();
+        // S'assurer que poe_enabled est un booléen
+        if (isset($portData['poe_enabled'])) {
+            $portData['poe_enabled'] = filter_var($portData['poe_enabled'], FILTER_VALIDATE_BOOLEAN);
+        }
+        
+        // S'assurer que connected_equipment_id est null si non fourni
+        if (!isset($portData['connected_equipment_id']) || $portData['connected_equipment_id'] === '') {
+            $portData['connected_equipment_id'] = null;
+        }
+
+        $port = Port::create($portData);
 
         return response()->json([
             'message' => 'Port créé avec succès.',
-            'port' => $port,
+            'data' => $port->load('equipement', 'connectedEquipment'),
         ], 201);
     }
 
@@ -67,7 +95,9 @@ class PortController extends Controller
      */
     public function show(Port $port)
     {
-        return response()->json($port);
+        return response()->json([
+            'data' => $port->load('equipement', 'connectedEquipment')
+        ]);
     }
 
     /**
@@ -85,6 +115,7 @@ class PortController extends Controller
             'poe_enabled' => 'sometimes|boolean',
             'vlan' => 'nullable|string|max:255',
             'speed' => 'nullable|string|max:255',
+            'equipement_id' => 'sometimes|exists:equipements,id',
             'connected_equipment_id' => 'nullable|exists:equipements,id',
         ]);
 
@@ -92,7 +123,7 @@ class PortController extends Controller
 
         return response()->json([
             'message' => 'Port mis à jour avec succès.',
-            'port' => $port,
+            'data' => $port->load('equipement', 'connectedEquipment'),
         ], 200);
     }
 

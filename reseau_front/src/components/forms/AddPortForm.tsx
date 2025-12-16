@@ -9,54 +9,67 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useData } from "@/contexts/DataContext";
-import { toast } from "@/hooks/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { Plus } from "lucide-react";
+import type { PortCreateData } from "@/services/portService";
 
 const portSchema = z.object({
-  nom: z.string().min(1, "Le nom est requis"),
-  type: z.string().min(1, "Le type est requis"),
-  vitesse: z.string().min(1, "La vitesse est requise"),
-  etat: z.string().min(1, "L'état est requis"),
-  armoire: z.string().min(1, "L'armoire est requise"),
-  vlan: z.string().min(1, "Le VLAN est requis"),
-  description: z.string().optional()
+  port_label: z.string().min(1, "Le label du port est requis"),
+  device_name: z.string().min(1, "Le nom de l'appareil est requis"),
+  poe_enabled: z.boolean(),
+  vlan: z.string().optional(),
+  speed: z.string().optional(),
+  equipement_id: z.number().min(1, "L'équipement est requis"),
+  connected_equipment_id: z.number().optional().nullable(),
 });
 
 type PortFormData = z.infer<typeof portSchema>;
 
 const AddPortForm = () => {
   const [open, setOpen] = useState(false);
-  const { addPort, armoires } = useData();
+  const { toast } = useToast();
+  const { addPort, refetchPorts, equipements, isLoadingEquipements } = useData();
 
   const form = useForm<PortFormData>({
     resolver: zodResolver(portSchema),
     defaultValues: {
-      nom: "",
-      type: "",
-      vitesse: "",
-      etat: "Libre",
-      armoire: "",
+      port_label: "",
+      device_name: "",
+      poe_enabled: false,
       vlan: "",
-      description: ""
-    }
+      speed: "",
+      equipement_id: undefined,
+      connected_equipment_id: undefined,
+    },
   });
 
-  const onSubmit = (data: PortFormData) => {
-    addPort({
-      nom: data.nom!,
-      type: data.type!,
-      vitesse: data.vitesse!,
-      etat: data.etat!,
-      armoire: data.armoire!,
-      vlan: data.vlan!,
-      description: data.description || ""
-    });
-    toast({
-      title: "Port ajouté",
-      description: `Le port ${data.nom} a été ajouté avec succès`,
-    });
-    form.reset();
-    setOpen(false);
+  const onSubmit = async (data: PortFormData) => {
+    try {
+      const portData: PortCreateData = {
+        port_label: data.port_label,
+        device_name: data.device_name,
+        poe_enabled: data.poe_enabled,
+        vlan: data.vlan || undefined,
+        speed: data.speed || undefined,
+        equipement_id: data.equipement_id,
+        connected_equipment_id: data.connected_equipment_id || undefined,
+      };
+      
+      await addPort(portData);
+      toast({
+        title: "Port ajouté",
+        description: `Le port ${data.port_label} a été ajouté avec succès`,
+      });
+      form.reset();
+      setOpen(false);
+      refetchPorts();
+    } catch (error: any) {
+      toast({
+        title: "Erreur",
+        description: error.response?.data?.message || "Une erreur est survenue lors de l'ajout du port",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -67,7 +80,7 @@ const AddPortForm = () => {
           Ajouter un port
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Ajouter un nouveau port</DialogTitle>
           <DialogDescription>
@@ -78,12 +91,41 @@ const AddPortForm = () => {
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField
               control={form.control}
-              name="nom"
+              name="equipement_id"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Nom</FormLabel>
+                  <FormLabel>Équipement *</FormLabel>
+                  <Select
+                    onValueChange={(value) => field.onChange(parseInt(value))}
+                    value={field.value?.toString()}
+                    disabled={isLoadingEquipements}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Sélectionner l'équipement" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {equipements?.map((equipement) => (
+                        <SelectItem key={equipement.id} value={equipement.id.toString()}>
+                          {equipement.name} ({equipement.equipement_code})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="port_label"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Label du port *</FormLabel>
                   <FormControl>
-                    <Input placeholder="Port-03" {...field} />
+                    <Input placeholder="Ex: P1, P2, Gi0/1" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -92,39 +134,31 @@ const AddPortForm = () => {
             
             <FormField
               control={form.control}
-              name="type"
+              name="device_name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Type</FormLabel>
+                  <FormLabel>Nom de l'appareil *</FormLabel>
                   <FormControl>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Sélectionner le type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="RJ45">RJ45</SelectItem>
-                        <SelectItem value="Fibre">Fibre optique</SelectItem>
-                        <SelectItem value="SFP">SFP</SelectItem>
-                        <SelectItem value="SFP+">SFP+</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <Input placeholder="Ex: Switch-001" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="vitesse"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Vitesse</FormLabel>
-                  <FormControl>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Sélectionner la vitesse" />
-                      </SelectTrigger>
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="speed"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Vitesse</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Sélectionner la vitesse" />
+                        </SelectTrigger>
+                      </FormControl>
                       <SelectContent>
                         <SelectItem value="100 Mbps">100 Mbps</SelectItem>
                         <SelectItem value="1 Gbps">1 Gbps</SelectItem>
@@ -134,60 +168,36 @@ const AddPortForm = () => {
                         <SelectItem value="100 Gbps">100 Gbps</SelectItem>
                       </SelectContent>
                     </Select>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            <FormField
-              control={form.control}
-              name="etat"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>État</FormLabel>
-                  <FormControl>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Sélectionner l'état" />
-                      </SelectTrigger>
+              <FormField
+                control={form.control}
+                name="poe_enabled"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>PoE activé</FormLabel>
+                    <Select
+                      onValueChange={(value) => field.onChange(value === "true")}
+                      value={field.value ? "true" : "false"}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
                       <SelectContent>
-                        <SelectItem value="Actif">Actif</SelectItem>
-                        <SelectItem value="Libre">Libre</SelectItem>
-                        <SelectItem value="Erreur">Erreur</SelectItem>
-                        <SelectItem value="Maintenance">Maintenance</SelectItem>
+                        <SelectItem value="true">Oui</SelectItem>
+                        <SelectItem value="false">Non</SelectItem>
                       </SelectContent>
                     </Select>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="armoire"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Armoire</FormLabel>
-                  <FormControl>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Sélectionner l'armoire" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {armoires.map((armoire) => (
-                          <SelectItem key={armoire.id} value={armoire.nom}>
-                            {armoire.nom} - {armoire.emplacement}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
             <FormField
               control={form.control}
@@ -196,7 +206,7 @@ const AddPortForm = () => {
                 <FormItem>
                   <FormLabel>VLAN</FormLabel>
                   <FormControl>
-                    <Input placeholder="VLAN-300" {...field} />
+                    <Input placeholder="Ex: VLAN-300" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -205,13 +215,32 @@ const AddPortForm = () => {
 
             <FormField
               control={form.control}
-              name="description"
+              name="connected_equipment_id"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Description</FormLabel>
-                  <FormControl>
-                    <Textarea placeholder="Description du port..." {...field} />
-                  </FormControl>
+                  <FormLabel>Équipement connecté (optionnel)</FormLabel>
+                  <Select
+                    onValueChange={(value) => {
+                      const numericValue = value === "none" ? undefined : parseInt(value);
+                      field.onChange(numericValue);
+                    }}
+                    value={field.value?.toString() || "none"}
+                    disabled={isLoadingEquipements}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Sélectionner l'équipement connecté" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="none">Aucun</SelectItem>
+                      {equipements?.map((equipement) => (
+                        <SelectItem key={equipement.id} value={equipement.id.toString()}>
+                          {equipement.name} ({equipement.equipement_code})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}

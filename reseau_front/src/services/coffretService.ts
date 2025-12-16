@@ -8,9 +8,13 @@ export interface Coffret {
   long: number;
   lat: number;
   status: string;
+  batiment_id?: number;
+  salle_id?: number;
   created_at?: string;
   updated_at?: string;
   equipements?: Equipement[];
+  batiment?: { id: number; nom: string };
+  salle?: { id: number; nom: string };
 }
 
 export interface Equipement {
@@ -35,11 +39,13 @@ export interface CoffretListResponse {
 }
 
 export interface CoffretCreateData {
-  code: string;
+  code?: string;
   nom: string;
   piece: string;
   long?: number;
   lat?: number;
+  batiment_id?: number;
+  salle_id?: number;
   status?: string;
 }
 

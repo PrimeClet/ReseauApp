@@ -28,7 +28,7 @@ class EquipementsController extends Controller
         $perPage = (int) $request->get('per_page', 15);
         $perPage = $perPage > 0 && $perPage <= 100 ? $perPage : 15;
 
-        $equipement = $query->orderBy('name')->paginate($perPage);
+        $equipement = $query->with('coffret', 'batiment', 'salle', 'ports')->orderBy('name')->paginate($perPage);
 
         return response()->json($equipement);
     }
@@ -43,7 +43,7 @@ class EquipementsController extends Controller
         }
 
         $request->validate([
-            'equipement_code' => 'required|string|max:255|unique:equipements,equipement_code',
+            'equipement_code' => 'nullable|string|max:255|unique:equipements,equipement_code',
             'name' => 'required|string|max:255',
             'type' => 'required|string|max:255',
             'description' => 'nullable|string',
@@ -51,15 +51,55 @@ class EquipementsController extends Controller
             'vlan' => 'nullable|string',
             'ip_address' => 'nullable|ip',
             'coffret_id' => 'required|exists:coffrets,id',
+            'batiment_id' => 'nullable|exists:batiments,id',
+            'salle_id' => 'nullable|exists:salles,id',
             'status' => 'required|in:active,inactive,maintenance',
         ]);
 
-        $equipement = Equipement::create($request->all());
+        // Générer automatiquement le code équipement s'il n'est pas fourni
+        $equipementCode = $request->equipement_code;
+        if (empty($equipementCode)) {
+            $equipementCode = $this->generateEquipementCode();
+        }
+
+        $equipementData = $request->all();
+        $equipementData['equipement_code'] = $equipementCode;
+
+        $equipement = Equipement::create($equipementData);
 
         return response()->json([
             'message' => 'Équipement créé avec succès.',
-            'equipement' => $equipement,
+            'data' => $equipement,
         ], 201);
+    }
+
+    /**
+     * Génère un code équipement unique au format EQ-001, EQ-002, etc.
+     */
+    private function generateEquipementCode(): string
+    {
+        // Récupérer tous les équipements avec un code au format EQ-XXX
+        $equipements = Equipement::where('equipement_code', 'like', 'EQ-%')
+            ->get();
+
+        $maxNumber = 0;
+        
+        foreach ($equipements as $equipement) {
+            // Extraire le numéro du code (après "EQ-")
+            $code = $equipement->equipement_code;
+            if (preg_match('/^EQ-(\d+)$/', $code, $matches)) {
+                $number = (int) $matches[1];
+                if ($number > $maxNumber) {
+                    $maxNumber = $number;
+                }
+            }
+        }
+
+        // Incrémenter pour obtenir le prochain numéro
+        $newNumber = $maxNumber + 1;
+
+        // Formater avec des zéros à gauche (EQ-001, EQ-002, etc.)
+        return 'EQ-' . str_pad($newNumber, 3, '0', STR_PAD_LEFT);
     }
 
     /**
@@ -67,7 +107,9 @@ class EquipementsController extends Controller
      */
     public function show(Equipement $equipement)
     {
-        return response()->json($equipement->load('coffret', 'ports'));
+        return response()->json([
+            'data' => $equipement->load('coffret', 'batiment', 'salle', 'ports')
+        ]);
     }
 
     /**
@@ -88,6 +130,8 @@ class EquipementsController extends Controller
             'vlan' => 'nullable|string',
             'ip_address' => 'nullable|ip',
             'coffret_id' => 'sometimes|exists:coffrets,id',
+            'batiment_id' => 'nullable|exists:batiments,id',
+            'salle_id' => 'nullable|exists:salles,id',
             'status' => 'sometimes|in:active,inactive,maintenance',
         ]);
 
@@ -95,7 +139,7 @@ class EquipementsController extends Controller
 
         return response()->json([
             'message' => 'Équipement mis à jour avec succès.',
-            'equipement' => $equipement,
+            'data' => $equipement,
         ], 200);
     }
 
