@@ -159,6 +159,12 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/import/template/{type}', [ImportController::class, 'template']);
         });
 
+        // Import CSV
+        Route::middleware('permission:manage_inventory')->group(function () {
+            Route::post('/import', [ImportController::class, 'import']);
+            Route::get('/import/template/{type}', [ImportController::class, 'template']);
+        });
+
         // Routes pour les utilisateurs (à activer si nécessaire)
         // Route::middleware('permission:manage_users')->group(function () {
         //     Route::get('/users', [UserController::class, 'index']);
