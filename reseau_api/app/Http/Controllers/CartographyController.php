@@ -25,10 +25,10 @@ class CartographyController extends Controller
         $topologies = $lans->map(function ($lan) {
             return [
                 'id' => (string) $lan->id,
-                'name' => $lan->nom,
-                'subnet' => $lan->sous_reseau,
-                'vlan' => $lan->vlan,
-                'description' => $lan->description ?? "Topologie du LAN {$lan->nom}",
+                'name' => $lan->name,
+                'subnet' => $lan->subnet,
+                'vlan' => $lan->vlan_id,
+                'description' => $lan->description ?? "Topologie du LAN {$lan->name}",
                 'batiment_id' => $lan->batiment_id,
                 'salle_id' => $lan->salle_id,
             ];
@@ -140,25 +140,42 @@ class CartographyController extends Controller
     protected function buildTopologyForLan(Lan $lan): array
     {
         // Récupérer les équipements associés au LAN
-        // Un équipement est associé si :
-        // 1. Il est dans le même bâtiment et la même salle que le LAN
-        // 2. OU son VLAN correspond au VLAN du LAN
+        // Stratégie : Filtrer par VLAN pour obtenir les équipements du segment réseau
+        // + Inclure les équipements d'interconnexion (VLAN 1 = management)
+
+        $vlanId = (string) $lan->vlan_id;
+
         $equipements = Equipement::with(['coffret', 'batiment', 'salle', 'ports'])
-            ->where(function ($query) use ($lan) {
-                // Équipements dans le même bâtiment et salle
-                if ($lan->batiment_id && $lan->salle_id) {
-                    $query->where(function ($q) use ($lan) {
-                        $q->where('batiment_id', $lan->batiment_id)
-                          ->where('salle_id', $lan->salle_id);
-                    });
-                }
-                // OU équipements avec le même VLAN (si le LAN a un VLAN)
-                if ($lan->vlan) {
-                    $query->orWhere('vlan', $lan->vlan);
-                }
-                // Si aucun critère n'est rempli, retourner tous les équipements (pour une vue globale)
-                if (!$lan->batiment_id && !$lan->salle_id && !$lan->vlan) {
-                    $query->orWhereRaw('1 = 1'); // Toujours vrai
+            ->where(function ($query) use ($lan, $vlanId) {
+                // Équipements avec le même VLAN que le LAN
+                if ($vlanId) {
+                    $query->where('vlan', $vlanId);
+
+                    // Inclure le switch core (VLAN 1) pour montrer les interconnexions
+                    // seulement si le LAN n'est pas déjà le VLAN 1
+                    if ($vlanId !== '1') {
+                        $query->orWhere(function ($q) use ($lan) {
+                            $q->where('vlan', '1')
+                              ->where('type', 'switch')
+                              ->where(function ($sub) use ($lan) {
+                                  // Même bâtiment/salle ou équipement core
+                                  if ($lan->batiment_id) {
+                                      $sub->where('batiment_id', $lan->batiment_id);
+                                  }
+                              });
+                        });
+                    }
+                } else {
+                    // Si pas de VLAN défini, filtrer par bâtiment/salle
+                    if ($lan->batiment_id && $lan->salle_id) {
+                        $query->where('batiment_id', $lan->batiment_id)
+                              ->where('salle_id', $lan->salle_id);
+                    } elseif ($lan->batiment_id) {
+                        $query->where('batiment_id', $lan->batiment_id);
+                    } else {
+                        // Retourner tous les équipements si aucun critère
+                        $query->whereRaw('1 = 1');
+                    }
                 }
             })
             ->get();
@@ -189,7 +206,7 @@ class CartographyController extends Controller
             $batiment = $equipement->batiment;
             $salle = $equipement->salle;
 
-            $role = $this->mapEquipementTypeToRole($equipement->type);
+            $role = $this->mapEquipementTypeToRole($equipement->type, $equipement->name);
             $status = $this->mapStatusToLanStatus($equipement->status);
 
             // Position auto en grille
@@ -223,7 +240,7 @@ class CartographyController extends Controller
                 'ip' => $equipement->ip_address ?? '',
                 'model' => $equipement->type ?? '',
                 'notes' => $equipement->description,
-                'icon' => '/placeholder.svg',
+                'icon' => $this->getEquipementIcon($equipement->type, $equipement->name),
                 'ports' => $ports, // Ajouter les ports à chaque nœud
             ];
 
@@ -263,7 +280,7 @@ class CartographyController extends Controller
                 'from' => (string) $fromEquipement->id,
                 'to' => (string) $toEquipement->id,
                 'type' => $this->mapMediaToLinkType($liaison->media),
-                'vlan' => $fromPort->vlan ?? $toPort->vlan ?? $lan->vlan ?? '',
+                'vlan' => $fromPort->vlan ?? $toPort->vlan ?? $lan->vlan_id ?? '',
                 'status' => $liaison->status ? 'up' : 'down',
                 'bandwidth' => $bandwidth,
                 'fromPort' => $fromPort->port_label,
@@ -273,32 +290,112 @@ class CartographyController extends Controller
 
         return [
             'id' => (string) $lan->id,
-            'name' => $lan->nom,
-            'subnet' => $lan->sous_reseau,
-            'vlan' => $lan->vlan,
-            'description' => $lan->description ?? "Topologie du LAN {$lan->nom}",
+            'name' => $lan->name,
+            'subnet' => $lan->subnet,
+            'vlan' => $lan->vlan_id,
+            'description' => $lan->description ?? "Topologie du LAN {$lan->name}",
             'nodes' => $nodes,
             'links' => $links,
         ];
     }
 
     /**
-     * Mappe le champ "type" de l’équipement vers un rôle de nœud logique.
+     * Retourne l'icône SVG correspondant au type d'équipement.
      */
-    protected function mapEquipementTypeToRole(?string $type): string
+    protected function getEquipementIcon(?string $type, ?string $name = null): string
     {
         $type = strtolower((string) $type);
+        $name = strtolower((string) $name);
 
-        if (str_contains($type, 'core')) {
+        // Switch Core / Nexus
+        if (str_contains($name, 'core') || str_contains($name, 'nexus')) {
+            return '/icons/switch-core.svg';
+        }
+
+        // Switch Distribution
+        if (str_contains($name, 'dist') || str_contains($type, 'distribution')) {
+            return '/icons/switch-distribution.svg';
+        }
+
+        // Routeur / WAN
+        if (str_contains($type, 'router') || str_contains($name, 'routeur') || str_contains($name, 'wan')) {
+            return '/icons/device-router.svg';
+        }
+
+        // Firewall
+        if (str_contains($type, 'firewall') || str_contains($name, 'firewall')) {
+            return '/icons/device-firewall.svg';
+        }
+
+        // Serveur
+        if (str_contains($type, 'server') || str_contains($type, 'serveur') ||
+            str_contains($name, 'server') || str_contains($name, 'serveur')) {
+            return '/icons/device-server.svg';
+        }
+
+        // Switch SAN / FC (avant stockage pour éviter confusion avec "san" dans le nom)
+        if (str_contains($name, 'sw-san') || str_contains($name, 'switch san') ||
+            (str_contains($type, 'switch') && str_contains($name, 'san'))) {
+            return '/icons/switch-san.svg';
+        }
+
+        // Stockage / SAN / NAS
+        if (str_contains($type, 'storage') || str_contains($type, 'stockage') ||
+            str_contains($name, 'baie') || str_contains($name, 'netapp') ||
+            (str_contains($name, 'san') && !str_contains($type, 'switch'))) {
+            return '/icons/device-storage.svg';
+        }
+
+        // Point d'accès WiFi
+        if (str_contains($type, 'access_point') || str_contains($type, 'ap') || str_contains($type, 'wifi') ||
+            str_contains($name, 'wifi') || str_contains($name, 'ap-') || str_contains($name, 'point')) {
+            return '/icons/device-wifi.svg';
+        }
+
+        // Switch générique (access, lab, admin, etc.)
+        if (str_contains($type, 'switch') || str_contains($name, 'switch') || str_contains($name, 'sw-')) {
+            return '/icons/switch-access.svg';
+        }
+
+        // Défaut
+        return '/icons/device-generic.svg';
+    }
+
+    /**
+     * Mappe le champ "type" de l'équipement vers un rôle de nœud logique.
+     */
+    protected function mapEquipementTypeToRole(?string $type, ?string $name = null): string
+    {
+        $type = strtolower((string) $type);
+        $name = strtolower((string) $name);
+
+        // Core : switch/routeur principal, core
+        if (str_contains($type, 'core') || str_contains($name, 'core') || str_contains($name, 'nexus')) {
             return 'core';
         }
 
-        if (str_contains($type, 'dist') || str_contains($type, 'distribution')) {
+        // Distribution : switch de distribution, routeur WAN
+        if (str_contains($type, 'dist') || str_contains($type, 'distribution') ||
+            str_contains($name, 'dist') || str_contains($type, 'router') ||
+            str_contains($name, 'routeur') || str_contains($name, 'wan')) {
             return 'distribution';
         }
 
-        if (str_contains($type, 'ap') || str_contains($type, 'wifi') || str_contains($type, 'endpoint')) {
+        // Endpoint : serveurs, points d'accès WiFi, stockage, équipements finaux
+        if (str_contains($type, 'server') || str_contains($type, 'serveur') ||
+            str_contains($type, 'ap') || str_contains($type, 'wifi') ||
+            str_contains($type, 'storage') || str_contains($type, 'stockage') ||
+            str_contains($name, 'serveur') || str_contains($name, 'server') ||
+            str_contains($name, 'baie') || str_contains($name, 'wifi') ||
+            str_contains($name, 'point') || str_contains($type, 'endpoint') ||
+            str_contains($name, 'netapp')) {
             return 'endpoint';
+        }
+
+        // Access : switch d'accès, firewall, switch SAN
+        if (str_contains($type, 'switch') || str_contains($type, 'firewall') ||
+            str_contains($name, 'switch') || str_contains($name, 'firewall')) {
+            return 'access';
         }
 
         return 'access';
@@ -378,7 +475,7 @@ class CartographyController extends Controller
             $batiment = $equipement->batiment;
             $salle = $equipement->salle;
 
-            $role = $this->mapEquipementTypeToRole($equipement->type);
+            $role = $this->mapEquipementTypeToRole($equipement->type, $equipement->name);
             $status = $this->mapStatusToLanStatus($equipement->status);
 
             // Position auto en grille
@@ -412,7 +509,7 @@ class CartographyController extends Controller
                 'ip' => $equipement->ip_address ?? '',
                 'model' => $equipement->type ?? '',
                 'notes' => $equipement->description,
-                'icon' => '/placeholder.svg',
+                'icon' => $this->getEquipementIcon($equipement->type, $equipement->name),
                 'ports' => $ports,
             ];
 

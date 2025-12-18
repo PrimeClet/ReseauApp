@@ -13,11 +13,12 @@ import { useData } from "@/contexts/DataContext";
 import { Plus } from "lucide-react";
 
 const lanSchema = z.object({
-  nom: z.string().min(1, "Le nom est requis"),
-  sous_reseau: z.string().min(1, "Le sous-réseau est requis"),
-  vlan: z.string().min(1, "Le VLAN est requis"),
+  name: z.string().min(1, "Le nom est requis"),
+  subnet: z.string().min(1, "Le sous-réseau est requis"),
+  vlan_id: z.coerce.number().min(1, "Le VLAN ID est requis"),
+  gateway: z.string().optional(),
   site: z.string().min(1, "Le site est requis"),
-  statut: z.string().min(1, "Le statut est requis"),
+  status: z.string().min(1, "Le statut est requis"),
   description: z.string().optional(),
   batiment_id: z.number().min(1, "Le bâtiment est requis"),
   salle_id: z.number().min(1, "La salle est requise"),
@@ -34,11 +35,12 @@ export default function AddLanForm() {
   const form = useForm<LanFormData>({
     resolver: zodResolver(lanSchema),
     defaultValues: {
-      nom: "",
-      sous_reseau: "",
-      vlan: "",
+      name: "",
+      subnet: "",
+      vlan_id: undefined,
+      gateway: "",
       site: "",
-      statut: "Actif",
+      status: "active",
       description: "",
       batiment_id: undefined,
       salle_id: undefined,
@@ -56,7 +58,7 @@ export default function AddLanForm() {
       await addLan(data);
       toast({
         title: "LAN ajouté",
-        description: `Le LAN ${data.nom} a été créé avec succès.`,
+        description: `Le LAN ${data.name} a été créé avec succès.`,
       });
       form.reset();
       setOpen(false);
@@ -85,7 +87,7 @@ export default function AddLanForm() {
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField
               control={form.control}
-              name="nom"
+              name="name"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Nom</FormLabel>
@@ -100,7 +102,7 @@ export default function AddLanForm() {
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
-                name="sous_reseau"
+                name="subnet"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Sous-réseau (CIDR)</FormLabel>
@@ -113,18 +115,32 @@ export default function AddLanForm() {
               />
               <FormField
                 control={form.control}
-                name="vlan"
+                name="vlan_id"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>VLAN</FormLabel>
+                    <FormLabel>VLAN ID</FormLabel>
                     <FormControl>
-                      <Input placeholder="Ex: VLAN 120" {...field} />
+                      <Input type="number" placeholder="Ex: 120" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
             </div>
+
+            <FormField
+              control={form.control}
+              name="gateway"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Passerelle (optionnel)</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Ex: 10.10.0.1" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <div className="grid grid-cols-2 gap-4">
               <FormField
@@ -209,7 +225,7 @@ export default function AddLanForm() {
               />
               <FormField
                 control={form.control}
-                name="statut"
+                name="status"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Statut</FormLabel>
@@ -220,10 +236,9 @@ export default function AddLanForm() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="Actif">Actif</SelectItem>
-                        <SelectItem value="Surveillé">Surveillé</SelectItem>
-                        <SelectItem value="Maintenance">Maintenance</SelectItem>
-                        <SelectItem value="Inactif">Inactif</SelectItem>
+                        <SelectItem value="active">Actif</SelectItem>
+                        <SelectItem value="inactive">Inactif</SelectItem>
+                        <SelectItem value="maintenance">Maintenance</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />

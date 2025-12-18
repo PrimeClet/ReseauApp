@@ -26,5 +26,29 @@ class Salle extends Model
     {
         return $this->belongsTo(Batiment::class);
     }
+
+    /**
+     * Relation avec les équipements
+     */
+    public function equipements()
+    {
+        return $this->hasMany(Equipement::class);
+    }
+
+    /**
+     * Relation avec les coffrets
+     */
+    public function coffrets()
+    {
+        return $this->hasMany(Coffret::class);
+    }
+
+    /**
+     * Relation avec les LANs
+     */
+    public function lans()
+    {
+        return $this->hasMany(Lan::class);
+    }
 }
 

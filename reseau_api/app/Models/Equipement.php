@@ -42,4 +42,21 @@ class Equipement extends Model
     {
         return $this->hasMany(Port::class, 'equipement_id');
     }
+
+    /**
+     * Relation avec les maintenances
+     */
+    public function maintenances()
+    {
+        return $this->hasMany(Maintenance::class);
+    }
+
+    /**
+     * Relation avec les liaisons (via les ports)
+     */
+    public function liaisons()
+    {
+        return Liaison::whereIn('from', $this->ports()->pluck('id'))
+            ->orWhereIn('to', $this->ports()->pluck('id'));
+    }
 }

@@ -10,11 +10,12 @@ class Lan extends Model
     use HasFactory;
 
     protected $fillable = [
-        'nom',
-        'sous_reseau',
-        'vlan',
+        'name',
+        'vlan_id',
+        'subnet',
+        'gateway',
         'site',
-        'statut',
+        'status',
         'description',
         'batiment_id',
         'salle_id',

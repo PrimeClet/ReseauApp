@@ -51,11 +51,12 @@ const Lans = () => {
   const handleSave = async (updatedLan: any) => {
     try {
       await updateLan(updatedLan.id, {
-        nom: updatedLan.nom,
-        sous_reseau: updatedLan.sous_reseau || updatedLan.sousReseau,
-        vlan: updatedLan.vlan,
+        name: updatedLan.name,
+        subnet: updatedLan.subnet,
+        vlan_id: updatedLan.vlan_id,
+        gateway: updatedLan.gateway,
         site: updatedLan.site,
-        statut: updatedLan.statut,
+        status: updatedLan.status,
         description: updatedLan.description,
         batiment_id: updatedLan.batiment_id,
         salle_id: updatedLan.salle_id,
@@ -98,13 +99,14 @@ const Lans = () => {
   // Préparer les données pour le tableau
   const tableData = lans.map((lan) => ({
     id: lan.id,
-    nom: lan.nom,
-    sousReseau: lan.sous_reseau,
-    vlan: lan.vlan,
+    name: lan.name,
+    subnet: lan.subnet,
+    vlan_id: lan.vlan_id,
+    gateway: lan.gateway || '',
     site: lan.site,
     batiment: lan.batiment?.nom || '-',
     salle: lan.salle?.nom || '-',
-    statut: lan.statut,
+    status: lan.status,
     description: lan.description || "",
   }));
 
@@ -113,11 +115,12 @@ const Lans = () => {
     if (!lan) return null;
     return {
       id: lan.id,
-      nom: lan.nom,
-      sous_reseau: lan.sous_reseau || lan.sousReseau,
-      vlan: lan.vlan,
+      name: lan.name,
+      subnet: lan.subnet,
+      vlan_id: lan.vlan_id,
+      gateway: lan.gateway || '',
       site: lan.site,
-      statut: lan.statut,
+      status: lan.status,
       description: lan.description || "",
     };
   };
@@ -143,7 +146,7 @@ const Lans = () => {
           <>
             <DataTableEnhanced
               title={`${lans.length} LAN${lans.length > 1 ? 's' : ''} configuré${lans.length > 1 ? 's' : ''}`}
-              columns={["nom", "sousReseau", "vlan", "batiment", "salle", "site", "statut"]}
+              columns={["name", "subnet", "vlan_id", "batiment", "salle", "site", "status"]}
               data={tableData}
               onRowClick={handleRowClick}
               onEdit={handleEdit}
@@ -169,11 +172,12 @@ const Lans = () => {
               data={formatLanForModal(selectedLan)}
               onSave={handleSave}
               fields={[
-                { key: "nom", label: "Nom", type: "text" },
-                { key: "sous_reseau", label: "Sous-réseau", type: "text" },
-                { key: "vlan", label: "VLAN", type: "text" },
+                { key: "name", label: "Nom", type: "text" },
+                { key: "subnet", label: "Sous-réseau", type: "text" },
+                { key: "vlan_id", label: "VLAN ID", type: "number" },
+                { key: "gateway", label: "Passerelle", type: "text" },
                 { key: "site", label: "Site", type: "text" },
-                { key: "statut", label: "Statut", type: "text" },
+                { key: "status", label: "Statut", type: "text" },
                 { key: "description", label: "Description", type: "text" },
               ]}
             />

@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 const Armoires = () => {
   const { isAuthenticated, isLoading: isLoadingAuth } = useAuth();
   const navigate = useNavigate();
-  const { coffrets, isLoadingCoffrets, addCoffret, updateCoffret, deleteCoffret, refetchCoffrets } = useData();
+  const { coffrets, batiments, salles, isLoadingCoffrets, addCoffret, updateCoffret, deleteCoffret, refetchCoffrets } = useData();
   const [selectedCoffret, setSelectedCoffret] = useState<any>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -110,16 +110,22 @@ const Armoires = () => {
   // Préparer les données pour les modals (format attendu)
   const formatCoffretForModal = (coffret: any) => {
     if (!coffret) return null;
+    // Trouver le coffret original dans la liste pour avoir les IDs
+    const originalCoffret = coffrets.find(c => c.id === coffret.id) || coffret;
+    const batiment = batiments.find(b => b.id === originalCoffret.batiment_id);
+    const salle = salles.find(s => s.id === originalCoffret.salle_id);
     return {
-      id: coffret.id,
-      code: coffret.code,
-      nom: coffret.nom,
-      piece: coffret.piece,
-      long: coffret.long || 0,
-      lat: coffret.lat || 0,
-      batiment_id: coffret.batiment_id,
-      salle_id: coffret.salle_id,
-      status: coffret.status,
+      id: originalCoffret.id,
+      code: originalCoffret.code,
+      nom: originalCoffret.nom,
+      piece: originalCoffret.piece,
+      long: originalCoffret.long || 0,
+      lat: originalCoffret.lat || 0,
+      batiment: batiment?.nom || null,
+      salle: salle?.nom || null,
+      batiment_id: originalCoffret.batiment_id,
+      salle_id: originalCoffret.salle_id,
+      status: originalCoffret.status,
     };
   };
 

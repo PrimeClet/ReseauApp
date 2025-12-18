@@ -1,6 +1,6 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit'
 import type { RootState } from '../store/store'
-import axios from 'axios';
+import api from '@/axios';
 
 export type user = {
     id: number,
@@ -35,7 +35,7 @@ export const fetchUsers = createAsyncThunk<user[]>(
     'user/fetchUsers',
     async (_, { rejectWithValue }) => {
       try {
-        const response = await axios.get('/api/users');
+        const response = await api.get('/users');
         return response.data; // tableau d’utilisateurs
       } catch (err: any) {
         return rejectWithValue('Erreur lors du fetch');
@@ -58,8 +58,8 @@ export const UserSlice = createSlice({
     },
     logout: (state) => {
         state.isLogin = false;
-        state.user = initialState.user;
-        state.token = '';
+        state.user = null;
+        state.token = null;
     },
     setUsers: (state, action: PayloadAction<user[]>) => {
         state.users = action.payload;

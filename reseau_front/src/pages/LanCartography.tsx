@@ -91,6 +91,36 @@ const roleColors: Record<LanNode["role"], string> = {
 
 const roleHierarchy: LanNode["role"][] = ["core", "distribution", "access", "endpoint"];
 
+// Icônes SVG pour les différents types d'équipements (encodées en data URI)
+const equipmentIcons: Record<string, string> = {
+  // Router/Core
+  router: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%233b82f6' stroke-width='2'%3E%3Crect x='2' y='6' width='20' height='12' rx='2'/%3E%3Cline x1='6' y1='10' x2='6' y2='14'/%3E%3Cline x1='10' y1='10' x2='10' y2='14'/%3E%3Cline x1='14' y1='10' x2='14' y2='14'/%3E%3Cline x1='18' y1='10' x2='18' y2='14'/%3E%3C/svg%3E",
+  // Switch/Distribution
+  switch: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%232563eb' stroke-width='2'%3E%3Crect x='2' y='4' width='20' height='16' rx='2'/%3E%3Cline x1='6' y1='8' x2='18' y2='8'/%3E%3Ccircle cx='6' cy='12' r='1.5' fill='%2310b981'/%3E%3Ccircle cx='10' cy='12' r='1.5' fill='%2310b981'/%3E%3Ccircle cx='14' cy='12' r='1.5' fill='%23f59e0b'/%3E%3Ccircle cx='18' cy='12' r='1.5' fill='%2310b981'/%3E%3Ccircle cx='6' cy='16' r='1.5' fill='%2310b981'/%3E%3Ccircle cx='10' cy='16' r='1.5' fill='%2364748b'/%3E%3Ccircle cx='14' cy='16' r='1.5' fill='%2310b981'/%3E%3Ccircle cx='18' cy='16' r='1.5' fill='%2310b981'/%3E%3C/svg%3E",
+  // Access Point
+  access: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2310b981' stroke-width='2'%3E%3Cpath d='M5 12.55a11 11 0 0 1 14.08 0'/%3E%3Cpath d='M1.42 9a16 16 0 0 1 21.16 0'/%3E%3Cpath d='M8.53 16.11a6 6 0 0 1 6.95 0'/%3E%3Ccircle cx='12' cy='20' r='1' fill='%2310b981'/%3E%3C/svg%3E",
+  // Server/Endpoint
+  server: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2'%3E%3Crect x='2' y='2' width='20' height='8' rx='2'/%3E%3Crect x='2' y='14' width='20' height='8' rx='2'/%3E%3Ccircle cx='6' cy='6' r='1' fill='%2310b981'/%3E%3Ccircle cx='6' cy='18' r='1' fill='%2310b981'/%3E%3Cline x1='10' y1='6' x2='18' y2='6'/%3E%3Cline x1='10' y1='18' x2='18' y2='18'/%3E%3C/svg%3E",
+  // Computer/Workstation
+  computer: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2'%3E%3Crect x='2' y='3' width='20' height='14' rx='2'/%3E%3Cline x1='8' y1='21' x2='16' y2='21'/%3E%3Cline x1='12' y1='17' x2='12' y2='21'/%3E%3C/svg%3E",
+  // Firewall
+  firewall: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ef4444' stroke-width='2'%3E%3Cpath d='M12 2L3 7v6c0 5.5 3.8 10.7 9 12 5.2-1.3 9-6.5 9-12V7l-9-5z'/%3E%3Cline x1='9' y1='12' x2='15' y2='12'/%3E%3C/svg%3E",
+  // Default network device
+  default: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cline x1='2' y1='12' x2='22' y2='12'/%3E%3Cpath d='M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z'/%3E%3C/svg%3E",
+};
+
+// Mapper le rôle vers l'icône appropriée
+const getIconForRole = (role: LanNode["role"], icon?: string): string => {
+  if (icon && equipmentIcons[icon]) return equipmentIcons[icon];
+  switch (role) {
+    case "core": return equipmentIcons.router;
+    case "distribution": return equipmentIcons.switch;
+    case "access": return equipmentIcons.access;
+    case "endpoint": return equipmentIcons.server;
+    default: return equipmentIcons.default;
+  }
+};
+
 // Créer un élément personnalisé avec icône
 const NetworkNode = shapes.standard.Rectangle.define("network.Node", {
   attrs: {
@@ -130,23 +160,61 @@ const NetworkNode = shapes.standard.Rectangle.define("network.Node", {
   ],
 });
 
-// Calculer les positions automatiques en étoile
-const computeAutoLayoutPositions = (nodes: LanNode[]) => {
+// Calculer les positions automatiques en topologie hiérarchique (arbre)
+const computeAutoLayoutPositions = (nodes: LanNode[], links: LanLink[]) => {
   const positions = new Map<string, { x: number; y: number }>();
-  const baseY = 50;
-  const rowSpacing = 150;
-  const rowWidth = 800;
-  const startX = 100;
+  const centerX = 600;
+  const startY = 80;
+  const levelSpacing = 180;
+  const nodeWidth = 180;
 
-  roleHierarchy.forEach((role, rowIndex) => {
-    const group = nodes.filter((node) => node.role === role);
+  // Grouper par rôle avec ordre hiérarchique
+  const coreNodes = nodes.filter((n) => n.role === "core");
+  const distributionNodes = nodes.filter((n) => n.role === "distribution");
+  const accessNodes = nodes.filter((n) => n.role === "access");
+  const endpointNodes = nodes.filter((n) => n.role === "endpoint");
+
+  // Fonction pour positionner un groupe de nœuds horizontalement centré
+  const positionGroup = (group: LanNode[], y: number) => {
     if (!group.length) return;
-    const step = rowWidth / (group.length + 1);
+    const totalWidth = group.length * nodeWidth;
+    const startX = centerX - totalWidth / 2 + nodeWidth / 2;
     group.forEach((node, idx) => {
-      const x = startX + (idx + 1) * step;
-      const y = baseY + rowIndex * rowSpacing;
-      positions.set(node.id, { x, y });
+      positions.set(node.id, { x: startX + idx * nodeWidth, y });
     });
+  };
+
+  // Positionner chaque niveau
+  let currentY = startY;
+
+  // Core au centre en haut
+  if (coreNodes.length > 0) {
+    positionGroup(coreNodes, currentY);
+    currentY += levelSpacing;
+  }
+
+  // Distribution
+  if (distributionNodes.length > 0) {
+    positionGroup(distributionNodes, currentY);
+    currentY += levelSpacing;
+  }
+
+  // Access
+  if (accessNodes.length > 0) {
+    positionGroup(accessNodes, currentY);
+    currentY += levelSpacing;
+  }
+
+  // Endpoints en bas
+  if (endpointNodes.length > 0) {
+    positionGroup(endpointNodes, currentY);
+  }
+
+  // Pour les nœuds sans position (fallback)
+  nodes.forEach((node, idx) => {
+    if (!positions.has(node.id)) {
+      positions.set(node.id, { x: 100 + (idx % 5) * nodeWidth, y: startY + Math.floor(idx / 5) * levelSpacing });
+    }
   });
 
   return positions;
@@ -159,7 +227,7 @@ const LanCartographyContent = () => {
   const [selectedBatimentId, setSelectedBatimentId] = useState<number | undefined>(undefined);
   const [selectedSalleId, setSelectedSalleId] = useState<number | undefined>(undefined);
   const [selectedTopologyId, setSelectedTopologyId] = useState<string>("");
-  const [filterMode, setFilterMode] = useState<"lan" | "batiment" | "salle">("lan");
+  const [filterMode, setFilterMode] = useState<"all" | "lan" | "batiment" | "salle">("all");
   const [topology, setTopology] = useState<LanTopology | null>(null);
   const [isLoadingLans, setIsLoadingLans] = useState(true);
   const [isLoadingBatiments, setIsLoadingBatiments] = useState(false);
@@ -169,10 +237,30 @@ const LanCartographyContent = () => {
   const [selectedNode, setSelectedNode] = useState<LanNode | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [sourceNodeId, setSourceNodeId] = useState<string | null>(null);
+  const [containerReady, setContainerReady] = useState(false);
+  const [showNoLinksAlert, setShowNoLinksAlert] = useState(true);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const graphRef = useRef<dia.Graph | null>(null);
   const paperRef = useRef<dia.Paper | null>(null);
   const handleKeyDownRef = useRef<((evt: KeyboardEvent) => void) | null>(null);
+
+  // Callback ref pour détecter quand le container est monté
+  const setContainerRef = useCallback((node: HTMLDivElement | null) => {
+    // Nettoyer l'ancien graphe si on reçoit un nouveau container
+    if (node && node !== containerRef.current) {
+      if (paperRef.current) {
+        paperRef.current.remove();
+        paperRef.current = null;
+      }
+      if (graphRef.current) {
+        graphRef.current.clear();
+        graphRef.current = null;
+      }
+    }
+    containerRef.current = node;
+    setContainerReady(!!node);
+    console.log('Container ref updated:', !!node);
+  }, []);
 
   // Charger la liste des LANs
   useEffect(() => {
@@ -190,9 +278,6 @@ const LanCartographyContent = () => {
           links: [],
         }));
         setLans(topologiesList);
-        if (topologiesList.length > 0 && !selectedTopologyId && filterMode === "lan") {
-          setSelectedTopologyId(topologiesList[0].id);
-        }
       } catch (error) {
         console.error('Erreur lors du chargement des LANs:', error);
       } finally {
@@ -246,18 +331,30 @@ const LanCartographyContent = () => {
     const loadTopology = async () => {
       try {
         setIsLoadingTopology(true);
+        // Reset containerReady pour forcer le re-mount du container
+        setContainerReady(false);
+        // Reset l'alerte pour qu'elle s'affiche à nouveau si nécessaire
+        setShowNoLinksAlert(true);
+
         let response: LanTopology;
 
-        if (filterMode === "lan" && selectedTopologyId) {
+        if (filterMode === "all") {
+          // Charger toute la topologie sans filtre
+          response = await cartographyService.getLanTopology();
+        } else if (filterMode === "lan" && selectedTopologyId) {
           response = await cartographyService.getLanTopology(selectedTopologyId);
         } else if (filterMode === "salle" && selectedSalleId) {
           response = await cartographyService.getLanTopology(undefined, { salle_id: selectedSalleId });
         } else if (filterMode === "batiment" && selectedBatimentId) {
           response = await cartographyService.getLanTopology(undefined, { batiment_id: selectedBatimentId });
         } else {
+          // Réinitialiser la topologie si les conditions ne sont pas remplies
+          setTopology(null);
+          setIsLoadingTopology(false);
           return;
         }
 
+        console.log('Topologie chargée:', response.nodes.length, 'nodes,', response.links.length, 'links');
         setTopology(response);
       } catch (error) {
         console.error('Erreur lors du chargement de la topologie:', error);
@@ -272,27 +369,54 @@ const LanCartographyContent = () => {
 
   // Initialisation de JointJS
   useEffect(() => {
-    if (!containerRef.current || !topology || isLoadingTopology) return;
+    console.log('JointJS useEffect triggered:', {
+      containerRef: !!containerRef.current,
+      containerReady,
+      topology: topology ? `${topology.nodes.length} nodes` : 'null',
+      isLoadingTopology
+    });
+
+    if (!containerRef.current || !containerReady || !topology || isLoadingTopology) {
+      console.log('JointJS: Conditions not met, skipping initialization');
+      return;
+    }
+    if (topology.nodes.length === 0) {
+      console.log('JointJS: No nodes, skipping initialization');
+      return;
+    }
 
     const container = containerRef.current;
-    
-    // Créer le graphique avec le namespace incluant notre élément personnalisé
-    const cellNamespace = { ...shapes, network: { Node: NetworkNode } };
-    const graph = new dia.Graph({}, { cellNamespace });
+
+    // Nettoyer complètement avant de recréer
+    if (paperRef.current) {
+      paperRef.current.remove();
+      paperRef.current = null;
+    }
+    if (graphRef.current) {
+      graphRef.current.clear();
+      graphRef.current = null;
+    }
+    container.innerHTML = '';
+
+    console.log('JointJS: Initialisation avec', topology.nodes.length, 'nodes et', topology.links.length, 'links');
+
+    // Créer le graphique - utiliser shapes standard sans namespace personnalisé
+    const graph = new dia.Graph();
     graphRef.current = graph;
 
-    // Créer le papier avec une taille agrandie
+    // Créer le papier
     const paper = new dia.Paper({
       el: container,
       model: graph,
       width: 1400,
-      height: 1200,
+      height: 900,
       gridSize: 10,
       drawGrid: true,
       background: {
-        color: "#f9fafb",
+        color: "#f8fafc",
       },
-      cellViewNamespace: cellNamespace,
+      async: true, // Améliore les performances
+      sorting: dia.Paper.sorting.APPROX,
     });
     paperRef.current = paper;
 
@@ -370,93 +494,126 @@ const LanCartographyContent = () => {
     container.addEventListener('contextmenu', (e) => e.preventDefault()); // Désactiver le menu contextuel pour le clic droit
 
     // Calculer les positions
-    const layoutPositions = computeAutoLayoutPositions(topology.nodes);
+    const layoutPositions = computeAutoLayoutPositions(topology.nodes, topology.links);
 
-    // Créer les éléments pour chaque nœud
+    // Map pour associer nos IDs aux éléments JointJS
     const nodeMap = new Map<string, dia.Element>();
-    
+
+    // Créer les éléments pour chaque nœud avec icône
     topology.nodes.forEach((nodeData) => {
       const position = layoutPositions.get(nodeData.id) || { x: 100, y: 100 };
       const roleColor = roleColors[nodeData.role] || roleColors.endpoint;
       const statusColor = statusColors[nodeData.status] || statusColors.down;
+      const iconUrl = getIconForRole(nodeData.role, nodeData.icon);
 
-      // Créer un élément rectangle personnalisé avec icône
-      const rect = new NetworkNode({
+      // Créer un groupe avec icône et texte
+      const nodeElement = new shapes.standard.Rectangle({
         position: { x: position.x, y: position.y },
-        size: { width: 160, height: 120 },
+        size: { width: 160, height: 90 },
         attrs: {
           body: {
             fill: "#ffffff",
-            stroke: roleColor,
-            strokeWidth: 2,
-            rx: 8,
-            ry: 8,
-          },
-          icon: {
-            ref: "body",
-            refX: "50%",
-            refY: 20,
-            refX2: -24,
-            refY2: -24,
-            width: 48,
-            height: 48,
-            "xlink:href": nodeData.icon || "/placeholder.svg",
-            preserveAspectRatio: "xMidYMid meet",
+            stroke: statusColor === statusColors.up ? roleColor : statusColor,
+            strokeWidth: 3,
+            rx: 10,
+            ry: 10,
+            cursor: "pointer",
           },
           label: {
-            text: nodeData.name,
+            text: `${nodeData.name}`,
             fill: "#1f2937",
             fontSize: 12,
             fontWeight: "bold",
-            refY: 75,
             textAnchor: "middle",
+            refY: 55,
             refX: "50%",
-          },
-          siteLabel: {
-            text: nodeData.site,
-            fill: "#6b7280",
-            fontSize: 10,
-            refY: 95,
-            textAnchor: "middle",
-            refX: "50%",
-          },
-          ipLabel: {
-            text: nodeData.ip,
-            fill: "#6b7280",
-            fontSize: 9,
-            fontFamily: "monospace",
-            refY: 110,
-            textAnchor: "middle",
-            refX: "50%",
-          },
-          statusIndicator: {
-            ref: "body",
-            refX: "100%",
-            refY: 0,
-            refX2: -12,
-            refY2: 4,
-            r: 4,
-            fill: statusColor,
-            stroke: "#ffffff",
-            strokeWidth: 1,
           },
         },
       });
 
-      // Stocker les données du nœud
-      (rect as any).nodeData = nodeData;
-      rect.set("id", nodeData.id);
+      // Stocker les données du nœud pour les événements
+      (nodeElement as any).nodeData = nodeData;
 
-      graph.addCell(rect);
-      nodeMap.set(nodeData.id, rect);
+      graph.addCell(nodeElement);
+      nodeMap.set(nodeData.id, nodeElement);
+
+      // Ajouter l'icône comme élément séparé positionné sur le noeud
+      const iconElement = new shapes.standard.Image({
+        position: { x: position.x + 56, y: position.y + 8 },
+        size: { width: 48, height: 36 },
+        attrs: {
+          image: {
+            xlinkHref: iconUrl,
+            cursor: "pointer",
+          },
+          body: {
+            fill: "transparent",
+            stroke: "none",
+          },
+        },
+      });
+      (iconElement as any).nodeData = nodeData;
+      (iconElement as any).parentNodeId = nodeData.id;
+      graph.addCell(iconElement);
+
+      // Ajouter le badge de statut
+      const statusBadge = new shapes.standard.Circle({
+        position: { x: position.x + 140, y: position.y + 5 },
+        size: { width: 16, height: 16 },
+        attrs: {
+          body: {
+            fill: statusColor,
+            stroke: "#ffffff",
+            strokeWidth: 2,
+            cursor: "pointer",
+          },
+        },
+      });
+      (statusBadge as any).nodeData = nodeData;
+      (statusBadge as any).parentNodeId = nodeData.id;
+      graph.addCell(statusBadge);
+
+      // Ajouter l'IP sous le nom
+      const ipLabel = new shapes.standard.Rectangle({
+        position: { x: position.x + 10, y: position.y + 68 },
+        size: { width: 140, height: 18 },
+        attrs: {
+          body: {
+            fill: "transparent",
+            stroke: "none",
+          },
+          label: {
+            text: nodeData.ip,
+            fill: "#6b7280",
+            fontSize: 10,
+            fontFamily: "monospace",
+            textAnchor: "middle",
+            refX: "50%",
+            refY: "50%",
+            cursor: "pointer",
+          },
+        },
+      });
+      (ipLabel as any).nodeData = nodeData;
+      (ipLabel as any).parentNodeId = nodeData.id;
+      graph.addCell(ipLabel);
+
+      console.log(`Node créé: ${nodeData.id} -> JointJS ID: ${nodeElement.id}`);
     });
 
     // Créer les liens
-    topology.links.forEach((linkData) => {
-      const sourceNode = nodeMap.get(linkData.from);
-      const targetNode = nodeMap.get(linkData.to);
+    console.log('JointJS: Création de', topology.links.length, 'liens');
+    topology.links.forEach((linkData, index) => {
+      const sourceElement = nodeMap.get(linkData.from);
+      const targetElement = nodeMap.get(linkData.to);
 
-      if (!sourceNode || !targetNode) return;
+      if (!sourceElement || !targetElement) {
+        console.warn(`Lien ${index}: source=${linkData.from} ou target=${linkData.to} non trouvé dans nodeMap`);
+        console.warn('NodeMap keys:', Array.from(nodeMap.keys()));
+        return;
+      }
+
+      console.log(`Lien ${index}: ${linkData.from} -> ${linkData.to}`);
 
       const strokeColor =
         linkData.status === "up"
@@ -464,34 +621,32 @@ const LanCartographyContent = () => {
           : linkData.status === "warn"
             ? "#f59e0b"
             : "#ef4444";
-      const strokeWidth = linkData.type === "fiber" ? 3 : linkData.type === "copper" ? 2 : 1.5;
+      const strokeWidth = linkData.type === "fiber" ? 4 : linkData.type === "copper" ? 3 : 2;
       const strokeDasharray = linkData.type === "wireless" ? "6 4" : undefined;
 
       const labels: any[] = [];
-      
+
       // Ajouter le label du port source
       if (linkData.fromPort) {
         labels.push({
           position: {
-            distance: 0.1,
-            offset: -15,
+            distance: 0.15,
+            offset: { x: 0, y: -12 },
           },
           attrs: {
             text: {
               text: linkData.fromPort,
               fill: "#1f2937",
-              fontSize: 10,
+              fontSize: 9,
               fontWeight: "bold",
               fontFamily: "monospace",
-              textAnchor: "middle",
-              textVerticalAnchor: "middle",
             },
             rect: {
               fill: "#ffffff",
-              stroke: "#e5e7eb",
+              stroke: "#d1d5db",
               strokeWidth: 1,
-              rx: 3,
-              ry: 3,
+              rx: 2,
+              ry: 2,
             },
           },
         });
@@ -501,33 +656,32 @@ const LanCartographyContent = () => {
       if (linkData.toPort) {
         labels.push({
           position: {
-            distance: 0.9,
-            offset: -15,
+            distance: 0.85,
+            offset: { x: 0, y: -12 },
           },
           attrs: {
             text: {
               text: linkData.toPort,
               fill: "#1f2937",
-              fontSize: 10,
+              fontSize: 9,
               fontWeight: "bold",
               fontFamily: "monospace",
-              textAnchor: "middle",
-              textVerticalAnchor: "middle",
             },
             rect: {
               fill: "#ffffff",
-              stroke: "#e5e7eb",
+              stroke: "#d1d5db",
               strokeWidth: 1,
-              rx: 3,
-              ry: 3,
+              rx: 2,
+              ry: 2,
             },
           },
         });
       }
 
+      // IMPORTANT: Utiliser les éléments JointJS directement comme source/target
       const link = new shapes.standard.Link({
-        source: { id: sourceNode.id },
-        target: { id: targetNode.id },
+        source: { id: sourceElement.id },
+        target: { id: targetElement.id },
         labels: labels,
         attrs: {
           line: {
@@ -536,33 +690,35 @@ const LanCartographyContent = () => {
             strokeDasharray: strokeDasharray,
             strokeLinecap: "round",
             strokeLinejoin: "round",
-            connection: true,
-            targetMarker: null,
+            targetMarker: {
+              type: 'path',
+              d: 'M 10 -5 0 0 10 5 z',
+              fill: strokeColor,
+            },
             sourceMarker: null,
           },
         },
         router: {
-          name: "orthogonal",
+          name: "manhattan",
           args: {
-            padding: 10,
+            padding: 20,
           },
         },
         connector: {
           name: "rounded",
+          args: {
+            radius: 10,
+          },
         },
       });
 
       // Stocker les données du lien
       (link as any).linkData = linkData;
-      link.set("id", linkData.id);
-
-      // Ajouter un événement de clic sur le lien
-      link.on("pointerclick", () => {
-        setSelectedLink(linkData);
-      });
 
       graph.addCell(link);
     });
+
+    console.log('JointJS: Graph contient', graph.getCells().length, 'cellules (nodes:', graph.getElements().length, ', links:', graph.getLinks().length, ')');
 
     // Gérer la création de liens en mode édition
     const handleNodeClick = (nodeView: dia.CellView, evt: dia.Event) => {
@@ -648,18 +804,41 @@ const LanCartographyContent = () => {
       }
     };
 
-    // Ajouter les événements sur les nœuds
-    nodeMap.forEach((node) => {
-      const nodeView = paper.findViewByModel(node.id);
-      if (nodeView) {
-        nodeView.on("pointerclick", (evt: dia.Event) => {
-          if (isEditMode) {
-            handleNodeClick(nodeView, evt);
-            return;
-          }
-          setSelectedLink(null);
-          setSelectedNode((nodeView.model as any).nodeData ?? null);
-        });
+    // Utiliser les événements du Paper (plus fiables que findViewByModel)
+    paper.on('element:pointerclick', (elementView: dia.ElementView) => {
+      const element = elementView.model;
+      const nodeData = (element as any).nodeData;
+
+      console.log('Element clicked:', element.id, 'nodeData:', nodeData?.name);
+
+      if (!nodeData) return;
+
+      if (isEditMode) {
+        handleNodeClick(elementView, {} as dia.Event);
+        return;
+      }
+
+      setSelectedLink(null);
+      setSelectedNode(nodeData);
+    });
+
+    paper.on('link:pointerclick', (linkView: dia.LinkView) => {
+      const link = linkView.model;
+      const linkData = (link as any).linkData;
+
+      console.log('Link clicked:', link.id, 'linkData:', linkData);
+
+      if (linkData) {
+        setSelectedNode(null);
+        setSelectedLink(linkData);
+      }
+    });
+
+    // Gérer le clic droit sur les liens
+    paper.on('link:contextmenu', (linkView: dia.LinkView, evt: dia.Event) => {
+      evt.preventDefault();
+      if (confirm("Voulez-vous supprimer ce lien ?")) {
+        linkView.model.remove();
       }
     });
 
@@ -682,30 +861,6 @@ const LanCartographyContent = () => {
         }
       }
     };
-
-    // Gérer le clic droit pour supprimer un lien
-    const handleLinkContextMenu = (evt: MouseEvent, link: dia.Link) => {
-      evt.preventDefault();
-      if (confirm("Voulez-vous supprimer ce lien ?")) {
-        graph.removeCells([link]);
-      }
-    };
-
-    // Ajouter les événements sur les liens pour le menu contextuel et la sélection
-    graph.getLinks().forEach((link) => {
-      const linkView = paper.findViewByModel(link.id);
-      if (linkView) {
-        linkView.on("contextmenu", (evt: dia.Event) => {
-          handleLinkContextMenu(evt as any, link);
-        });
-        if (isEditMode) {
-          linkView.on("pointerclick", () => {
-            // Marquer le lien comme sélectionné visuellement
-            link.attr("line/strokeWidth", (link.attr("line/strokeWidth") || 2) + 1);
-          });
-        }
-      }
-    });
 
     if (handleKeyDownRef.current) {
       window.addEventListener("keydown", handleKeyDownRef.current);
@@ -736,7 +891,8 @@ const LanCartographyContent = () => {
         graphRef.current = null;
       }
     };
-  }, [topology, isEditMode, sourceNodeId, isLoadingTopology]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [topology, isLoadingTopology, containerReady]);
 
   const exportTopology = useCallback(
     (format: "csv" | "pdf") => {
@@ -852,7 +1008,7 @@ const LanCartographyContent = () => {
         </div>
         <div className="flex items-center gap-2 flex-wrap justify-end">
           <Select value={filterMode} onValueChange={(value) => {
-            setFilterMode(value as "lan" | "batiment" | "salle");
+            setFilterMode(value as "all" | "lan" | "batiment" | "salle");
             setSelectedTopologyId("");
             setSelectedBatimentId(undefined);
             setSelectedSalleId(undefined);
@@ -861,6 +1017,7 @@ const LanCartographyContent = () => {
               <SelectValue placeholder="Mode de filtrage" />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="all">Tout le réseau</SelectItem>
               <SelectItem value="lan">Par LAN</SelectItem>
               <SelectItem value="batiment">Par Bâtiment</SelectItem>
               <SelectItem value="salle">Par Salle</SelectItem>
@@ -982,31 +1139,92 @@ const LanCartographyContent = () => {
           <CardHeader>
             <CardTitle>{topology?.name || 'Chargement...'}</CardTitle>
             <CardDescription>
-              {topology?.description || ''} — {topology?.subnet || ''} ({topology?.vlan || ''})
+              {topology?.description || ''}
+              {topology?.subnet && ` — ${topology.subnet}`}
+              {topology?.vlan && ` (VLAN ${topology.vlan})`}
             </CardDescription>
           </CardHeader>
-          <CardContent className="flex justify-center overflow-auto">
+          <CardContent className="flex flex-col justify-center overflow-auto">
             {isLoadingTopology ? (
-              <div className="flex items-center justify-center h-[1200px]">
+              <div className="flex items-center justify-center h-[600px]">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
                 <span className="ml-2 text-muted-foreground">Chargement de la topologie...</span>
               </div>
+            ) : !topology ? (
+              <div className="flex flex-col items-center justify-center h-[400px] text-muted-foreground">
+                <p className="text-lg font-medium">
+                  {filterMode === "lan" && !selectedTopologyId
+                    ? "Sélectionnez un LAN"
+                    : filterMode === "batiment" && !selectedBatimentId
+                      ? "Sélectionnez un bâtiment"
+                      : filterMode === "salle" && !selectedBatimentId
+                        ? "Sélectionnez un bâtiment puis une salle"
+                        : filterMode === "salle" && selectedBatimentId && !selectedSalleId
+                          ? "Sélectionnez une salle"
+                          : "Chargement..."}
+                </p>
+                <p className="text-sm mt-2">
+                  Utilisez les filtres ci-dessus pour afficher la cartographie
+                </p>
+              </div>
+            ) : topology.nodes.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-[400px] text-muted-foreground">
+                <p className="text-lg font-medium">Aucun équipement trouvé</p>
+                <p className="text-sm mt-2">
+                  {filterMode === "all"
+                    ? "Aucun équipement dans la base de données"
+                    : filterMode === "lan"
+                      ? "Ce LAN ne contient pas d'équipements"
+                      : filterMode === "batiment"
+                        ? "Ce bâtiment ne contient pas d'équipements"
+                        : "Cette salle ne contient pas d'équipements"}
+                </p>
+              </div>
             ) : (
-              <div
-                ref={containerRef}
-                style={{
-                  width: "100%",
-                  maxWidth: "1400px",
-                  margin: "0 auto",
-                  height: "1200px",
-                  minHeight: "1200px",
-                  border: "1px solid #e5e7eb",
-                  borderRadius: "8px",
-                  backgroundColor: "#f9fafb",
-                  position: "relative",
-                  overflow: "auto",
-                }}
-              />
+              <>
+                {topology.links.length === 0 && showNoLinksAlert && (
+                  <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-top-2 duration-300">
+                    <div className="bg-red-600 text-white px-6 py-4 rounded-lg shadow-lg flex items-start gap-4 max-w-md">
+                      <div className="flex-1">
+                        <p className="text-lg font-semibold flex items-center gap-2">
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                          </svg>
+                          Réseau indisponible
+                        </p>
+                        <p className="text-sm mt-1 text-red-100">
+                          {topology.nodes.length} équipement(s) trouvé(s) mais aucune liaison configurée
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setShowNoLinksAlert(false)}
+                        className="text-white hover:text-red-200 transition-colors p-1"
+                        aria-label="Fermer"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                )}
+                <div
+                  ref={setContainerRef}
+                  key={`canvas-${topology.id || 'default'}-${topology.nodes.length}`}
+                  style={{
+                    width: "100%",
+                    maxWidth: "1400px",
+                    margin: "0 auto",
+                    height: "900px",
+                    minHeight: "600px",
+                    border: "1px solid #e5e7eb",
+                    borderRadius: "8px",
+                    backgroundColor: "#f9fafb",
+                    position: "relative",
+                    overflow: "auto",
+                  }}
+                />
+              </>
             )}
           </CardContent>
         </Card>
