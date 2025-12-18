@@ -111,17 +111,19 @@ const Salles = () => {
   // Préparer les données pour les modals (format attendu)
   const formatSalleForModal = (salle: any) => {
     if (!salle) return null;
-    const batiment = batiments.find(b => b.id === salle.batiment_id);
+    // Trouver la salle originale dans la liste pour avoir tous les champs
+    const originalSalle = salles.find(s => s.id === salle.id) || salle;
+    const batiment = batiments.find(b => b.id === originalSalle.batiment_id);
     return {
-      id: salle.id,
-      nom: salle.nom,
-      batiment_id: salle.batiment_id,
-      batiment: batiment?.nom || 'N/A',
-      etage: salle.etage,
-      capacite: salle.capacite,
-      type: salle.type,
-      etat: salle.etat,
-      description: salle.description || "",
+      id: originalSalle.id,
+      nom: originalSalle.nom,
+      batiment: batiment?.nom || null,
+      batiment_id: originalSalle.batiment_id,
+      etage: originalSalle.etage,
+      capacite: `${originalSalle.capacite} personnes`,
+      type: originalSalle.type,
+      etat: originalSalle.etat,
+      description: originalSalle.description || "",
     };
   };
 

@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(php artisan tinker:*)",
+      "Bash(curl:*)",
+      "Bash(python3 -c \"import sys,json;d=json.load(sys.stdin)[''''data''''];print(''''LAN 2:'''',d[''''name''''],''''- Nodes:'''',len(d[''''nodes'''']),'''', Links:'''',len(d[''''links'''']))\" curl -s \"http://localhost:8000/api/cartography/lans/10\" -H \"Authorization: Bearer 3|SX0jcrnnXCvmD2XhX75OH9cLGgis3oduTFeGeeXBc85dcddc\")",
+      "Bash(python3 -c \"import sys,json;d=json.load(sys.stdin)[''''data''''];print(''''LAN 10:'''',d[''''name''''],''''- Nodes:'''',len(d[''''nodes'''']),'''', Links:'''',len(d[''''links'''']))\" curl -s \"http://localhost:8000/api/cartography/lans/11\" -H \"Authorization: Bearer 3|SX0jcrnnXCvmD2XhX75OH9cLGgis3oduTFeGeeXBc85dcddc\")",
+      "Bash(python3:*)",
+      "Bash(php artisan migrate:fresh:*)",
+      "Bash(npm run build:*)"
+    ]
+  }
+}

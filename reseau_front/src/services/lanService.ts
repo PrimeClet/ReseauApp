@@ -2,11 +2,12 @@ import api from '@/axios';
 
 export interface Lan {
   id: number;
-  nom: string;
-  sous_reseau: string;
-  vlan: string;
+  name: string;
+  subnet: string;
+  vlan_id: number;
+  gateway?: string;
   site: string;
-  statut: string;
+  status: string;
   description?: string;
   batiment_id: number;
   salle_id: number;
@@ -31,11 +32,12 @@ export interface LanListResponse {
 }
 
 export interface LanCreateData {
-  nom: string;
-  sous_reseau: string;
-  vlan: string;
+  name: string;
+  subnet: string;
+  vlan_id: number;
+  gateway?: string;
   site: string;
-  statut: string;
+  status: string;
   description?: string;
   batiment_id: number;
   salle_id: number;

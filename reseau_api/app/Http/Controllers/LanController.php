@@ -14,16 +14,16 @@ class LanController extends Controller
     {
         $query = Lan::query();
 
-        if ($request->has('statut')) {
-            $query->where('statut', $request->statut);
+        if ($request->has('status')) {
+            $query->where('status', $request->status);
         }
 
         if ($request->has('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
-                $q->where('nom', 'like', "%{$search}%")
-                  ->orWhere('sous_reseau', 'like', "%{$search}%")
-                  ->orWhere('vlan', 'like', "%{$search}%")
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('subnet', 'like', "%{$search}%")
+                  ->orWhere('vlan_id', 'like', "%{$search}%")
                   ->orWhere('site', 'like', "%{$search}%");
             });
         }
@@ -31,7 +31,7 @@ class LanController extends Controller
         $perPage = (int) $request->get('per_page', 15);
         $perPage = $perPage > 0 && $perPage <= 100 ? $perPage : 15;
 
-        $lans = $query->with('batiment', 'salle')->orderBy('nom')->paginate($perPage);
+        $lans = $query->with('batiment', 'salle')->orderBy('name')->paginate($perPage);
 
         return response()->json($lans);
     }
@@ -46,12 +46,13 @@ class LanController extends Controller
         }
 
         $request->validate([
-            'nom' => 'required|string|max:255',
-            'sous_reseau' => 'required|string|max:255',
-            'vlan' => 'required|string|max:255',
+            'name' => 'required|string|max:255',
+            'subnet' => 'required|string|max:255',
+            'vlan_id' => 'required|integer',
             'site' => 'required|string|max:255',
-            'statut' => 'required|in:Actif,Inactif,Maintenance',
+            'status' => 'required|in:active,inactive,maintenance',
             'description' => 'nullable|string',
+            'gateway' => 'nullable|string|max:255',
             'batiment_id' => 'required|exists:batiments,id',
             'salle_id' => 'required|exists:salles,id',
         ]);
@@ -82,14 +83,15 @@ class LanController extends Controller
         if (!auth()->user()->isAdministrator()) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
-        
+
         $request->validate([
-            'nom' => 'sometimes|string|max:255',
-            'sous_reseau' => 'sometimes|string|max:255',
-            'vlan' => 'sometimes|string|max:255',
+            'name' => 'sometimes|string|max:255',
+            'subnet' => 'sometimes|string|max:255',
+            'vlan_id' => 'sometimes|integer',
             'site' => 'sometimes|string|max:255',
-            'statut' => 'sometimes|in:Actif,Inactif,Maintenance',
+            'status' => 'sometimes|in:active,inactive,maintenance',
             'description' => 'nullable|string',
+            'gateway' => 'nullable|string|max:255',
             'batiment_id' => 'sometimes|exists:batiments,id',
             'salle_id' => 'sometimes|exists:salles,id',
         ]);

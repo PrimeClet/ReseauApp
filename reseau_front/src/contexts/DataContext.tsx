@@ -1,5 +1,6 @@
 import React, { createContext, useContext } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   coffretService,
   equipementService,
@@ -187,8 +188,9 @@ const DataContext = createContext<DataContextType | undefined>(undefined);
 
 export const DataProvider = ({ children }: { children: React.ReactNode }) => {
   const queryClient = useQueryClient();
+  const { isAuthenticated } = useAuth();
 
-  // Queries
+  // Queries - only fetch when authenticated
   const {
     data: coffretData,
     isLoading: isLoadingCoffrets,
@@ -200,6 +202,7 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
     staleTime: 5 * 60 * 1000, // 5 minutes
     retry: 1, // Réessayer seulement 1 fois en cas d'erreur
     retryDelay: 1000, // Attendre 1 seconde avant de réessayer
+    enabled: isAuthenticated, // Ne fetch que si authentifié
   });
 
   const {
@@ -213,6 +216,7 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
     staleTime: 5 * 60 * 1000,
     retry: 1,
     retryDelay: 1000,
+    enabled: isAuthenticated,
   });
 
   const {
@@ -226,6 +230,7 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
     staleTime: 5 * 60 * 1000,
     retry: 1,
     retryDelay: 1000,
+    enabled: isAuthenticated,
   });
 
   const {
@@ -239,6 +244,7 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
     staleTime: 5 * 60 * 1000,
     retry: 1,
     retryDelay: 1000,
+    enabled: isAuthenticated,
   });
 
   const {
@@ -252,6 +258,7 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
     staleTime: 5 * 60 * 1000,
     retry: 1,
     retryDelay: 1000,
+    enabled: isAuthenticated,
   });
 
   const {
@@ -265,6 +272,7 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
     staleTime: 5 * 60 * 1000,
     retry: 1,
     retryDelay: 1000,
+    enabled: isAuthenticated,
   });
 
   const {
@@ -278,6 +286,7 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
     staleTime: 5 * 60 * 1000,
     retry: 1,
     retryDelay: 1000,
+    enabled: isAuthenticated,
   });
 
   const {
@@ -291,6 +300,7 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
     staleTime: 5 * 60 * 1000,
     retry: 1,
     retryDelay: 1000,
+    enabled: isAuthenticated,
   });
 
   const {
@@ -304,6 +314,7 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
     staleTime: 5 * 60 * 1000,
     retry: 1,
     retryDelay: 1000,
+    enabled: isAuthenticated,
   });
 
   const {
@@ -314,6 +325,7 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
     queryKey: ['globalStats'],
     queryFn: () => statistiqueService.getGlobalStats(),
     staleTime: 5 * 60 * 1000,
+    enabled: isAuthenticated,
   });
 
   // Mutations - Coffrets
