@@ -10,7 +10,7 @@ class Coffret extends Model
     use HasFactory;
     
     protected $fillable = [
-        'code', 'nom', 'piece', 'long', 'lat', 'status', 'batiment_id', 'salle_id'
+        'code', 'nom', 'piece', 'long', 'lat', 'status', 'batiment_id', 'salle_id', 'qr_code'
     ];
 
     public function equipements()

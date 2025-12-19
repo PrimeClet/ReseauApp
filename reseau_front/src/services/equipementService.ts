@@ -19,10 +19,21 @@ export interface Equipement {
     id: number;
     code: string;
     nom: string;
+    piece?: string;
+    batiment?: {
+      id: number;
+      nom: string;
+      ville?: string;
+    };
+    salle?: {
+      id: number;
+      nom: string;
+    };
   };
   batiment?: {
     id: number;
     nom: string;
+    ville?: string;
   };
   salle?: {
     id: number;

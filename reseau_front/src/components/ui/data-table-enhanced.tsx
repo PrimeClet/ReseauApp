@@ -87,20 +87,30 @@ export default function DataTableEnhanced({
   const filteredData = useMemo(() => {
     let filtered = data;
 
+    // Colonnes à exclure du filtrage
+    const excludedColumns = ['equipement_code', 'ip_address'];
+
     // Apply search
     if (searchTerm) {
       filtered = filtered.filter((row) =>
-        Object.values(row).some((value) =>
-          String(value).toLowerCase().includes(searchTerm.toLowerCase())
-        )
+        Object.entries(row).some(([key, value]) => {
+          // Exclure les colonnes equipement_code et ip_address de la recherche
+          if (excludedColumns.includes(key)) {
+            return false;
+          }
+          return String(value).toLowerCase().includes(searchTerm.toLowerCase());
+        })
       );
     }
 
     // Apply column filter
     if (filterColumn && filterValue) {
-      filtered = filtered.filter((row) =>
-        String(row[filterColumn]).toLowerCase().includes(filterValue.toLowerCase())
-      );
+      // Empêcher le filtrage sur les colonnes exclues
+      if (!excludedColumns.includes(filterColumn)) {
+        filtered = filtered.filter((row) =>
+          String(row[filterColumn]).toLowerCase().includes(filterValue.toLowerCase())
+        );
+      }
     }
 
     return filtered;
@@ -225,7 +235,9 @@ export default function DataTableEnhanced({
                   <SelectValue placeholder="Colonne" />
                 </SelectTrigger>
                 <SelectContent>
-                  {columns.map((column) => (
+                  {columns
+                    .filter((column) => !['equipement_code', 'ip_address'].includes(column))
+                    .map((column) => (
                     <SelectItem key={column} value={column}>
                       {column}
                     </SelectItem>

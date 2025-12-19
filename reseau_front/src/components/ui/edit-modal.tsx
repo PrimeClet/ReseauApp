@@ -31,10 +31,33 @@ export default function EditModal({
   const [formData, setFormData] = useState<any>({});
 
   useEffect(() => {
-    if (data) {
-      setFormData({ ...data });
+    if (data && open) {
+      // Réinitialiser les données du formulaire quand le modal s'ouvre avec de nouvelles données
+      const initialData: any = {};
+      if (fields) {
+        fields.forEach(field => {
+          // Pour les champs select, garder la valeur telle quelle (même si undefined/null), pour les autres mettre '' si undefined
+          if (field.type === 'select') {
+            const value = data[field.key];
+            // Si la valeur existe mais ne correspond à aucune option, essayer de trouver une correspondance (case-insensitive)
+            if (value && field.options) {
+              const matchingOption = field.options.find(opt => 
+                opt.toLowerCase() === String(value).toLowerCase()
+              );
+              initialData[field.key] = matchingOption || value;
+            } else {
+              initialData[field.key] = value !== undefined && value !== null ? value : '';
+            }
+          } else {
+            initialData[field.key] = data[field.key] || '';
+          }
+        });
+      } else {
+        Object.assign(initialData, data);
+      }
+      setFormData(initialData);
     }
-  }, [data]);
+  }, [data, open, fields]);
 
   if (!data) return null;
 
@@ -74,7 +97,7 @@ export default function EditModal({
               
               {type === 'select' && options ? (
                 <Select 
-                  value={formData[key]} 
+                  value={formData[key] && formData[key] !== '' ? String(formData[key]) : undefined} 
                   onValueChange={(value) => handleChange(key, value)}
                 >
                   <SelectTrigger>
@@ -92,7 +115,7 @@ export default function EditModal({
                 <Input
                   id={key}
                   type={type === 'number' ? 'number' : 'text'}
-                  value={formData[key] || ''}
+                  value={formData[key] ?? ''}
                   onChange={(e) => handleChange(key, e.target.value)}
                   placeholder={`Entrer ${label}`}
                 />
