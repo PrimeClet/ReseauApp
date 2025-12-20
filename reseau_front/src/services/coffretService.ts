@@ -10,6 +10,7 @@ export interface Coffret {
   status: string;
   batiment_id?: number;
   salle_id?: number;
+  qr_code?: string;
   created_at?: string;
   updated_at?: string;
   equipements?: Equipement[];
@@ -41,7 +42,7 @@ export interface CoffretListResponse {
 export interface CoffretCreateData {
   code?: string;
   nom: string;
-  piece: string;
+  piece?: string;
   long?: number;
   lat?: number;
   batiment_id?: number;

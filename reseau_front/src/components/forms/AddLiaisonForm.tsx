@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -15,6 +16,8 @@ import { Plus } from "lucide-react";
 const liaisonSchema = z.object({
   label: z.string().min(1, "Le label est requis"),
   media: z.string().min(1, "Le média est requis"),
+  from_equipement_id: z.number().min(1, "L'équipement d'origine est requis"),
+  to_equipement_id: z.number().min(1, "L'équipement de destination est requis"),
   from: z.number().min(1, "Le port d'origine est requis"),
   to: z.number().min(1, "Le port de destination est requis"),
   length: z.number().optional().nullable(),
@@ -23,21 +26,76 @@ const liaisonSchema = z.object({
 
 type LiaisonFormData = z.infer<typeof liaisonSchema>;
 
-const AddLiaisonForm = () => {
+interface AddLiaisonFormProps {
+  defaultCoffretId?: number;
+  onSuccess?: () => void;
+  trigger?: React.ReactNode;
+}
+
+const AddLiaisonForm = ({ defaultCoffretId, onSuccess, trigger }: AddLiaisonFormProps) => {
   const [open, setOpen] = useState(false);
-  const { addLiaison, refetchLiaisons, ports, isLoadingPorts } = useData();
+  const { addLiaison, refetchLiaisons, ports, equipements, isLoadingPorts, liaisons } = useData();
+
+  // Filtrer les équipements par coffret si defaultCoffretId est fourni
+  const filteredEquipements = defaultCoffretId
+    ? equipements.filter(e => e.coffret_id === defaultCoffretId)
+    : equipements;
+
+  // Récupérer tous les IDs de ports déjà utilisés dans les liaisons existantes
+  const usedPortIds = new Set<number>();
+  liaisons.forEach(liaison => {
+    if (liaison.from) usedPortIds.add(liaison.from);
+    if (liaison.to) usedPortIds.add(liaison.to);
+  });
 
   const form = useForm<LiaisonFormData>({
     resolver: zodResolver(liaisonSchema),
     defaultValues: {
       label: "",
       media: "",
+      from_equipement_id: undefined,
+      to_equipement_id: undefined,
       from: undefined,
       to: undefined,
       length: undefined,
       status: true,
     }
   });
+
+  // Observer les valeurs des équipements et ports pour réinitialiser les ports
+  const fromEquipementId = form.watch("from_equipement_id");
+  const toEquipementId = form.watch("to_equipement_id");
+  const selectedFromPort = form.watch("from");
+  const selectedToPort = form.watch("to");
+
+  // Filtrer les ports selon les équipements sélectionnés et exclure les ports déjà utilisés
+  // Aussi exclure le port de destination sélectionné pour éviter qu'un même port soit origine et destination
+  const filteredFromPorts = fromEquipementId
+    ? ports.filter(p => 
+        p.equipement_id === fromEquipementId && 
+        !usedPortIds.has(p.id) &&
+        p.id !== selectedToPort
+      )
+    : [];
+
+  const filteredToPorts = toEquipementId
+    ? ports.filter(p => 
+        p.equipement_id === toEquipementId && 
+        !usedPortIds.has(p.id) &&
+        p.id !== selectedFromPort
+      )
+    : [];
+
+  // Réinitialiser les ports quand on change d'équipement
+  const handleFromEquipementChange = (equipementId: number) => {
+    form.setValue("from_equipement_id", equipementId);
+    form.setValue("from", undefined);
+  };
+
+  const handleToEquipementChange = (equipementId: number) => {
+    form.setValue("to_equipement_id", equipementId);
+    form.setValue("to", undefined);
+  };
 
   const onSubmit = async (data: LiaisonFormData) => {
     try {
@@ -56,6 +114,7 @@ const AddLiaisonForm = () => {
       form.reset();
       setOpen(false);
       refetchLiaisons();
+      onSuccess?.();
     } catch (error: any) {
       toast({
         title: "Erreur",
@@ -68,12 +127,14 @@ const AddLiaisonForm = () => {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>
-          <Plus className="mr-2 h-4 w-4" />
-          Ajouter une liaison
-        </Button>
+        {trigger || (
+          <Button>
+            <Plus className="mr-2 h-4 w-4" />
+            Ajouter une liaison
+          </Button>
+        )}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Ajouter une nouvelle liaison</DialogTitle>
           <DialogDescription>
@@ -101,11 +162,11 @@ const AddLiaisonForm = () => {
               name="media"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Média *</FormLabel>
+                  <FormLabel>Type de liaison *</FormLabel>
                   <FormControl>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Sélectionner le média" />
+                        <SelectValue placeholder="Sélectionner le type de liaison" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="Fibre optique">Fibre optique</SelectItem>
@@ -124,28 +185,88 @@ const AddLiaisonForm = () => {
 
             <FormField
               control={form.control}
+              name="from_equipement_id"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Équipement d'origine *</FormLabel>
+                  <FormControl>
+                    <Select
+                      onValueChange={(value) => handleFromEquipementChange(parseInt(value))}
+                      value={field.value?.toString()}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Sélectionner l'équipement d'origine" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {filteredEquipements?.map((equipement) => (
+                          <SelectItem key={equipement.id} value={equipement.id.toString()}>
+                            {equipement.name} ({equipement.equipement_code})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
               name="from"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Port d'origine *</FormLabel>
-                  <Select
-                    onValueChange={(value) => field.onChange(parseInt(value))}
-                    value={field.value?.toString()}
-                    disabled={isLoadingPorts}
-                  >
-                    <FormControl>
+                  <FormControl>
+                    <Select
+                      onValueChange={(value) => field.onChange(parseInt(value))}
+                      value={field.value?.toString()}
+                      disabled={isLoadingPorts || !fromEquipementId}
+                    >
                       <SelectTrigger>
-                        <SelectValue placeholder="Sélectionner le port d'origine" />
+                        <SelectValue placeholder={
+                          !fromEquipementId 
+                            ? "Sélectionnez d'abord l'équipement d'origine" 
+                            : "Sélectionner le port d'origine"
+                        } />
                       </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {ports?.map((port) => (
-                        <SelectItem key={port.id} value={port.id.toString()}>
-                          {port.port_label} - {port.device_name} {port.equipement ? `(${port.equipement.name})` : ''}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                      <SelectContent>
+                        {filteredFromPorts?.map((port) => (
+                          <SelectItem key={port.id} value={port.id.toString()}>
+                            {port.port_label} - {port.device_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="to_equipement_id"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Équipement de destination *</FormLabel>
+                  <FormControl>
+                    <Select
+                      onValueChange={(value) => handleToEquipementChange(parseInt(value))}
+                      value={field.value?.toString()}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Sélectionner l'équipement de destination" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {filteredEquipements?.map((equipement) => (
+                          <SelectItem key={equipement.id} value={equipement.id.toString()}>
+                            {equipement.name} ({equipement.equipement_code})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
@@ -157,24 +278,28 @@ const AddLiaisonForm = () => {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Port de destination *</FormLabel>
-                  <Select
-                    onValueChange={(value) => field.onChange(parseInt(value))}
-                    value={field.value?.toString()}
-                    disabled={isLoadingPorts}
-                  >
-                    <FormControl>
+                  <FormControl>
+                    <Select
+                      onValueChange={(value) => field.onChange(parseInt(value))}
+                      value={field.value?.toString()}
+                      disabled={isLoadingPorts || !toEquipementId}
+                    >
                       <SelectTrigger>
-                        <SelectValue placeholder="Sélectionner le port de destination" />
+                        <SelectValue placeholder={
+                          !toEquipementId 
+                            ? "Sélectionnez d'abord l'équipement de destination" 
+                            : "Sélectionner le port de destination"
+                        } />
                       </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {ports?.map((port) => (
-                        <SelectItem key={port.id} value={port.id.toString()}>
-                          {port.port_label} - {port.device_name} {port.equipement ? `(${port.equipement.name})` : ''}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                      <SelectContent>
+                        {filteredToPorts?.map((port) => (
+                          <SelectItem key={port.id} value={port.id.toString()}>
+                            {port.port_label} - {port.device_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}

@@ -78,6 +78,17 @@ export default function LiaisonsSection() {
         title="Modifier la liaison"
         data={selectedLiaison}
         onSave={handleSave}
+        fields={[
+          { key: 'label', label: 'Label', type: 'text' },
+          { 
+            key: 'media', 
+            label: 'Type de liaison', 
+            type: 'select', 
+            options: ['Fibre optique', 'Cuivre', 'MPLS', 'VPN', 'Ethernet', 'Satellite'] 
+          },
+          { key: 'length', label: 'Longueur (mètres)', type: 'number' },
+          { key: 'status', label: 'Statut', type: 'text' },
+        ]}
       />
     </div>
   );

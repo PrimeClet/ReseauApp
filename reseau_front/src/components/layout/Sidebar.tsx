@@ -13,7 +13,6 @@ import {
   Wrench,
   Users,
   User,
-  MapPin,
   Building2,
   DoorOpen,
   ChevronDown,
@@ -39,8 +38,8 @@ const menuItems = [
   { id: "dashboard", label: "Tableau de bord", icon: LayoutDashboard },
   { id: "armoires", label: "Armoires", icon: Server },
   { id: "equipements", label: "Équipements", icon: HardDrive },
-  { id: "liaisons", label: "Liaisons", icon: Cable },
   { id: "ports", label: "Ports", icon: Router },
+  { id: "liaisons", label: "Liaisons", icon: Cable },
   { id: "maintenance", label: "Maintenance", icon: Wrench },
 ];
 
@@ -51,15 +50,7 @@ export default function Sidebar({ activeSection, onSectionChange }: SidebarProps
   const location = useLocation();
   const isMobile = useIsMobile();
   const { setSidebarOpen } = useSidebarToggle();
-  const [isLocalisationOpen, setIsLocalisationOpen] = useState(false);
   const [isAccessOpen, setIsAccessOpen] = useState(false);
-
-  // Ouvrir automatiquement le menu Localisation si on est sur une page de localisation
-  useEffect(() => {
-    if (location.pathname === "/batiments" || location.pathname === "/salles") {
-      setIsLocalisationOpen(true);
-    }
-  }, [location.pathname]);
 
   useEffect(() => {
     if (
@@ -134,7 +125,51 @@ export default function Sidebar({ activeSection, onSectionChange }: SidebarProps
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-3 pb-2">
               Inventaire
             </p>
-            {menuItems.map((item) => {
+            {/* Tableau de bord - premier élément */}
+            {(() => {
+              const dashboardItem = menuItems.find(item => item.id === "dashboard");
+              if (!dashboardItem) return null;
+              const isActive = location.pathname === "/" && activeSection === dashboardItem.id;
+              return (
+                <Button
+                  key={dashboardItem.id}
+                  variant="ghost"
+                  className={cn(
+                    "w-full justify-start text-nav-text hover:bg-muted hover:text-foreground",
+                    isActive && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
+                  )}
+                  onClick={() => handleMenuClick(dashboardItem.id)}
+                >
+                  <dashboardItem.icon className="mr-3 h-4 w-4" />
+                  {dashboardItem.label}
+                </Button>
+              );
+            })()}
+            {/* Bâtiments */}
+            <Button
+              variant="ghost"
+              className={cn(
+                "w-full justify-start text-nav-text hover:bg-muted hover:text-foreground",
+                location.pathname === "/batiments" && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
+              )}
+              onClick={() => handleNavigate("/batiments")}
+            >
+              <Building2 className="mr-3 h-4 w-4" />
+              Bâtiments
+            </Button>
+            {/* Salles */}
+            <Button
+              variant="ghost"
+              className={cn(
+                "w-full justify-start text-nav-text hover:bg-muted hover:text-foreground",
+                location.pathname === "/salles" && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
+              )}
+              onClick={() => handleNavigate("/salles")}
+            >
+              <DoorOpen className="mr-3 h-4 w-4" />
+              Salles
+            </Button>
+            {menuItems.filter(item => item.id !== "dashboard").map((item) => {
               // Gérer le cas spécial des armoires qui a sa propre page
               if (item.id === "armoires") {
                 const isActive = location.pathname === "/armoires";
@@ -170,57 +205,6 @@ export default function Sidebar({ activeSection, onSectionChange }: SidebarProps
                 </Button>
               );
             })}
-          </div>
-
-          {/* Section LOCALISATION */}
-          <div className="space-y-1">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-3 pb-2">
-              Localisation
-            </p>
-            <Collapsible open={isLocalisationOpen} onOpenChange={setIsLocalisationOpen}>
-              <CollapsibleTrigger asChild>
-                <Button
-                  variant="ghost"
-                  className={cn(
-                    "w-full justify-between text-nav-text hover:bg-muted hover:text-foreground"
-                  )}
-                >
-                  <div className="flex items-center">
-                    <MapPin className="mr-3 h-4 w-4" />
-                    <span>Localisation</span>
-                  </div>
-                  {isLocalisationOpen ? (
-                    <ChevronDown className="h-4 w-4" />
-                  ) : (
-                    <ChevronRight className="h-4 w-4" />
-                  )}
-                </Button>
-              </CollapsibleTrigger>
-              <CollapsibleContent className="pl-4 space-y-1">
-                <Button
-                  variant="ghost"
-                  className={cn(
-                    "w-full justify-start text-nav-text hover:bg-muted hover:text-foreground text-sm",
-                    location.pathname === "/batiments" && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
-                  )}
-                  onClick={() => handleNavigate("/batiments")}
-                >
-                  <Building2 className="mr-3 h-4 w-4" />
-                  Bâtiments
-                </Button>
-                <Button
-                  variant="ghost"
-                  className={cn(
-                    "w-full justify-start text-nav-text hover:bg-muted hover:text-foreground text-sm",
-                    location.pathname === "/salles" && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
-                  )}
-                  onClick={() => handleNavigate("/salles")}
-                >
-                  <DoorOpen className="mr-3 h-4 w-4" />
-                  Salles
-                </Button>
-              </CollapsibleContent>
-            </Collapsible>
           </div>
 
           {/* Section RÉSEAU */}

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Coffret;
 use Illuminate\Http\Request;
 use OpenApi\Annotations as OA;
+use SimpleSoftwareIO\QrCode\Facades\QrCode;
 
 /**
  * @OA\Tag(
@@ -133,12 +134,12 @@ class CoffretController extends Controller
 
         $request->validate([
             'nom' => 'required|string|max:255',
-            'piece' => 'required|string|max:255',
+            'piece' => 'nullable|string|max:255',
             'long' => 'nullable|numeric',
             'lat' => 'nullable|numeric',
             'batiment_id' => 'nullable|exists:batiments,id',
             'salle_id' => 'nullable|exists:salles,id',
-            'status' => 'sometimes|in:active,inactive,maintenance',
+            'status' => 'sometimes|in:active,inactive',
         ]);
 
         // Générer automatiquement le code si non fourni
@@ -150,13 +151,18 @@ class CoffretController extends Controller
         $coffret = Coffret::create([
             'code' => $code,
             'nom' => $request->nom,
-            'piece' => $request->piece,
+            'piece' => $request->piece ?? '',
             'long' => $request->long ?? 0,
             'lat' => $request->lat ?? 0,
             'batiment_id' => $request->batiment_id,
             'salle_id' => $request->salle_id,
             'status' => $request->status ?? 'active',
         ]);
+
+        // Générer et stocker le QR code
+        $qrCode = $this->generateQRCode($coffret);
+        $coffret->update(['qr_code' => $qrCode]);
+        $coffret->refresh();
     
         // Retourner une réponse JSON
         return response()->json([
@@ -194,9 +200,37 @@ class CoffretController extends Controller
          *     )
          * )
          */
+        // Générer le QR code s'il n'existe pas
+        if (!$coffret->qr_code) {
+            $qrCode = $this->generateQRCode($coffret);
+            $coffret->update(['qr_code' => $qrCode]);
+            $coffret->refresh();
+        }
+
         return response()->json([
             'data' => $coffret->load('equipements', 'metrics', 'batiment', 'salle')
         ]);
+    }
+
+    /**
+     * Génère un QR code pour un coffret
+     */
+    private function generateQRCode(Coffret $coffret): string
+    {
+        // Créer les données à encoder dans le QR code
+        $qrData = json_encode([
+            'id' => $coffret->id,
+            'code' => $coffret->code,
+            'nom' => $coffret->nom,
+            'type' => 'coffret'
+        ]);
+
+        // Générer le QR code en format SVG (string)
+        $qrCode = QrCode::size(300)
+            ->format('svg')
+            ->generate($qrData);
+
+        return $qrCode;
     }
 
     /**
@@ -274,11 +308,18 @@ class CoffretController extends Controller
             'lat' => 'sometimes|numeric',
             'batiment_id' => 'nullable|exists:batiments,id',
             'salle_id' => 'nullable|exists:salles,id',
-            'status' => 'sometimes|in:active,inactive,maintenance',
+            'status' => 'sometimes|in:active,inactive',
         ]);
 
         // Mise à jour des champs fournis
         $coffret->update($request->only(['code', 'nom', 'piece', 'long', 'lat', 'batiment_id', 'salle_id', 'status']));
+
+        // Régénérer le QR code si le code ou le nom a changé
+        if ($request->has('code') || $request->has('nom')) {
+            $qrCode = $this->generateQRCode($coffret);
+            $coffret->update(['qr_code' => $qrCode]);
+            $coffret->refresh();
+        }
 
         // Retourner une réponse JSON
         return response()->json([

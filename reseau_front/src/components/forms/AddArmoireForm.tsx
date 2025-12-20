@@ -14,12 +14,11 @@ import type { CoffretCreateData } from "@/services/coffretService";
 
 const armoireSchema = z.object({
   nom: z.string().min(1, "Le nom est requis"),
-  piece: z.string().min(1, "La pièce est requise"),
   long: z.number().optional().nullable(),
   lat: z.number().optional().nullable(),
   batiment_id: z.number().optional().nullable(),
   salle_id: z.number().optional().nullable(),
-  status: z.enum(["active", "inactive", "maintenance"]),
+  status: z.enum(["active", "inactive"]),
 });
 
 type ArmoireFormData = z.infer<typeof armoireSchema>;
@@ -34,7 +33,6 @@ const AddArmoireForm = () => {
     resolver: zodResolver(armoireSchema),
     defaultValues: {
       nom: "",
-      piece: "",
       long: undefined,
       lat: undefined,
       batiment_id: undefined,
@@ -53,7 +51,7 @@ const AddArmoireForm = () => {
     try {
       const coffretData: CoffretCreateData = {
         nom: data.nom,
-        piece: data.piece,
+        piece: "", // Valeur par défaut vide (champ retiré du formulaire)
         long: data.long ?? undefined,
         lat: data.lat ?? undefined,
         batiment_id: data.batiment_id || undefined,
@@ -104,20 +102,6 @@ const AddArmoireForm = () => {
                   <FormLabel>Nom *</FormLabel>
                   <FormControl>
                     <Input placeholder="Ex: Armoire principale" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            
-            <FormField
-              control={form.control}
-              name="piece"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Pièce *</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Ex: Salle serveur C" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -252,7 +236,6 @@ const AddArmoireForm = () => {
                     <SelectContent>
                       <SelectItem value="active">Actif</SelectItem>
                       <SelectItem value="inactive">Inactif</SelectItem>
-                      <SelectItem value="maintenance">Maintenance</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />

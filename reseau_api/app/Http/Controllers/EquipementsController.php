@@ -28,7 +28,7 @@ class EquipementsController extends Controller
         $perPage = (int) $request->get('per_page', 15);
         $perPage = $perPage > 0 && $perPage <= 100 ? $perPage : 15;
 
-        $equipement = $query->with('coffret', 'batiment', 'salle', 'ports')->orderBy('name')->paginate($perPage);
+        $equipement = $query->with('coffret.batiment', 'coffret.salle', 'batiment', 'salle', 'ports')->orderBy('name')->paginate($perPage);
 
         return response()->json($equipement);
     }
@@ -108,7 +108,7 @@ class EquipementsController extends Controller
     public function show(Equipement $equipement)
     {
         return response()->json([
-            'data' => $equipement->load('coffret', 'batiment', 'salle', 'ports')
+            'data' => $equipement->load('coffret.batiment', 'coffret.salle', 'batiment', 'salle', 'ports')
         ]);
     }
 

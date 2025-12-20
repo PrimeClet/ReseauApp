@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -8,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useData } from "@/contexts/DataContext";
-import { toast } from "@/hooks/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { Plus } from "lucide-react";
 
 const systemeSchema = z.object({
@@ -23,9 +24,16 @@ const systemeSchema = z.object({
 
 type SystemeFormData = z.infer<typeof systemeSchema>;
 
-const AddSystemeForm = () => {
+interface AddSystemeFormProps {
+  defaultCoffretId?: number;
+  onSuccess?: () => void;
+  trigger?: React.ReactNode;
+}
+
+const AddSystemeForm = ({ defaultCoffretId, onSuccess, trigger }: AddSystemeFormProps) => {
   const [open, setOpen] = useState(false);
-  const { addSysteme } = useData();
+  const { toast } = useToast();
+  const { addSystem, refetchSystems } = useData();
 
   const form = useForm<SystemeFormData>({
     resolver: zodResolver(systemeSchema),
@@ -40,31 +48,41 @@ const AddSystemeForm = () => {
     }
   });
 
-  const onSubmit = (data: SystemeFormData) => {
-    addSysteme({
-      nom: data.nom!,
-      type: data.type!,
-      version: data.version!,
-      etat: data.etat!,
-      cpu: data.cpu!,
-      memoire: data.memoire!,
-      stockage: data.stockage!
-    });
-    toast({
-      title: "Système ajouté",
-      description: `Le système ${data.nom} a été ajouté avec succès`,
-    });
-    form.reset();
-    setOpen(false);
+  const onSubmit = async (data: SystemeFormData) => {
+    try {
+      await addSystem({
+        name: data.nom,
+        type: data.type,
+        description: `Version: ${data.version}, CPU: ${data.cpu}, Mémoire: ${data.memoire}, Stockage: ${data.stockage}`,
+        status: data.etat,
+        coffret_id: defaultCoffretId,
+      });
+      toast({
+        title: "Système ajouté",
+        description: `Le système ${data.nom} a été ajouté avec succès`,
+      });
+      form.reset();
+      setOpen(false);
+      refetchSystems?.();
+      onSuccess?.();
+    } catch (error: any) {
+      toast({
+        title: "Erreur",
+        description: error?.response?.data?.message || "Une erreur est survenue lors de l'ajout du système",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>
-          <Plus className="mr-2 h-4 w-4" />
-          Ajouter un système
-        </Button>
+        {trigger || (
+          <Button>
+            <Plus className="mr-2 h-4 w-4" />
+            Ajouter un système
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>

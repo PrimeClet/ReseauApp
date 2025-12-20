@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -25,10 +26,21 @@ const portSchema = z.object({
 
 type PortFormData = z.infer<typeof portSchema>;
 
-const AddPortForm = () => {
+interface AddPortFormProps {
+  defaultCoffretId?: number;
+  onSuccess?: () => void;
+  trigger?: React.ReactNode;
+}
+
+const AddPortForm = ({ defaultCoffretId, onSuccess, trigger }: AddPortFormProps) => {
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
   const { addPort, refetchPorts, equipements, isLoadingEquipements } = useData();
+
+  // Filtrer les équipements par coffret si defaultCoffretId est fourni
+  const filteredEquipements = defaultCoffretId
+    ? equipements.filter(e => e.coffret_id === defaultCoffretId)
+    : equipements;
 
   const form = useForm<PortFormData>({
     resolver: zodResolver(portSchema),
@@ -63,6 +75,7 @@ const AddPortForm = () => {
       form.reset();
       setOpen(false);
       refetchPorts();
+      onSuccess?.();
     } catch (error: any) {
       toast({
         title: "Erreur",
@@ -75,10 +88,12 @@ const AddPortForm = () => {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>
-          <Plus className="mr-2 h-4 w-4" />
-          Ajouter un port
-        </Button>
+        {trigger || (
+          <Button>
+            <Plus className="mr-2 h-4 w-4" />
+            Ajouter un port
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
@@ -106,7 +121,7 @@ const AddPortForm = () => {
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {equipements?.map((equipement) => (
+                      {filteredEquipements?.map((equipement) => (
                         <SelectItem key={equipement.id} value={equipement.id.toString()}>
                           {equipement.name} ({equipement.equipement_code})
                         </SelectItem>
@@ -234,7 +249,7 @@ const AddPortForm = () => {
                     </FormControl>
                     <SelectContent>
                       <SelectItem value="none">Aucun</SelectItem>
-                      {equipements?.map((equipement) => (
+                      {filteredEquipements?.map((equipement) => (
                         <SelectItem key={equipement.id} value={equipement.id.toString()}>
                           {equipement.name} ({equipement.equipement_code})
                         </SelectItem>

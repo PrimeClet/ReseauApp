@@ -17,33 +17,33 @@ export default function DashboardOverview() {
 
   const isLoading = isLoadingCoffrets || isLoadingEquipements || isLoadingLiaisons || isLoadingStats;
 
-  // Préparer les données des coffrets pour l'affichage
+  // Prepare cabinet data for display
   const coffretsTableData = coffrets.slice(0, 5).map(coffret => ({
     ID: coffret.code,
-    Emplacement: coffret.piece || '-',
-    Nom: coffret.nom,
-    État: coffret.status || 'Actif',
+    Location: coffret.piece || '-',
+    Name: coffret.nom,
+    Status: coffret.status || 'Active',
     _id: coffret.id
   }));
 
-  // Préparer les données des liaisons pour l'affichage (top par longueur)
+  // Prepare liaison data for display (top by length)
   const liaisonsTableData = [...liaisons]
     .sort((a, b) => (b.length || 0) - (a.length || 0))
     .slice(0, 5)
     .map(liaison => ({
       Label: liaison.label || `LNK-${liaison.id}`,
-      Média: liaison.media || '-',
-      Longueur: liaison.length?.toString() || '-'
+      Media: liaison.media || '-',
+      Length: liaison.length?.toString() || '-'
     }));
 
-  // Compter les liaisons actives
+  // Count active liaisons
   const liaisonsActives = liaisons.filter(l => l.status === true).length;
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <span className="ml-2 text-muted-foreground">Chargement des données...</span>
+        <span className="ml-2 text-muted-foreground">Loading data...</span>
       </div>
     );
   }
@@ -53,14 +53,14 @@ export default function DashboardOverview() {
       {/* Status header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-foreground">Vue d'ensemble</h2>
+          <h2 className="text-2xl font-bold text-foreground">Overview</h2>
         </div>
         <div className="flex items-center gap-4 text-sm text-muted-foreground">
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-status-up"></div>
-            <span>Système opérationnel</span>
+            <span>System operational</span>
           </div>
-          <span>Données en temps réel</span>
+          <span>Real-time data</span>
         </div>
       </div>
 
@@ -74,13 +74,13 @@ export default function DashboardOverview() {
           }}
         >
           <StatsCard
-            title="Coffrets"
+            title="Cabinets"
             value={globalStats?.coffrets?.total ?? coffrets.length}
             icon={Server}
           />
         </div>
         <StatsCard
-          title="Équipements"
+          title="Equipment"
           value={globalStats?.equipements?.total ?? equipements.length}
           icon={Router}
         />
@@ -90,7 +90,7 @@ export default function DashboardOverview() {
           icon={Cable}
         />
         <StatsCard
-          title="Liaisons actives"
+          title="Active Links"
           value={globalStats?.liaisons?.active ?? liaisonsActives ?? liaisons.length}
           icon={Activity}
         />
@@ -100,7 +100,7 @@ export default function DashboardOverview() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-card border border-border rounded-lg">
           <div className="p-4 border-b border-border flex items-center justify-between">
-            <h3 className="font-semibold text-foreground">Coffrets – Aperçu rapide</h3>
+            <h3 className="font-semibold text-foreground">Cabinets – Quick View</h3>
             <button
               onClick={() => {
                 localStorage.setItem('activeSection', 'armoires');
@@ -108,20 +108,20 @@ export default function DashboardOverview() {
               }}
               className="text-sm text-primary hover:underline"
             >
-              Voir tout →
+              View all →
             </button>
           </div>
           <div className="p-4">
             {coffrets.length === 0 ? (
-              <p className="text-muted-foreground text-center py-4">Aucun coffret trouvé</p>
+              <p className="text-muted-foreground text-center py-4">No cabinets found</p>
             ) : (
               <table className="w-full">
                 <thead>
                   <tr className="text-left text-sm text-muted-foreground">
                     <th className="pb-2">Code</th>
-                    <th className="pb-2">Nom</th>
-                    <th className="pb-2">Pièce</th>
-                    <th className="pb-2">État</th>
+                    <th className="pb-2">Name</th>
+                    <th className="pb-2">Room</th>
+                    <th className="pb-2">Status</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -136,15 +136,15 @@ export default function DashboardOverview() {
                       }}
                     >
                       <td className="py-2 text-primary font-medium">{coffret.ID}</td>
-                      <td className="py-2">{coffret.Nom}</td>
-                      <td className="py-2">{coffret.Emplacement}</td>
+                      <td className="py-2">{coffret.Name}</td>
+                      <td className="py-2">{coffret.Location}</td>
                       <td className="py-2">
                         <span className={`px-2 py-1 rounded-full text-xs ${
-                          coffret.État === 'Actif' || coffret.État === 'actif'
+                          coffret.Status === 'Active' || coffret.Status === 'active'
                             ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
                             : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
                         }`}>
-                          {coffret.État}
+                          {coffret.Status}
                         </span>
                       </td>
                     </tr>
@@ -156,20 +156,29 @@ export default function DashboardOverview() {
         </div>
 
         <div className="bg-card border border-border rounded-lg">
-          <div className="p-4 border-b border-border">
-            <h3 className="font-semibold text-foreground">Équipements récents</h3>
+          <div className="p-4 border-b border-border flex items-center justify-between">
+            <h3 className="font-semibold text-foreground">Recent Equipment</h3>
+            <button
+              onClick={() => {
+                localStorage.setItem('activeSection', 'equipements');
+                window.location.reload();
+              }}
+              className="text-sm text-primary hover:underline"
+            >
+              View all →
+            </button>
           </div>
           <div className="p-4">
             {equipements.length === 0 ? (
-              <p className="text-muted-foreground text-center py-4">Aucun équipement trouvé</p>
+              <p className="text-muted-foreground text-center py-4">No equipment found</p>
             ) : (
               <table className="w-full">
                 <thead>
                   <tr className="text-left text-sm text-muted-foreground">
                     <th className="pb-2">Code</th>
-                    <th className="pb-2">Nom</th>
+                    <th className="pb-2">Name</th>
                     <th className="pb-2">Type</th>
-                    <th className="pb-2">État</th>
+                    <th className="pb-2">Status</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -198,27 +207,36 @@ export default function DashboardOverview() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-card border border-border rounded-lg">
-          <div className="p-4 border-b border-border">
-            <h3 className="font-semibold text-foreground">Top liaisons par longueur</h3>
+          <div className="p-4 border-b border-border flex items-center justify-between">
+            <h3 className="font-semibold text-foreground">Top Links by Length</h3>
+            <button
+              onClick={() => {
+                localStorage.setItem('activeSection', 'liaisons');
+                window.location.reload();
+              }}
+              className="text-sm text-primary hover:underline"
+            >
+              View all →
+            </button>
           </div>
           <div className="p-4">
             {liaisons.length === 0 ? (
-              <p className="text-muted-foreground text-center py-4">Aucune liaison trouvée</p>
+              <p className="text-muted-foreground text-center py-4">No links found</p>
             ) : (
               <table className="w-full">
                 <thead>
                   <tr className="text-left text-sm text-muted-foreground">
                     <th className="pb-2">Label</th>
-                    <th className="pb-2">Média</th>
-                    <th className="pb-2">Longueur (m)</th>
+                    <th className="pb-2">Media</th>
+                    <th className="pb-2">Length (m)</th>
                   </tr>
                 </thead>
                 <tbody>
                   {liaisonsTableData.map((liaison, index) => (
                     <tr key={index} className="border-t border-border">
                       <td className="py-2 font-medium">{liaison.Label}</td>
-                      <td className="py-2">{liaison.Média}</td>
-                      <td className="py-2">{liaison.Longueur}</td>
+                      <td className="py-2">{liaison.Media}</td>
+                      <td className="py-2">{liaison.Length}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -228,17 +246,26 @@ export default function DashboardOverview() {
         </div>
 
         <div className="bg-card border border-border rounded-lg">
-          <div className="p-4 border-b border-border">
-            <h3 className="font-semibold text-foreground">Statistiques rapides</h3>
+          <div className="p-4 border-b border-border flex items-center justify-between">
+            <h3 className="font-semibold text-foreground">Quick Statistics</h3>
+            <button
+              onClick={() => {
+                localStorage.removeItem('activeSection');
+                window.location.reload();
+              }}
+              className="text-sm text-primary hover:underline"
+            >
+              View all →
+            </button>
           </div>
           <div className="p-4 grid grid-cols-2 gap-4">
             <div className="text-center p-4 bg-muted/50 rounded-lg">
               <div className="text-2xl font-bold text-foreground">{coffrets.length}</div>
-              <div className="text-sm text-muted-foreground">Coffrets</div>
+              <div className="text-sm text-muted-foreground">Cabinets</div>
             </div>
             <div className="text-center p-4 bg-muted/50 rounded-lg">
               <div className="text-2xl font-bold text-foreground">{equipements.length}</div>
-              <div className="text-sm text-muted-foreground">Équipements</div>
+              <div className="text-sm text-muted-foreground">Equipment</div>
             </div>
             <div className="text-center p-4 bg-muted/50 rounded-lg">
               <div className="text-2xl font-bold text-foreground">{ports.length}</div>
@@ -246,7 +273,7 @@ export default function DashboardOverview() {
             </div>
             <div className="text-center p-4 bg-muted/50 rounded-lg">
               <div className="text-2xl font-bold text-foreground">{liaisons.length}</div>
-              <div className="text-sm text-muted-foreground">Liaisons</div>
+              <div className="text-sm text-muted-foreground">Links</div>
             </div>
           </div>
         </div>

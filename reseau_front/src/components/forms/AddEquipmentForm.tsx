@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import type React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -8,19 +9,22 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
 import { useData } from "@/contexts/DataContext";
-import { Plus } from "lucide-react";
+import { Plus, Check, ChevronsUpDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { EquipementCreateData } from "@/services/equipementService";
 
 const equipmentSchema = z.object({
-  name: z.string().min(1, "Le nom est requis"),
-  type: z.string().min(1, "Le type est requis"),
+  name: z.string().min(1, "Name is required"),
+  type: z.string().min(1, "Type is required"),
   description: z.string().optional(),
   direction_in_out: z.string().optional(),
   vlan: z.string().optional(),
   ip_address: z.string().optional(),
-  coffret_id: z.number().min(1, "Le coffret est requis"),
+  coffret_id: z.number().min(1, "Cabinet is required"),
   batiment_id: z.number().optional().nullable(),
   salle_id: z.number().optional().nullable(),
   status: z.enum(["active", "inactive", "maintenance"]),
@@ -28,10 +32,17 @@ const equipmentSchema = z.object({
 
 type EquipmentFormData = z.infer<typeof equipmentSchema>;
 
-export default function AddEquipmentForm() {
+interface AddEquipmentFormProps {
+  defaultCoffretId?: number;
+  onSuccess?: () => void;
+  trigger?: React.ReactNode;
+}
+
+export default function AddEquipmentForm({ defaultCoffretId, onSuccess, trigger }: AddEquipmentFormProps) {
   const [open, setOpen] = useState(false);
+  const [coffretComboboxOpen, setCoffretComboboxOpen] = useState(false);
   const { toast } = useToast();
-  const { coffrets, batiments, salles, addEquipement, isLoadingCoffrets, isLoadingBatiments, isLoadingSalles } = useData();
+  const { coffrets, batiments, salles, addEquipement, refetchEquipements, isLoadingCoffrets, isLoadingBatiments, isLoadingSalles } = useData();
   const [filteredSalles, setFilteredSalles] = useState(salles || []);
 
   const form = useForm<EquipmentFormData>({
@@ -43,12 +54,52 @@ export default function AddEquipmentForm() {
       direction_in_out: "",
       vlan: "",
       ip_address: "",
-      coffret_id: undefined,
+      coffret_id: defaultCoffretId,
       batiment_id: undefined,
       salle_id: undefined,
       status: "active",
     },
   });
+
+  // Observer le coffret sélectionné
+  const selectedCoffretId = form.watch("coffret_id");
+
+  // Réinitialiser le formulaire quand defaultCoffretId change
+  useEffect(() => {
+    if (defaultCoffretId && open) {
+      form.setValue("coffret_id", defaultCoffretId);
+    }
+  }, [defaultCoffretId, open, form]);
+
+  // Auto-remplir le bâtiment et la salle à partir du coffret sélectionné
+  useEffect(() => {
+    if (selectedCoffretId && coffrets) {
+      const selectedCoffret = coffrets.find(c => c.id === selectedCoffretId);
+      if (selectedCoffret) {
+        // Utiliser batiment_id ou batiment.id selon ce qui est disponible
+        const batimentId = selectedCoffret.batiment_id || selectedCoffret.batiment?.id;
+        if (batimentId) {
+          form.setValue("batiment_id", batimentId);
+        } else {
+          // Réinitialiser si le coffret n'a pas de bâtiment
+          form.setValue("batiment_id", undefined);
+        }
+        
+        // Utiliser salle_id ou salle.id selon ce qui est disponible
+        const salleId = selectedCoffret.salle_id || selectedCoffret.salle?.id;
+        if (salleId) {
+          form.setValue("salle_id", salleId);
+        } else {
+          // Réinitialiser si le coffret n'a pas de salle
+          form.setValue("salle_id", undefined);
+        }
+      }
+    } else if (!selectedCoffretId) {
+      // Si aucun coffret n'est sélectionné, réinitialiser les champs
+      form.setValue("batiment_id", undefined);
+      form.setValue("salle_id", undefined);
+    }
+  }, [selectedCoffretId, coffrets, form]);
 
   const selectedBatimentId = form.watch("batiment_id");
 
@@ -86,31 +137,46 @@ export default function AddEquipmentForm() {
       
       toast({
         title: "Équipement ajouté",
-        description: "L'équipement a été ajouté avec succès",
+        description: "Equipment has been added successfully",
       });
       
-      form.reset();
+      form.reset({
+        coffret_id: defaultCoffretId,
+        status: "active",
+      });
+      setCoffretComboboxOpen(false);
       setOpen(false);
+      refetchEquipements?.();
+      onSuccess?.();
     } catch (error: any) {
       toast({
         title: "Erreur",
-        description: error?.response?.data?.message || "Une erreur est survenue lors de l'ajout de l'équipement",
+        description: error?.response?.data?.message || "An error occurred while adding the equipment",
         variant: "destructive",
       });
     }
   };
 
+  const handleDialogOpenChange = (isOpen: boolean) => {
+    setOpen(isOpen);
+    if (!isOpen) {
+      setCoffretComboboxOpen(false);
+    }
+  };
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleDialogOpenChange}>
       <DialogTrigger asChild>
-        <Button className="bg-primary text-primary-foreground hover:bg-primary/90">
-          <Plus className="h-4 w-4 mr-2" />
-          Ajouter équipement
-        </Button>
+        {trigger || (
+          <Button className="bg-primary text-primary-foreground hover:bg-primary/90">
+            <Plus className="h-4 w-4 mr-2" />
+            Add equipment
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Ajouter un nouvel équipement</DialogTitle>
+          <DialogTitle>Add new equipment</DialogTitle>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -119,7 +185,7 @@ export default function AddEquipmentForm() {
               name="name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Nom *</FormLabel>
+                  <FormLabel>Name *</FormLabel>
                   <FormControl>
                     <Input placeholder="Ex: Switch-001" {...field} />
                   </FormControl>
@@ -138,7 +204,7 @@ export default function AddEquipmentForm() {
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Sélectionner le type" />
+                          <SelectValue placeholder="Select type" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
@@ -159,25 +225,57 @@ export default function AddEquipmentForm() {
                 name="coffret_id"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Coffret *</FormLabel>
-                    <Select
-                      onValueChange={(value) => field.onChange(parseInt(value))}
-                      value={field.value?.toString()}
-                      disabled={isLoadingCoffrets}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Sélectionner le coffret" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {coffrets?.map((coffret) => (
-                          <SelectItem key={coffret.id} value={coffret.id.toString()}>
-                            {coffret.nom || coffret.code}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FormLabel>Cabinet *</FormLabel>
+                    <Popover open={coffretComboboxOpen} onOpenChange={setCoffretComboboxOpen}>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            className={cn(
+                              "w-full justify-between",
+                              !field.value && "text-muted-foreground"
+                            )}
+                            disabled={isLoadingCoffrets}
+                          >
+                            {field.value
+                              ? coffrets?.find((coffret) => coffret.id === field.value)?.nom || 
+                                coffrets?.find((coffret) => coffret.id === field.value)?.code || 
+                                "Select cabinet"
+                              : "Select cabinet"}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-full p-0" align="start">
+                        <Command>
+                          <CommandInput placeholder="Rechercher un coffret par nom ou code..." />
+                          <CommandList>
+                            <CommandEmpty>Aucun coffret trouvé.</CommandEmpty>
+                            <CommandGroup>
+                              {coffrets?.map((coffret) => (
+                                <CommandItem
+                                  key={coffret.id}
+                                  value={`${coffret.nom} ${coffret.code}`}
+                                  onSelect={() => {
+                                    field.onChange(coffret.id);
+                                    setCoffretComboboxOpen(false);
+                                  }}
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      coffret.id === field.value ? "opacity-100" : "opacity-0"
+                                    )}
+                                  />
+                                  {coffret.nom || coffret.code}
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -190,7 +288,7 @@ export default function AddEquipmentForm() {
                 name="batiment_id"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Bâtiment</FormLabel>
+                    <FormLabel>Building</FormLabel>
                     <Select
                       onValueChange={(value) => {
                         if (value === "none") {
@@ -204,7 +302,7 @@ export default function AddEquipmentForm() {
                     >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Sélectionner le bâtiment (optionnel)" />
+                          <SelectValue placeholder="Select building (optional)" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
@@ -225,7 +323,7 @@ export default function AddEquipmentForm() {
                 name="salle_id"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Salle</FormLabel>
+                    <FormLabel>Room</FormLabel>
                     <Select
                       onValueChange={(value) => {
                         if (value === "none") {
@@ -239,7 +337,7 @@ export default function AddEquipmentForm() {
                     >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder={selectedBatimentId ? "Sélectionner la salle (optionnel)" : "Sélectionnez d'abord un bâtiment"} />
+                          <SelectValue placeholder={selectedBatimentId ? "Select room (optional)" : "Select a building first"} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
@@ -263,7 +361,7 @@ export default function AddEquipmentForm() {
                 name="ip_address"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Adresse IP</FormLabel>
+                    <FormLabel>IP Address</FormLabel>
                     <FormControl>
                       <Input placeholder="Ex: 192.168.1.10" {...field} />
                     </FormControl>
@@ -289,16 +387,16 @@ export default function AddEquipmentForm() {
                 name="status"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>État *</FormLabel>
+                    <FormLabel>Status *</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Sélectionner l'état" />
+                          <SelectValue placeholder="Select status" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="active">Actif</SelectItem>
-                        <SelectItem value="inactive">Inactif</SelectItem>
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="inactive">Inactive</SelectItem>
                         <SelectItem value="maintenance">Maintenance</SelectItem>
                       </SelectContent>
                     </Select>
@@ -313,7 +411,7 @@ export default function AddEquipmentForm() {
               name="description"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Description (optionnel)</FormLabel>
+                  <FormLabel>Description (optional)</FormLabel>
                   <FormControl>
                     <Textarea 
                       placeholder="Description de l'équipement..."
@@ -327,9 +425,9 @@ export default function AddEquipmentForm() {
 
             <div className="flex justify-end space-x-2">
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-                Annuler
+                Cancel
               </Button>
-              <Button type="submit">Ajouter</Button>
+              <Button type="submit">Add</Button>
             </div>
           </form>
         </Form>
