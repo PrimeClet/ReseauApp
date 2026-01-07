@@ -12,7 +12,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('coffrets', function (Blueprint $table) {
-            $table->text('qr_code')->nullable()->after('code');
+            $table->string('modele')->nullable()->after('nom');
+            $table->string('photo')->nullable()->after('modele');
         });
     }
 
@@ -22,9 +23,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('coffrets', function (Blueprint $table) {
-            $table->dropColumn('qr_code');
+            $table->dropColumn(['modele', 'photo']);
         });
     }
 };
-
-

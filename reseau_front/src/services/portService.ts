@@ -7,6 +7,11 @@ export interface Port {
   poe_enabled: boolean;
   vlan?: string;
   speed?: string;
+  type_reseau?: 'IT' | 'OT';
+  statut?: 'actif' | 'inactif' | 'reserve';
+  connexion_type?: 'fibre' | 'cuivre';
+  uplink?: string;
+  downlink?: string;
   equipement_id: number;
   connected_equipment_id?: number;
   created_at?: string;
@@ -37,6 +42,11 @@ export interface PortCreateData {
   poe_enabled?: boolean;
   vlan?: string;
   speed?: string;
+  type_reseau?: 'IT' | 'OT';
+  statut?: 'actif' | 'inactif' | 'reserve';
+  connexion_type?: 'fibre' | 'cuivre';
+  uplink?: string;
+  downlink?: string;
   equipement_id: number;
   connected_equipment_id?: number;
 }

@@ -15,6 +15,8 @@ use App\Http\Controllers\MaintenanceController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\CartographyController;
 use App\Http\Controllers\ImportController;
+use App\Http\Controllers\SiteController;
+use App\Http\Controllers\ZoneController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -53,6 +55,7 @@ Route::middleware('auth:sanctum')->group(function () {
             // Coffrets
             Route::get('/coffrets', [CoffretController::class, 'index']);
             Route::get('/coffrets/{coffret}', [CoffretController::class, 'show']);
+            Route::get('/coffrets/{coffret}/photo', [CoffretController::class, 'photo']);
 
             // Équipements
             Route::get('/equipements', [EquipementsController::class, 'index']);
@@ -89,6 +92,14 @@ Route::middleware('auth:sanctum')->group(function () {
             // Maintenances
             Route::get('/maintenances', [MaintenanceController::class, 'index']);
             Route::get('/maintenances/{maintenance}', [MaintenanceController::class, 'show']);
+
+            // Sites
+            Route::get('/sites', [SiteController::class, 'index']);
+            Route::get('/sites/{site}', [SiteController::class, 'show']);
+
+            // Zones
+            Route::get('/zones', [ZoneController::class, 'index']);
+            Route::get('/zones/{zone}', [ZoneController::class, 'show']);
         });
 
         // INVENTAIRE : écriture (création / modification / suppression)
@@ -142,6 +153,16 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/maintenances', [MaintenanceController::class, 'store']);
             Route::put('/maintenances/{maintenance}', [MaintenanceController::class, 'update']);
             Route::delete('/maintenances/{maintenance}', [MaintenanceController::class, 'destroy']);
+
+            // Sites
+            Route::post('/sites', [SiteController::class, 'store']);
+            Route::put('/sites/{site}', [SiteController::class, 'update']);
+            Route::delete('/sites/{site}', [SiteController::class, 'destroy']);
+
+            // Zones
+            Route::post('/zones', [ZoneController::class, 'store']);
+            Route::put('/zones/{zone}', [ZoneController::class, 'update']);
+            Route::delete('/zones/{zone}', [ZoneController::class, 'destroy']);
         });
 
         // Exemple futur : routes pour la cartographie (LANs)

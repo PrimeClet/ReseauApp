@@ -10,6 +10,8 @@ import {
   lanService,
   batimentService,
   salleService,
+  siteService,
+  zoneService,
   maintenanceService,
   statistiqueService
 } from '@/services';
@@ -30,13 +32,17 @@ import type {
   BatimentCreateData,
   Salle,
   SalleCreateData,
+  Site,
+  SiteCreateData,
+  Zone,
+  ZoneCreateData,
   Maintenance,
   MaintenanceCreateData,
   GlobalStats
 } from '@/services';
 
 // Re-export types for compatibility
-export type { Coffret, Equipement, Port, Liaison, System, Lan, Batiment, Salle, Maintenance };
+export type { Coffret, Equipement, Port, Liaison, System, Lan, Batiment, Salle, Site, Zone, Maintenance };
 
 // Legacy interfaces for backwards compatibility
 export interface Armoire {
@@ -98,6 +104,8 @@ interface DataContextType {
   lans: Lan[];
   batiments: Batiment[];
   salles: Salle[];
+  sites: Site[];
+  zones: Zone[];
   maintenances: Maintenance[];
   globalStats: GlobalStats | null;
 
@@ -110,6 +118,8 @@ interface DataContextType {
   isLoadingLans: boolean;
   isLoadingBatiments: boolean;
   isLoadingSalles: boolean;
+  isLoadingSites: boolean;
+  isLoadingZones: boolean;
   isLoadingMaintenances: boolean;
   isLoadingStats: boolean;
 
@@ -122,6 +132,8 @@ interface DataContextType {
   lanError: Error | null;
   batimentError: Error | null;
   salleError: Error | null;
+  siteError: Error | null;
+  zoneError: Error | null;
   maintenanceError: Error | null;
 
   // CRUD operations
@@ -157,6 +169,14 @@ interface DataContextType {
   updateSalle: (id: number, data: Partial<SalleCreateData>) => Promise<Salle>;
   deleteSalle: (id: number) => Promise<void>;
 
+  addSite: (data: SiteCreateData) => Promise<Site>;
+  updateSite: (id: number, data: Partial<SiteCreateData>) => Promise<Site>;
+  deleteSite: (id: number) => Promise<void>;
+
+  addZone: (data: ZoneCreateData) => Promise<Zone>;
+  updateZone: (id: number, data: Partial<ZoneCreateData>) => Promise<Zone>;
+  deleteZone: (id: number) => Promise<void>;
+
   addMaintenance: (data: MaintenanceCreateData) => Promise<Maintenance>;
   updateMaintenance: (id: number, data: Partial<MaintenanceCreateData>) => Promise<Maintenance>;
   deleteMaintenance: (id: number) => Promise<void>;
@@ -170,6 +190,8 @@ interface DataContextType {
   refetchLans: () => void;
   refetchBatiments: () => void;
   refetchSalles: () => void;
+  refetchSites: () => void;
+  refetchZones: () => void;
   refetchMaintenances: () => void;
   refetchStats: () => void;
 
@@ -297,6 +319,34 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
   } = useQuery({
     queryKey: ['salles'],
     queryFn: () => salleService.getAll(),
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+    retryDelay: 1000,
+    enabled: isAuthenticated,
+  });
+
+  const {
+    data: siteData,
+    isLoading: isLoadingSites,
+    error: siteError,
+    refetch: refetchSites
+  } = useQuery({
+    queryKey: ['sites'],
+    queryFn: () => siteService.getAll(),
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+    retryDelay: 1000,
+    enabled: isAuthenticated,
+  });
+
+  const {
+    data: zoneData,
+    isLoading: isLoadingZones,
+    error: zoneError,
+    refetch: refetchZones
+  } = useQuery({
+    queryKey: ['zones'],
+    queryFn: () => zoneService.getAll(),
     staleTime: 5 * 60 * 1000,
     retry: 1,
     retryDelay: 1000,
@@ -464,6 +514,40 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['salles'] }),
   });
 
+  // Mutations - Zones
+  const createZoneMutation = useMutation({
+    mutationFn: zoneService.create,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['zones'] }),
+  });
+
+  const updateZoneMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: Partial<ZoneCreateData> }) =>
+      zoneService.update(id, data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['zones'] }),
+  });
+
+  const deleteZoneMutation = useMutation({
+    mutationFn: zoneService.delete,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['zones'] }),
+  });
+
+  // Mutations - Sites
+  const createSiteMutation = useMutation({
+    mutationFn: siteService.create,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['sites'] }),
+  });
+
+  const updateSiteMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: Partial<SiteCreateData> }) =>
+      siteService.update(id, data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['sites'] }),
+  });
+
+  const deleteSiteMutation = useMutation({
+    mutationFn: siteService.delete,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['sites'] }),
+  });
+
   // Mutations - Maintenances
   const createMaintenanceMutation = useMutation({
     mutationFn: maintenanceService.create,
@@ -578,6 +662,30 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
     return deleteSalleMutation.mutateAsync(id);
   };
 
+  const addZone = async (data: ZoneCreateData) => {
+    return createZoneMutation.mutateAsync(data);
+  };
+
+  const updateZone = async (id: number, data: Partial<ZoneCreateData>) => {
+    return updateZoneMutation.mutateAsync({ id, data });
+  };
+
+  const deleteZone = async (id: number) => {
+    return deleteZoneMutation.mutateAsync(id);
+  };
+
+  const addSite = async (data: SiteCreateData) => {
+    return createSiteMutation.mutateAsync(data);
+  };
+
+  const updateSite = async (id: number, data: Partial<SiteCreateData>) => {
+    return updateSiteMutation.mutateAsync({ id, data });
+  };
+
+  const deleteSite = async (id: number) => {
+    return deleteSiteMutation.mutateAsync(id);
+  };
+
   const addMaintenance = async (data: MaintenanceCreateData) => {
     return createMaintenanceMutation.mutateAsync(data);
   };
@@ -614,6 +722,8 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
     lans: lanData?.data || [],
     batiments: batimentData?.data || [],
     salles: salleData?.data || [],
+    sites: siteData?.data || [],
+    zones: zoneData?.data || [],
     maintenances: maintenanceData?.data || [],
     globalStats: globalStats || null,
 
@@ -626,6 +736,8 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
     isLoadingLans,
     isLoadingBatiments,
     isLoadingSalles,
+    isLoadingSites,
+    isLoadingZones,
     isLoadingMaintenances,
     isLoadingStats,
 
@@ -638,6 +750,8 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
     lanError: lanError as Error | null,
     batimentError: batimentError as Error | null,
     salleError: salleError as Error | null,
+    siteError: siteError as Error | null,
+    zoneError: zoneError as Error | null,
     maintenanceError: maintenanceError as Error | null,
 
     // CRUD operations
@@ -665,6 +779,12 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
     addSalle,
     updateSalle,
     deleteSalle,
+    addZone,
+    updateZone,
+    deleteZone,
+    addSite,
+    updateSite,
+    deleteSite,
     addMaintenance,
     updateMaintenance,
     deleteMaintenance,
@@ -678,6 +798,8 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
     refetchLans,
     refetchBatiments,
     refetchSalles,
+    refetchZones,
+    refetchSites,
     refetchMaintenances,
     refetchStats,
 

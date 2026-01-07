@@ -12,7 +12,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('coffrets', function (Blueprint $table) {
-            $table->text('qr_code')->nullable()->after('code');
+            $table->foreignId('site_id')->nullable()->after('salle_id')->constrained('sites')->nullOnDelete();
+            $table->foreignId('zone_id')->nullable()->after('site_id')->constrained('zones')->nullOnDelete();
+            $table->string('emplacement')->nullable()->after('piece');
         });
     }
 
@@ -22,9 +24,9 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('coffrets', function (Blueprint $table) {
-            $table->dropColumn('qr_code');
+            $table->dropColumn('emplacement');
+            $table->dropConstrainedForeignId('zone_id');
+            $table->dropConstrainedForeignId('site_id');
         });
     }
 };
-
-

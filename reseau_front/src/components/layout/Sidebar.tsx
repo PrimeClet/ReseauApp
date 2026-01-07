@@ -15,6 +15,8 @@ import {
   User,
   Building2,
   DoorOpen,
+  MapPin,
+  Layers,
   ChevronDown,
   ChevronRight,
   Shield,
@@ -145,6 +147,30 @@ export default function Sidebar({ activeSection, onSectionChange }: SidebarProps
                 </Button>
               );
             })()}
+            {/* Sites */}
+            <Button
+              variant="ghost"
+              className={cn(
+                "w-full justify-start text-nav-text hover:bg-muted hover:text-foreground",
+                location.pathname === "/sites" && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
+              )}
+              onClick={() => handleNavigate("/sites")}
+            >
+              <MapPin className="mr-3 h-4 w-4" />
+              Sites
+            </Button>
+            {/* Zones */}
+            <Button
+              variant="ghost"
+              className={cn(
+                "w-full justify-start text-nav-text hover:bg-muted hover:text-foreground",
+                location.pathname === "/zones" && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
+              )}
+              onClick={() => handleNavigate("/zones")}
+            >
+              <Layers className="mr-3 h-4 w-4" />
+              Zones
+            </Button>
             {/* Bâtiments */}
             <Button
               variant="ghost"

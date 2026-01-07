@@ -7,6 +7,8 @@ export { default as systemService } from './systemService';
 export { default as lanService } from './lanService';
 export { default as batimentService } from './batimentService';
 export { default as salleService } from './salleService';
+export { default as siteService } from './siteService';
+export { default as zoneService } from './zoneService';
 export { default as maintenanceService } from './maintenanceService';
 export { default as statistiqueService } from './statistiqueService';
 export { default as cartographyService } from './cartographyService';
@@ -22,6 +24,8 @@ export type { System, SystemListResponse, SystemCreateData } from './systemServi
 export type { Lan, LanListResponse, LanCreateData } from './lanService';
 export type { Batiment, BatimentListResponse, BatimentCreateData } from './batimentService';
 export type { Salle, SalleListResponse, SalleCreateData } from './salleService';
+export type { Site, SiteListResponse, SiteCreateData } from './siteService';
+export type { Zone, ZoneListResponse, ZoneCreateData } from './zoneService';
 export type { Maintenance, MaintenanceListResponse, MaintenanceCreateData } from './maintenanceService';
 export type { EntityStats, GlobalStats, SystemsByType, EquipementsByCoffret, PortsByVlan } from './statistiqueService';
 export type { TopologyNode, TopologyLink, LanTopology, LanListItem } from './cartographyService';

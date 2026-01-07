@@ -77,11 +77,16 @@ export default function PortsSection() {
 
       <DataTableEnhanced
         title={`${ports.length} ports configurés`}
-        columns={["Label", "Appareil", "Vitesse", "PoE", "Équipement", "VLAN"]}
+        columns={["Label", "Appareil", "Type", "Statut", "Connexion", "Uplink", "Downlink", "Vitesse", "PoE", "Équipement", "VLAN"]}
         data={ports.map((port) => ({
           id: port.id,
           Label: port.port_label,
           Appareil: port.device_name,
+          Type: port.type_reseau || '-',
+          Statut: port.statut ? (port.statut === 'actif' ? 'Actif' : port.statut === 'inactif' ? 'Inactif' : 'Réservé') : '-',
+          Connexion: port.connexion_type ? (port.connexion_type === 'fibre' ? 'Fibre optique' : 'Cuivre (RJ45)') : '-',
+          Uplink: port.uplink || '-',
+          Downlink: port.downlink || '-',
           Vitesse: port.speed || '-',
           PoE: port.poe_enabled ? 'Oui' : 'Non',
           Équipement: port.equipement ? `${port.equipement.name} (${port.equipement.equipement_code})` : '-',
@@ -108,6 +113,18 @@ export default function PortsSection() {
         title="Modifier le port"
         data={selectedPortOriginal}
         onSave={handleSave}
+        fields={[
+          { key: 'port_label', label: 'Label', type: 'text' },
+          { key: 'device_name', label: 'Appareil', type: 'text' },
+          { key: 'type_reseau', label: 'Type', type: 'select', options: ['IT', 'OT'] },
+          { key: 'statut', label: 'Statut', type: 'select', options: ['actif', 'inactif', 'reserve'] },
+          { key: 'connexion_type', label: 'Connexion', type: 'select', options: ['fibre', 'cuivre'] },
+          { key: 'uplink', label: 'Uplink', type: 'text' },
+          { key: 'downlink', label: 'Downlink', type: 'text' },
+          { key: 'speed', label: 'Vitesse', type: 'text' },
+          { key: 'poe_enabled', label: 'PoE activé', type: 'select', options: ['true', 'false'] },
+          { key: 'vlan', label: 'VLAN', type: 'text' },
+        ]}
       />
     </div>
   );

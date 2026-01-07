@@ -60,13 +60,17 @@ export default function EquipmentsSection() {
       <div className="grid grid-cols-1 gap-6">
         <DataTableEnhanced
           title={`${equipements.length} équipements`}
-          columns={["name", "type", "equipement_code", "coffret", "status", "ip_address"]}
+          columns={["name", "type", "modele", "fabricant", "equipement_code", "coffret", "type_reseau", "ports", "status", "ip_address"]}
           data={equipements.map((eq) => ({
             id: eq.id,
             name: eq.name,
             type: eq.type,
+            modele: eq.modele || '-',
+            fabricant: eq.fabricant || '-',
             equipement_code: eq.equipement_code,
             coffret: eq.coffret?.nom || eq.coffret?.code || '-',
+            type_reseau: eq.type_reseau || '-',
+            ports: `${eq.nb_ports_fibre ?? 0} fibre, ${eq.nb_ports_rj45 ?? 0} RJ45`,
             status: eq.status,
             ip_address: eq.ip_address || '-',
           }))}
@@ -97,6 +101,12 @@ export default function EquipmentsSection() {
           { key: 'name', label: 'Nom', type: 'text' },
           { key: 'equipement_code', label: 'Code équipement', type: 'text' },
           { key: 'type', label: 'Type', type: 'select', options: ['switch', 'routeur', 'firewall', 'point-acces', 'serveur', 'autre'] },
+          { key: 'modele', label: 'Modèle', type: 'text' },
+          { key: 'fabricant', label: 'Fabricant', type: 'text' },
+          { key: 'numero_serie', label: 'Numéro de série', type: 'text' },
+          { key: 'type_reseau', label: 'Type de réseau', type: 'select', options: ['IT', 'OT'] },
+          { key: 'nb_ports_fibre', label: 'Ports fibre', type: 'number' },
+          { key: 'nb_ports_rj45', label: 'Ports RJ45', type: 'number' },
           { key: 'ip_address', label: 'Adresse IP', type: 'text' },
           { key: 'vlan', label: 'VLAN', type: 'text' },
           { key: 'status', label: 'État', type: 'select', options: ['active', 'inactive', 'maintenance'] },

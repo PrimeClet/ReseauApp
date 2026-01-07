@@ -11,8 +11,12 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('coffrets', function (Blueprint $table) {
-            $table->text('qr_code')->nullable()->after('code');
+        Schema::create('zones', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('site_id')->constrained('sites')->cascadeOnDelete();
+            $table->string('libelle');
+            $table->text('description')->nullable();
+            $table->timestamps();
         });
     }
 
@@ -21,10 +25,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('coffrets', function (Blueprint $table) {
-            $table->dropColumn('qr_code');
-        });
+        Schema::dropIfExists('zones');
     }
 };
-
-

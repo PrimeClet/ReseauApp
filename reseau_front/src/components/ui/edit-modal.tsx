@@ -15,9 +15,10 @@ interface EditModalProps {
   fields?: Array<{
     key: string;
     label: string;
-    type: 'text' | 'select' | 'number';
+    type: 'text' | 'select' | 'number' | 'file';
     options?: string[];
   }>;
+  className?: string;
 }
 
 export default function EditModal({ 
@@ -26,7 +27,8 @@ export default function EditModal({
   title, 
   data, 
   onSave,
-  fields
+  fields,
+  className
 }: EditModalProps) {
   const [formData, setFormData] = useState<any>({});
 
@@ -36,17 +38,21 @@ export default function EditModal({
       const initialData: any = {};
       if (fields) {
         fields.forEach(field => {
-          // Pour les champs select, garder la valeur telle quelle (même si undefined/null), pour les autres mettre '' si undefined
-          if (field.type === 'select') {
+          // Pour les champs file, ne pas pré-remplir (on ne peut pas pré-remplir un input file)
+          if (field.type === 'file') {
+            initialData[field.key] = undefined;
+          } else if (field.type === 'select') {
             const value = data[field.key];
             // Si la valeur existe mais ne correspond à aucune option, essayer de trouver une correspondance (case-insensitive)
-            if (value && field.options) {
+            if (value !== undefined && value !== null && field.options) {
+              const valueStr = String(value);
               const matchingOption = field.options.find(opt => 
-                opt.toLowerCase() === String(value).toLowerCase()
+                opt === valueStr || opt.toLowerCase() === valueStr.toLowerCase()
               );
-              initialData[field.key] = matchingOption || value;
+              initialData[field.key] = matchingOption || valueStr;
             } else {
-              initialData[field.key] = value !== undefined && value !== null ? value : '';
+              // Garder undefined au lieu de chaîne vide pour les valeurs null/undefined
+              initialData[field.key] = value !== undefined && value !== null ? String(value) : undefined;
             }
           } else {
             initialData[field.key] = data[field.key] || '';
@@ -70,7 +76,10 @@ export default function EditModal({
   const formFields = fields || defaultFields;
 
   const handleSave = () => {
-    onSave(formData);
+    const payload = data && data.id !== undefined
+      ? { id: data.id, ...formData }
+      : formData;
+    onSave(payload);
     onOpenChange(false);
   };
 
@@ -83,14 +92,14 @@ export default function EditModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className={className || "max-w-2xl"}>
         <DialogHeader>
           <DialogTitle className="text-xl font-semibold">{title}</DialogTitle>
         </DialogHeader>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
           {formFields.map(({ key, label, type, options }) => (
-            <div key={key} className="space-y-2">
+            <div key={key} className={type === 'file' ? 'space-y-2 md:col-span-2' : 'space-y-2'}>
               <Label htmlFor={key} className="text-sm font-medium capitalize">
                 {label}
               </Label>
@@ -111,6 +120,16 @@ export default function EditModal({
                     ))}
                   </SelectContent>
                 </Select>
+              ) : type === 'file' ? (
+                <Input
+                  id={key}
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    handleChange(key, file);
+                  }}
+                />
               ) : (
                 <Input
                   id={key}

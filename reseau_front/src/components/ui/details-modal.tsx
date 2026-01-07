@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./dialog";
 import { Button } from "./button";
-import { Edit, MapPin, QrCode } from "lucide-react";
+import { Edit, MapPin, QrCode, Image as ImageIcon } from "lucide-react";
+import api from "@/axios";
 import StatusBadge from "../dashboard/StatusBadge";
 import QRCodeModal from "./qr-code-modal";
 
@@ -26,6 +27,17 @@ export default function DetailsModal({
 
   // Détecter si c'est un coffret (a un code et un nom)
   const isCoffret = data.code && data.nom;
+  const backendOrigin = (() => {
+    const base = (api as any)?.defaults?.baseURL as string | undefined;
+    if (!base) return '';
+    return base.replace(/\/api\/?$/, '');
+  })();
+  const resolvePhotoUrl = (pathOrUrl?: string) => {
+    if (!pathOrUrl) return null;
+    if (/^https?:\/\//i.test(pathOrUrl)) return pathOrUrl;
+    if (!backendOrigin) return `/storage/${pathOrUrl}`;
+    return `${backendOrigin}/storage/${pathOrUrl}`;
+  };
 
   const getLabel = (key: string) => {
     // Mapping des labels personnalisés
@@ -120,6 +132,41 @@ export default function DetailsModal({
             </div>
           </div>
         </DialogHeader>
+
+        {/* Photo du coffret si disponible */}
+        {isCoffret && (data.photo_url || data.photo) && (
+          <div className="mt-2">
+            <div className="flex items-center gap-2 mb-2">
+              <ImageIcon className="h-5 w-5 text-primary" />
+              <h3 className="text-sm font-medium text-foreground">Photo</h3>
+            </div>
+            <div className="rounded-md border border-border overflow-hidden bg-muted/20">
+              <img
+                src={data.photo_url || resolvePhotoUrl(data.photo) || undefined}
+                alt={`Photo - ${data.nom || data.code}`}
+                className="w-full h-auto object-contain max-h-[380px] bg-background"
+                loading="lazy"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* QR Code inline si disponible */}
+        {isCoffret && data.qr_code && (
+          <div className="mt-4">
+            <div className="flex items-center gap-2 mb-2">
+              <QrCode className="h-5 w-5 text-primary" />
+              <h3 className="text-sm font-medium text-foreground">QR Code</h3>
+            </div>
+            <div className="rounded-md border border-border p-3 bg-muted/20">
+              <div
+                className="w-full overflow-auto"
+                // qr_code est un SVG (string) renvoyé par l'API
+                dangerouslySetInnerHTML={{ __html: data.qr_code }}
+              />
+            </div>
+          </div>
+        )}
         
         {/* Section Localisation - spécifique aux équipements */}
         {data.coffret && (
@@ -169,6 +216,8 @@ export default function DetailsModal({
               // Exclure les champs système, les IDs si la relation existe, et les relations de localisation
               if (key === 'ports' || key === 'created_at' || key === 'updated_at') return false;
               if (key === 'coffret' || key === 'batiment' || key === 'salle') return false;
+              // Déjà rendus avec un affichage dédié
+              if (key === 'qr_code' || key === 'photo' || key === 'photo_url') return false;
               if (key.endsWith('_id')) {
                 // Ne pas afficher l'ID si la relation existe (ex: coffret_id si coffret existe)
                 const relationKey = key.replace('_id', '');
