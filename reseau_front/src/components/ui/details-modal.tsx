@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./dialog";
 import { Button } from "./button";
-import { Edit, MapPin, QrCode, Image as ImageIcon } from "lucide-react";
+import { Edit, MapPin, QrCode, Image as ImageIcon, User as UserIcon } from "lucide-react";
 import api from "@/axios";
 import StatusBadge from "../dashboard/StatusBadge";
 import QRCodeModal from "./qr-code-modal";
@@ -27,6 +27,8 @@ export default function DetailsModal({
 
   // Détecter si c'est un coffret (a un code et un nom)
   const isCoffret = data.code && data.nom;
+  // Détecter si c'est une modification (a photo_avant_url ou photo_apres_url)
+  const isModification = data.photo_avant_url || data.photo_apres_url;
   const backendOrigin = (() => {
     const base = (api as any)?.defaults?.baseURL as string | undefined;
     if (!base) return '';
@@ -43,6 +45,16 @@ export default function DetailsModal({
     // Mapping des labels personnalisés
     const labelMap: { [key: string]: string } = {
       'media': 'Type de liaison',
+      'user': 'Utilisateur',
+      'type_modification': 'Type de modification',
+      'description': 'Description',
+      'raison': 'Raison / Justification',
+      'date_intervention': 'Date d\'intervention',
+      'heure_intervention': 'Heure d\'intervention',
+      'statut': 'Statut',
+      'commentaire_validation': 'Commentaire de validation',
+      'validated_by': 'Validé par',
+      'validated_at': 'Date de validation',
     };
     return labelMap[key] || key.replace(/_/g, ' ');
   };
@@ -76,7 +88,7 @@ export default function DetailsModal({
 
     const stringValue = String(value);
     
-    if (key.toLowerCase().includes('état') || key.toLowerCase().includes('status') || key.toLowerCase().includes('etat')) {
+    if (key.toLowerCase().includes('état') || key.toLowerCase().includes('status') || key.toLowerCase().includes('etat') || key.toLowerCase().includes('statut')) {
       const statusMapping: { [key: string]: "up" | "down" | "warn" | "maintenance" | "ok" | "actif" | "fermee" } = {
         'actif': 'actif',
         'active': 'actif', 
@@ -92,11 +104,28 @@ export default function DetailsModal({
         'alerte': 'warn',
         'ok': 'ok',
         'fermee': 'fermee',
-        'fermée': 'fermee'
+        'fermée': 'fermee',
+        'en attente': 'warn',
+        'approuvée': 'ok',
+        'approuvee': 'ok',
+        'rejetée': 'down',
+        'rejetee': 'down',
+        'en révision': 'maintenance',
+        'en_revision': 'maintenance',
       };
       
       const mappedStatus = statusMapping[stringValue.toLowerCase()] || 'ok';
       return <StatusBadge status={mappedStatus} />;
+    }
+
+    // Formatage pour validated_at
+    if (key === 'validated_at' || key === 'created_at' || key === 'updated_at') {
+      try {
+        const date = new Date(stringValue);
+        return <span className="text-foreground">{date.toLocaleString('fr-FR')}</span>;
+      } catch {
+        return <span className="text-foreground">{stringValue}</span>;
+      }
     }
     
     return <span className="text-foreground">{stringValue}</span>;
@@ -167,9 +196,104 @@ export default function DetailsModal({
             </div>
           </div>
         )}
+
+        {/* Photos avant/après pour les modifications */}
+        {isModification && (data.photo_avant_url || data.photo_apres_url) && (
+          <div className="mt-4">
+            <div className="flex items-center gap-2 mb-4">
+              <ImageIcon className="h-5 w-5 text-primary" />
+              <h3 className="text-sm font-medium text-foreground">Photos de l'intervention</h3>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {data.photo_avant_url && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-muted-foreground">Photo avant</label>
+                  <div className="rounded-md border border-border overflow-hidden bg-muted/20">
+                    <img
+                      src={data.photo_avant_url}
+                      alt="Photo avant l'intervention"
+                      className="w-full h-auto object-contain max-h-[300px] bg-background"
+                      loading="lazy"
+                    />
+                  </div>
+                </div>
+              )}
+              {data.photo_apres_url && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-muted-foreground">Photo après</label>
+                  <div className="rounded-md border border-border overflow-hidden bg-muted/20">
+                    <img
+                      src={data.photo_apres_url}
+                      alt="Photo après l'intervention"
+                      className="w-full h-auto object-contain max-h-[300px] bg-background"
+                      loading="lazy"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Section Informations utilisateur - spécifique aux modifications */}
+        {isModification && data.user && (
+          <div className="mt-4 p-4 bg-muted/30 rounded-lg border border-border">
+            <div className="flex items-center gap-2 mb-4">
+              <UserIcon className="h-5 w-5 text-primary" />
+              <h3 className="text-lg font-semibold text-foreground">Demandeur</h3>
+            </div>
+            <div className="text-foreground font-medium">
+              {data.user}
+            </div>
+          </div>
+        )}
+
+        {/* Section Localisation - spécifique aux modifications */}
+        {isModification && (
+          <div className="mt-6 p-4 bg-muted/30 rounded-lg border border-border">
+            <div className="flex items-center gap-2 mb-4">
+              <MapPin className="h-5 w-5 text-primary" />
+              <h3 className="text-lg font-semibold text-foreground">Location</h3>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-muted-foreground">City</label>
+                <div className="text-foreground">
+                  {data.batiment?.ville || '-'}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-muted-foreground">Site</label>
+                <div className="text-foreground">
+                  {data.site?.libelle || '-'}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-muted-foreground">Building</label>
+                <div className="text-foreground">
+                  {data.batiment?.nom || '-'}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-muted-foreground">Room</label>
+                <div className="text-foreground">
+                  {data.salle?.nom || '-'}
+                </div>
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <label className="text-sm font-medium text-muted-foreground">Cabinet (Coffret)</label>
+                <div className="text-foreground">
+                  {data.coffret || (data.coffret_nom && data.coffret_code 
+                    ? `${data.coffret_nom} (${data.coffret_code})` 
+                    : data.coffret_nom || data.coffret_code || '-')}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
         
         {/* Section Localisation - spécifique aux équipements */}
-        {data.coffret && (
+        {!isModification && data.coffret && (
           <div className="mt-6 p-4 bg-muted/30 rounded-lg border border-border">
             <div className="flex items-center gap-2 mb-4">
               <MapPin className="h-5 w-5 text-primary" />
@@ -215,9 +339,17 @@ export default function DetailsModal({
             .filter(([key]) => {
               // Exclure les champs système, les IDs si la relation existe, et les relations de localisation
               if (key === 'ports' || key === 'created_at' || key === 'updated_at') return false;
-              if (key === 'coffret' || key === 'batiment' || key === 'salle') return false;
+              if (key === 'coffret' || key === 'batiment' || key === 'salle' || key === 'site' || key === 'zone') return false;
               // Déjà rendus avec un affichage dédié
-              if (key === 'qr_code' || key === 'photo' || key === 'photo_url') return false;
+              if (key === 'qr_code' || key === 'photo' || key === 'photo_url' || key === 'photo_avant_url' || key === 'photo_apres_url') return false;
+              // Exclure les labels de type_modification pour les modifications
+              if (key === 'type_modification_label') return false;
+              // Exclure user pour les modifications (affiché dans une section dédiée)
+              if (isModification && key === 'user') return false;
+              // Pour les modifications, afficher validated_by et validated_at même s'il y a validatedBy (relation)
+              if (isModification && key === 'validated_by' && data.validatedBy) {
+                // Ne pas exclure, on veut l'afficher
+              }
               if (key.endsWith('_id')) {
                 // Ne pas afficher l'ID si la relation existe (ex: coffret_id si coffret existe)
                 const relationKey = key.replace('_id', '');

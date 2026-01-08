@@ -151,7 +151,7 @@ export default function DataTableEnhanced({
 
     const stringValue = String(value);
     
-    if (column.toLowerCase().includes('état') || column.toLowerCase().includes('status') || column.toLowerCase().includes('etat')) {
+    if (column.toLowerCase().includes('état') || column.toLowerCase().includes('status') || column.toLowerCase().includes('etat') || column.toLowerCase().includes('statut')) {
       const statusMapping: { [key: string]: "up" | "down" | "warn" | "maintenance" | "ok" | "actif" | "fermee" } = {
         'actif': 'actif',
         'active': 'actif', 
@@ -167,7 +167,14 @@ export default function DataTableEnhanced({
         'alerte': 'warn',
         'ok': 'ok',
         'fermee': 'fermee',
-        'fermée': 'fermee'
+        'fermée': 'fermee',
+        'en attente': 'warn',
+        'approuvée': 'ok',
+        'approuvee': 'ok',
+        'rejetée': 'down',
+        'rejetee': 'down',
+        'en révision': 'maintenance',
+        'en_revision': 'maintenance',
       };
       
       const mappedStatus = statusMapping[stringValue.toLowerCase()] || 'ok';

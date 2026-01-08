@@ -10,9 +10,11 @@ export { default as salleService } from './salleService';
 export { default as siteService } from './siteService';
 export { default as zoneService } from './zoneService';
 export { default as maintenanceService } from './maintenanceService';
+export { default as modificationService } from './modificationService';
 export { default as statistiqueService } from './statistiqueService';
 export { default as cartographyService } from './cartographyService';
 export { default as importService } from './importService';
+export { default as notificationService } from './notificationService';
 
 // Re-export types
 export type { LoginCredentials, User, LoginResponse, AuthMeResponse } from './authService';
@@ -27,6 +29,8 @@ export type { Salle, SalleListResponse, SalleCreateData } from './salleService';
 export type { Site, SiteListResponse, SiteCreateData } from './siteService';
 export type { Zone, ZoneListResponse, ZoneCreateData } from './zoneService';
 export type { Maintenance, MaintenanceListResponse, MaintenanceCreateData } from './maintenanceService';
-export type { EntityStats, GlobalStats, SystemsByType, EquipementsByCoffret, PortsByVlan } from './statistiqueService';
+export type { Modification, ModificationListResponse, ModificationCreateData } from './modificationService';
+export type { EntityStats, GlobalStats, SystemsByType, EquipementsByCoffret, PortsByVlan, ModificationsStats } from './statistiqueService';
 export type { TopologyNode, TopologyLink, LanTopology, LanListItem } from './cartographyService';
 export type { ImportType, ImportResult } from './importService';
+export type { Notification, NotificationListResponse } from './notificationService';

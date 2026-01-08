@@ -1,21 +1,25 @@
 import { Server, Router, Cable, Activity, Loader2 } from "lucide-react";
 import StatsCard from "./StatsCard";
 import { useData } from "@/contexts/DataContext";
+import { useNavigate } from "react-router-dom";
 
 export default function DashboardOverview() {
+  const navigate = useNavigate();
   const {
     coffrets,
     equipements,
     ports,
     liaisons,
     globalStats,
+    modificationsStats,
     isLoadingCoffrets,
     isLoadingEquipements,
     isLoadingLiaisons,
-    isLoadingStats
+    isLoadingStats,
+    isLoadingModificationsStats
   } = useData();
 
-  const isLoading = isLoadingCoffrets || isLoadingEquipements || isLoadingLiaisons || isLoadingStats;
+  const isLoading = isLoadingCoffrets || isLoadingEquipements || isLoadingLiaisons || isLoadingStats || isLoadingModificationsStats;
 
   // Prepare cabinet data for display
   const coffretsTableData = coffrets.slice(0, 5).map(coffret => ({
@@ -95,6 +99,7 @@ export default function DashboardOverview() {
           icon={Activity}
         />
       </div>
+
 
       {/* Data sections */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -259,21 +264,33 @@ export default function DashboardOverview() {
             </button>
           </div>
           <div className="p-4 grid grid-cols-2 gap-4">
-            <div className="text-center p-4 bg-muted/50 rounded-lg">
-              <div className="text-2xl font-bold text-foreground">{coffrets.length}</div>
-              <div className="text-sm text-muted-foreground">Cabinets</div>
+            <div 
+              className="text-center p-4 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted/70 transition-colors"
+              onClick={() => navigate('/modifications')}
+            >
+              <div className="text-2xl font-bold text-foreground">{modificationsStats?.total ?? 0}</div>
+              <div className="text-sm text-muted-foreground">Demandes Total</div>
             </div>
-            <div className="text-center p-4 bg-muted/50 rounded-lg">
-              <div className="text-2xl font-bold text-foreground">{equipements.length}</div>
-              <div className="text-sm text-muted-foreground">Equipment</div>
+            <div 
+              className="text-center p-4 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted/70 transition-colors"
+              onClick={() => navigate('/modifications')}
+            >
+              <div className="text-2xl font-bold text-foreground">{modificationsStats?.en_cours ?? 0}</div>
+              <div className="text-sm text-muted-foreground">En cours</div>
             </div>
-            <div className="text-center p-4 bg-muted/50 rounded-lg">
-              <div className="text-2xl font-bold text-foreground">{ports.length}</div>
-              <div className="text-sm text-muted-foreground">Ports</div>
+            <div 
+              className="text-center p-4 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted/70 transition-colors"
+              onClick={() => navigate('/modifications')}
+            >
+              <div className="text-2xl font-bold text-foreground">{modificationsStats?.approuvee ?? 0}</div>
+              <div className="text-sm text-muted-foreground">Validées</div>
             </div>
-            <div className="text-center p-4 bg-muted/50 rounded-lg">
-              <div className="text-2xl font-bold text-foreground">{liaisons.length}</div>
-              <div className="text-sm text-muted-foreground">Links</div>
+            <div 
+              className="text-center p-4 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted/70 transition-colors"
+              onClick={() => navigate('/modifications')}
+            >
+              <div className="text-2xl font-bold text-foreground">{modificationsStats?.rejetee ?? 0}</div>
+              <div className="text-sm text-muted-foreground">Rejetées</div>
             </div>
           </div>
         </div>

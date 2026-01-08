@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./dialog";
 import { Button } from "./button";
 import { Input } from "./input";
 import { Label } from "./label";
+import { Textarea } from "./textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./select";
 import { Save } from "lucide-react";
 
@@ -15,7 +16,7 @@ interface EditModalProps {
   fields?: Array<{
     key: string;
     label: string;
-    type: 'text' | 'select' | 'number' | 'file';
+    type: 'text' | 'select' | 'number' | 'file' | 'textarea' | 'date' | 'time';
     options?: string[];
   }>;
   className?: string;
@@ -99,7 +100,7 @@ export default function EditModal({
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
           {formFields.map(({ key, label, type, options }) => (
-            <div key={key} className={type === 'file' ? 'space-y-2 md:col-span-2' : 'space-y-2'}>
+            <div key={key} className={(type === 'file' || type === 'textarea') ? 'space-y-2 md:col-span-2' : 'space-y-2'}>
               <Label htmlFor={key} className="text-sm font-medium capitalize">
                 {label}
               </Label>
@@ -130,10 +131,18 @@ export default function EditModal({
                     handleChange(key, file);
                   }}
                 />
+              ) : type === 'textarea' ? (
+                <Textarea
+                  id={key}
+                  value={formData[key] ?? ''}
+                  onChange={(e) => handleChange(key, e.target.value)}
+                  placeholder={`Entrer ${label}`}
+                  rows={4}
+                />
               ) : (
                 <Input
                   id={key}
-                  type={type === 'number' ? 'number' : 'text'}
+                  type={type === 'number' ? 'number' : type === 'date' ? 'date' : type === 'time' ? 'time' : 'text'}
                   value={formData[key] ?? ''}
                   onChange={(e) => handleChange(key, e.target.value)}
                   placeholder={`Entrer ${label}`}

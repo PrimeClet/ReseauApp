@@ -18,6 +18,10 @@ import Roles from "./pages/Roles";
 import Permissions from "./pages/Permissions";
 import Lans from "./pages/Lans";
 import LanCartography from "./pages/LanCartography";
+import Modifications from "./pages/Modifications";
+import ValidationModifications from "./pages/ValidationModifications";
+import Notifications from "./pages/Notifications";
+import ModificationHistory from "./pages/ModificationHistory";
 
 const queryClient = new QueryClient();
 
@@ -42,6 +46,10 @@ const App = () => (
               <Route path="/permissions" element={<Permissions />} />
               <Route path="/lans" element={<Lans />} />
               <Route path="/cartographie-lan" element={<LanCartography />} />
+              <Route path="/modifications" element={<Modifications />} />
+              <Route path="/validation-modifications" element={<ValidationModifications />} />
+              <Route path="/notifications" element={<Notifications />} />
+              <Route path="/modification-history" element={<ModificationHistory />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

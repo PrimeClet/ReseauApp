@@ -8,6 +8,7 @@ use App\Models\Port;
 use App\Models\Metric;
 use App\Models\Liaison;
 use App\Models\System;
+use App\Models\Modification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -86,5 +87,27 @@ class StatistiqueController extends Controller
             ->get();
 
         return response()->json($portsByVlan);
+    }
+
+    /**
+     * Obtenir les statistiques des demandes de modification.
+     */
+    public function modificationsStats()
+    {
+        $total = Modification::count();
+        $enAttente = Modification::where('statut', 'en_attente')->count();
+        $enRevision = Modification::where('statut', 'en_revision')->count();
+        $approuvee = Modification::where('statut', 'approuvee')->count();
+        $rejetee = Modification::where('statut', 'rejetee')->count();
+        $enCours = $enAttente + $enRevision;
+
+        return response()->json([
+            'total' => $total,
+            'en_cours' => $enCours,
+            'en_attente' => $enAttente,
+            'en_revision' => $enRevision,
+            'approuvee' => $approuvee,
+            'rejetee' => $rejetee,
+        ]);
     }
 }

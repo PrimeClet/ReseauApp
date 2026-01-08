@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useSidebarToggle } from "@/components/layout/AppShell";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   LayoutDashboard, 
   Server, 
@@ -22,7 +23,11 @@ import {
   Shield,
   KeyRound,
   Network,
-  Map
+  Map,
+  ClipboardList,
+  CheckCircle2,
+  Bell,
+  History
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -52,7 +57,9 @@ export default function Sidebar({ activeSection, onSectionChange }: SidebarProps
   const location = useLocation();
   const isMobile = useIsMobile();
   const { setSidebarOpen } = useSidebarToggle();
+  const { user } = useAuth();
   const [isAccessOpen, setIsAccessOpen] = useState(false);
+  const [isModificationsOpen, setIsModificationsOpen] = useState(false);
 
   useEffect(() => {
     if (
@@ -63,6 +70,16 @@ export default function Sidebar({ activeSection, onSectionChange }: SidebarProps
       setIsAccessOpen(true);
     }
   }, [location.pathname, activeSection]);
+
+  useEffect(() => {
+    if (
+      location.pathname === "/modifications" ||
+      location.pathname === "/validation-modifications" ||
+      location.pathname === "/modification-history"
+    ) {
+      setIsModificationsOpen(true);
+    }
+  }, [location.pathname]);
 
   const isAccessButtonActive = (sectionId: string) => {
     if (location.pathname === "/") {
@@ -233,6 +250,75 @@ export default function Sidebar({ activeSection, onSectionChange }: SidebarProps
             })}
           </div>
 
+          {/* Section MODIFICATIONS */}
+          <div className="space-y-1">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-3 pb-2">
+              Modifications
+            </p>
+            <Collapsible open={isModificationsOpen} onOpenChange={setIsModificationsOpen}>
+              <CollapsibleTrigger asChild>
+                <Button
+                  variant="ghost"
+                  className={cn(
+                    "w-full justify-between text-nav-text hover:bg-muted hover:text-foreground",
+                    (location.pathname === "/modifications" || location.pathname === "/validation-modifications" || location.pathname === "/modification-history") &&
+                      "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
+                  )}
+                >
+                  <div className="flex items-center">
+                    <ClipboardList className="mr-3 h-4 w-4" />
+                    Demandes de modification
+                  </div>
+                  {isModificationsOpen ? (
+                    <ChevronDown className="h-4 w-4" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4" />
+                  )}
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="pl-4 space-y-1">
+                <Button
+                  variant="ghost"
+                  className={cn(
+                    "w-full justify-start text-sm text-nav-text hover:bg-muted hover:text-foreground",
+                    location.pathname === "/modifications" &&
+                      "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
+                  )}
+                  onClick={() => handleNavigate("/modifications")}
+                >
+                  <ClipboardList className="mr-3 h-4 w-4" />
+                  Mes demandes
+                </Button>
+                {user?.role === 'administrator' && (
+                  <Button
+                    variant="ghost"
+                    className={cn(
+                      "w-full justify-start text-sm text-nav-text hover:bg-muted hover:text-foreground",
+                      location.pathname === "/validation-modifications" &&
+                        "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
+                    )}
+                    onClick={() => handleNavigate("/validation-modifications")}
+                  >
+                    <CheckCircle2 className="mr-3 h-4 w-4" />
+                    Validation
+                  </Button>
+                )}
+                <Button
+                  variant="ghost"
+                  className={cn(
+                    "w-full justify-start text-sm text-nav-text hover:bg-muted hover:text-foreground",
+                    location.pathname === "/modification-history" &&
+                      "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
+                  )}
+                  onClick={() => handleNavigate("/modification-history")}
+                >
+                  <History className="mr-3 h-4 w-4" />
+                  Historique
+                </Button>
+              </CollapsibleContent>
+            </Collapsible>
+          </div>
+
           {/* Section RÉSEAU */}
           <div className="space-y-1">
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-3 pb-2">
@@ -331,6 +417,17 @@ export default function Sidebar({ activeSection, onSectionChange }: SidebarProps
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-3 pb-2">
               Compte
             </p>
+            <Button
+              variant="ghost"
+              className={cn(
+                "w-full justify-start text-nav-text hover:bg-muted hover:text-foreground",
+                location.pathname === "/notifications" && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
+              )}
+              onClick={() => handleNavigate("/notifications")}
+            >
+              <Bell className="mr-3 h-4 w-4" />
+              Notifications
+            </Button>
             <Button
               variant="ghost"
               className={cn(

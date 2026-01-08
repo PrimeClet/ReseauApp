@@ -39,6 +39,8 @@ class User extends Authenticatable
         'remember_token',
     ];
 
+    protected $appends = ['full_name'];
+
     /**
      * Get the attributes that should be cast.
      *
@@ -72,5 +74,28 @@ class User extends Authenticatable
         $permissionsForRole = config('permissions.roles.' . $role, []);
 
         return in_array($permission, $permissionsForRole, true);
+    }
+
+    /**
+     * Retourne le nom complet de l'utilisateur (name + surname)
+     */
+    public function getFullNameAttribute(): string
+    {
+        $name = trim($this->name ?? '');
+        $surname = trim($this->surname ?? '');
+        
+        if ($name && $surname) {
+            return $name . ' ' . $surname;
+        }
+        
+        if ($name) {
+            return $name;
+        }
+        
+        if ($surname) {
+            return $surname;
+        }
+        
+        return $this->username ?? 'Utilisateur';
     }
 }

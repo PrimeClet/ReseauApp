@@ -46,13 +46,13 @@ export default function AppShell({
       <div className="flex h-screen bg-background overflow-hidden">
         {/* Fixed Sidebar - full height, on top */}
         {isSidebarOpen && (
-          <aside className="fixed left-0 top-0 h-full w-64 border-r border-border bg-card overflow-y-auto z-[60]">
+          <aside className="fixed left-0 top-0 h-full w-72 border-r border-border bg-card overflow-y-auto z-[60]">
             <Sidebar activeSection={activeSection} onSectionChange={onSectionChange} />
           </aside>
         )}
 
         {/* Main content area with navbar */}
-        <div className={`flex flex-col flex-1 min-h-0 overflow-hidden ${isSidebarOpen ? 'ml-64' : ''} transition-all duration-300`}>
+        <div className={`flex flex-col flex-1 min-h-0 overflow-hidden ${isSidebarOpen ? 'ml-72' : ''} transition-all duration-300`}>
           {/* Navbar inside content area */}
           <Navbar />
 
