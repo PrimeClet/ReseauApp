@@ -5,10 +5,10 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useSidebarToggle } from "@/components/layout/AppShell";
 import { useAuth } from "@/contexts/AuthContext";
 import {
-  LayoutDashboard, 
-  Server, 
-  Cable, 
-  Router, 
+  LayoutDashboard,
+  Server,
+  Cable,
+  Router,
   Settings,
   HardDrive,
   Wrench,
@@ -24,10 +24,7 @@ import {
   KeyRound,
   Network,
   Map,
-  ClipboardList,
-  CheckCircle2,
-  Bell,
-  History
+  Plug
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -45,7 +42,7 @@ const menuItems = [
   { id: "dashboard", label: "Tableau de bord", icon: LayoutDashboard },
   { id: "armoires", label: "Armoires", icon: Server },
   { id: "equipements", label: "Équipements", icon: HardDrive },
-  { id: "ports", label: "Ports", icon: Router },
+  { id: "ports", label: "Ports", icon: Plug },
   { id: "liaisons", label: "Liaisons", icon: Cable },
   { id: "maintenance", label: "Maintenance", icon: Wrench },
 ];
@@ -82,9 +79,6 @@ export default function Sidebar({ activeSection, onSectionChange }: SidebarProps
   }, [location.pathname]);
 
   const isAccessButtonActive = (sectionId: string) => {
-    if (location.pathname === "/") {
-      return activeSection === sectionId;
-    }
     if (sectionId === "roles" && location.pathname === "/roles") {
       return true;
     }
@@ -215,7 +209,7 @@ export default function Sidebar({ activeSection, onSectionChange }: SidebarProps
             {menuItems.filter(item => item.id !== "dashboard").map((item) => {
               // Gérer le cas spécial des armoires qui a sa propre page
               if (item.id === "armoires") {
-                const isActive = location.pathname === "/armoires";
+                const isActive = location.pathname === "/armoires" || location.pathname === "/armoires-detail";
                 return (
                   <Button
                     key={item.id}
@@ -231,7 +225,64 @@ export default function Sidebar({ activeSection, onSectionChange }: SidebarProps
                   </Button>
                 );
               }
-              
+
+              // Gérer le cas des équipements qui a sa propre page
+              if (item.id === "equipements") {
+                const isActive = location.pathname === "/equipements";
+                return (
+                  <Button
+                    key={item.id}
+                    variant="ghost"
+                    className={cn(
+                      "w-full justify-start text-nav-text hover:bg-muted hover:text-foreground",
+                      isActive && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
+                    )}
+                    onClick={() => handleNavigate("/equipements")}
+                  >
+                    <item.icon className="mr-3 h-4 w-4" />
+                    {item.label}
+                  </Button>
+                );
+              }
+
+              // Gérer le cas des ports qui a sa propre page
+              if (item.id === "ports") {
+                const isActive = location.pathname === "/ports";
+                return (
+                  <Button
+                    key={item.id}
+                    variant="ghost"
+                    className={cn(
+                      "w-full justify-start text-nav-text hover:bg-muted hover:text-foreground",
+                      isActive && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
+                    )}
+                    onClick={() => handleNavigate("/ports")}
+                  >
+                    <item.icon className="mr-3 h-4 w-4" />
+                    {item.label}
+                  </Button>
+                );
+              }
+
+              // Gérer le cas des liaisons qui a sa propre page
+              if (item.id === "liaisons") {
+                const isActive = location.pathname === "/liaisons";
+                return (
+                  <Button
+                    key={item.id}
+                    variant="ghost"
+                    className={cn(
+                      "w-full justify-start text-nav-text hover:bg-muted hover:text-foreground",
+                      isActive && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
+                    )}
+                    onClick={() => handleNavigate("/liaisons")}
+                  >
+                    <item.icon className="mr-3 h-4 w-4" />
+                    {item.label}
+                  </Button>
+                );
+              }
+
               const isActive = location.pathname === "/" && activeSection === item.id;
               return (
                 <Button
@@ -381,7 +432,7 @@ export default function Sidebar({ activeSection, onSectionChange }: SidebarProps
                     "w-full justify-start text-nav-text hover:bg-muted hover:text-foreground text-sm",
                     isAccessButtonActive("users") && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
                   )}
-                  onClick={() => handleMenuClick("users")}
+                  onClick={() => handleNavigate("/users")}
                 >
                   <Users className="mr-3 h-4 w-4" />
                   Utilisateurs

@@ -3,7 +3,9 @@ import DataTableEnhanced from "@/components/ui/data-table-enhanced";
 import DetailsModal from "@/components/ui/details-modal";
 import EditModal from "@/components/ui/edit-modal";
 import AddMaintenanceForm from "@/components/forms/AddMaintenanceForm";
+import PageHeader from "@/components/ui/page-header";
 import { useData } from "@/contexts/DataContext";
+import { Wrench } from "lucide-react";
 
 export default function MaintenanceSection() {
   const { maintenances, isLoadingMaintenances, maintenanceError, refetchMaintenances } = useData();
@@ -28,15 +30,16 @@ export default function MaintenanceSection() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-foreground">Gestion de la Maintenance</h2>
-          <div className="text-sm text-muted-foreground mt-1">
-            Planification et suivi des interventions techniques
-          </div>
-        </div>
-        <AddMaintenanceForm />
-      </div>
+      <PageHeader
+        title="Gestion de la Maintenance"
+        description="Planification et suivi des interventions techniques"
+        icon={<Wrench className="h-6 w-6 text-primary" />}
+        breadcrumbs={[
+          { label: "Tableau de bord", href: "/" },
+          { label: "Maintenance" },
+        ]}
+        actions={<AddMaintenanceForm />}
+      />
 
       {isLoadingMaintenances ? (
         <div className="flex items-center justify-center h-64">

@@ -20,7 +20,7 @@ interface DataTableProps {
   onExport?: () => void;
 }
 
-const usePagination = (data: any[], initialItemsPerPage = 10) => {
+const usePagination = (data: any[], initialItemsPerPage = 5) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(initialItemsPerPage);
 

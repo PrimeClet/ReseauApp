@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 
-type StatusType = "up" | "down" | "warn" | "maintenance" | "ok" | "actif" | "fermee";
+type StatusType = "up" | "down" | "warn" | "maintenance" | "ok" | "actif" | "fermee" | "supprime";
 
 interface StatusBadgeProps {
   status: StatusType;
@@ -32,9 +32,13 @@ const statusConfig = {
     color: "bg-status-up text-white",
     label: "Actif"
   },
-  fermee: { 
+  fermee: {
     color: "bg-status-down text-white",
     label: "Fermée"
+  },
+  supprime: {
+    color: "bg-status-down text-white",
+    label: "Supprimé"
   }
 };
 

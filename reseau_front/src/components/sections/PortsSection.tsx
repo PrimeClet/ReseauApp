@@ -3,8 +3,10 @@ import DataTableEnhanced from "@/components/ui/data-table-enhanced";
 import DetailsModal from "@/components/ui/details-modal";
 import EditModal from "@/components/ui/edit-modal";
 import AddPortForm from "@/components/forms/AddPortForm";
+import PageHeader from "@/components/ui/page-header";
 import { useData } from "@/contexts/DataContext";
 import { useToast } from "@/hooks/use-toast";
+import { Cable } from "lucide-react";
 
 export default function PortsSection() {
   const { ports, updatePort, refetchPorts } = useData();
@@ -65,15 +67,16 @@ export default function PortsSection() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-foreground">Gestion des Ports</h2>
-          <div className="text-sm text-muted-foreground mt-1">
-            Configuration et surveillance des ports réseau
-          </div>
-        </div>
-        <AddPortForm />
-      </div>
+      <PageHeader
+        title="Gestion des Ports"
+        description="Configuration et surveillance des ports réseau"
+        icon={<Cable className="h-6 w-6 text-primary" />}
+        breadcrumbs={[
+          { label: "Tableau de bord", href: "/" },
+          { label: "Ports" },
+        ]}
+        actions={<AddPortForm />}
+      />
 
       <DataTableEnhanced
         title={`${ports.length} ports configurés`}

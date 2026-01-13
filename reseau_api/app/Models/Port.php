@@ -4,11 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Port extends Model
 {
-
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     protected $fillable = [
         'port_label',
@@ -23,6 +23,7 @@ class Port extends Model
         'downlink',
         'equipement_id',
         'connected_equipment_id',
+        'status',
     ];
 
     public function equipement()

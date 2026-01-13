@@ -8,6 +8,7 @@ export interface Liaison {
   media?: string;
   length?: number;
   status: boolean;
+  deleted_at?: string;
   created_at?: string;
   updated_at?: string;
   from_port?: {
@@ -50,7 +51,7 @@ export interface LiaisonCreateData {
 }
 
 const liaisonService = {
-  async getAll(params?: { page?: number; per_page?: number; search?: string }): Promise<LiaisonListResponse> {
+  async getAll(params?: { page?: number; per_page?: number; search?: string; with_trashed?: string; only_trashed?: string }): Promise<LiaisonListResponse> {
     const response = await api.get<LiaisonListResponse>('/liaisons', { params });
     return response.data;
   },
@@ -72,6 +73,11 @@ const liaisonService = {
 
   async delete(id: number): Promise<void> {
     await api.delete(`/liaisons/${id}`);
+  },
+
+  async restore(id: number): Promise<Liaison> {
+    const response = await api.post<{ data: Liaison }>(`/liaisons/${id}/restore`);
+    return response.data.data;
   },
 };
 

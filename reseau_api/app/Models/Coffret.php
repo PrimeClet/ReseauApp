@@ -5,10 +5,11 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Coffret extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
     
     protected $fillable = [
         'code', 'nom', 'modele', 'photo', 'piece', 'emplacement', 'long', 'lat', 'status', 'batiment_id', 'salle_id', 'site_id', 'zone_id', 'qr_code'

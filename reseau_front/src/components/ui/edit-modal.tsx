@@ -16,8 +16,9 @@ interface EditModalProps {
   fields?: Array<{
     key: string;
     label: string;
-    type: 'text' | 'select' | 'number' | 'file' | 'textarea' | 'date' | 'time';
-    options?: string[];
+    type: 'text' | 'select' | 'number' | 'textarea';
+    options?: Array<{ value: string; label: string }> | string[];
+    disabled?: boolean;
   }>;
   className?: string;
 }
@@ -36,7 +37,8 @@ export default function EditModal({
   useEffect(() => {
     if (data && open) {
       // Réinitialiser les données du formulaire quand le modal s'ouvre avec de nouvelles données
-      const initialData: any = {};
+      // Commencer avec toutes les données originales (id, batiment_id, etc.)
+      const initialData: any = { ...data };
       if (fields) {
         fields.forEach(field => {
           // Pour les champs file, ne pas pré-remplir (on ne peut pas pré-remplir un input file)
@@ -44,23 +46,40 @@ export default function EditModal({
             initialData[field.key] = undefined;
           } else if (field.type === 'select') {
             const value = data[field.key];
-            // Si la valeur existe mais ne correspond à aucune option, essayer de trouver une correspondance (case-insensitive)
+            // Si la valeur existe mais ne correspond à aucune option, essayer de trouver une correspondance
             if (value !== undefined && value !== null && field.options) {
-              const valueStr = String(value);
-              const matchingOption = field.options.find(opt => 
-                opt === valueStr || opt.toLowerCase() === valueStr.toLowerCase()
-              );
-              initialData[field.key] = matchingOption || valueStr;
+              // Vérifier si les options sont des objets avec value/label
+              const hasObjectOptions = field.options.some(opt => typeof opt === 'object' && opt !== null && 'value' in opt);
+
+              if (hasObjectOptions) {
+                // Convertir la valeur en string pour correspondre aux options
+                const stringValue = String(value);
+                const matchingOption = field.options.find(opt => {
+                  const isObjectOption = typeof opt === 'object' && opt !== null;
+                  const optValue = isObjectOption ? opt.value : opt;
+                  return String(optValue) === stringValue;
+                });
+                // Utiliser la valeur string correspondante
+                if (matchingOption) {
+                  const isObjectOption = typeof matchingOption === 'object' && matchingOption !== null;
+                  initialData[field.key] = isObjectOption ? matchingOption.value : String(matchingOption);
+                } else {
+                  initialData[field.key] = stringValue;
+                }
+              } else {
+                // Options simples (strings)
+                const matchingOption = field.options.find(opt => {
+                  return String(opt).toLowerCase() === String(value).toLowerCase();
+                });
+                initialData[field.key] = matchingOption ? String(matchingOption) : String(value);
+              }
             } else {
-              // Garder undefined au lieu de chaîne vide pour les valeurs null/undefined
-              initialData[field.key] = value !== undefined && value !== null ? String(value) : undefined;
+              initialData[field.key] = value !== undefined && value !== null ? String(value) : '';
             }
           } else {
-            initialData[field.key] = data[field.key] || '';
+            initialData[field.key] = data[field.key] !== undefined && data[field.key] !== null ? data[field.key] : '';
           }
         });
-      } else {
-        Object.assign(initialData, data);
       }
       setFormData(initialData);
     }
@@ -99,53 +118,51 @@ export default function EditModal({
         </DialogHeader>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-          {formFields.map(({ key, label, type, options }) => (
-            <div key={key} className={(type === 'file' || type === 'textarea') ? 'space-y-2 md:col-span-2' : 'space-y-2'}>
+          {formFields.map(({ key, label, type, options, disabled }) => (
+            <div key={key} className="space-y-2">
               <Label htmlFor={key} className="text-sm font-medium capitalize">
                 {label}
               </Label>
-              
+
               {type === 'select' && options ? (
-                <Select 
-                  value={formData[key] && formData[key] !== '' ? String(formData[key]) : undefined} 
+                <Select
+                  value={formData[key] && formData[key] !== '' ? String(formData[key]) : undefined}
                   onValueChange={(value) => handleChange(key, value)}
+                  disabled={disabled}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder={`Sélectionner ${label}`} />
                   </SelectTrigger>
                   <SelectContent>
-                    {options.map((option) => (
-                      <SelectItem key={option} value={option}>
-                        {option}
-                      </SelectItem>
-                    ))}
+                    {options.map((option) => {
+                      const isObjectOption = typeof option === 'object' && option !== null;
+                      const value = isObjectOption ? option.value : option;
+                      const optionLabel = isObjectOption ? option.label : option;
+                      return (
+                        <SelectItem key={value} value={value}>
+                          {optionLabel}
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
-              ) : type === 'file' ? (
-                <Input
-                  id={key}
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    handleChange(key, file);
-                  }}
-                />
               ) : type === 'textarea' ? (
                 <Textarea
                   id={key}
                   value={formData[key] ?? ''}
                   onChange={(e) => handleChange(key, e.target.value)}
                   placeholder={`Entrer ${label}`}
-                  rows={4}
+                  rows={3}
+                  disabled={disabled}
                 />
               ) : (
                 <Input
                   id={key}
                   type={type === 'number' ? 'number' : type === 'date' ? 'date' : type === 'time' ? 'time' : 'text'}
                   value={formData[key] ?? ''}
-                  onChange={(e) => handleChange(key, e.target.value)}
+                  onChange={(e) => handleChange(key, type === 'number' ? (e.target.value === '' ? '' : parseInt(e.target.value, 10)) : e.target.value)}
                   placeholder={`Entrer ${label}`}
+                  disabled={disabled}
                 />
               )}
             </div>

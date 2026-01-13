@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowLeft, Loader2, MapPin, Server, Plus, QrCode } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -8,6 +9,7 @@ import DataTableEnhanced from "../ui/data-table-enhanced";
 import DetailsModal from "../ui/details-modal";
 import EditModal from "../ui/edit-modal";
 import QRCodeModal from "../ui/qr-code-modal";
+import PageHeader from "../ui/page-header";
 import { useData } from "@/contexts/DataContext";
 import type { Coffret, Equipement } from "@/contexts/DataContext";
 import AddEquipmentForm from "../forms/AddEquipmentForm";
@@ -16,6 +18,7 @@ import AddLiaisonForm from "../forms/AddLiaisonForm";
 import AddSystemeForm from "../forms/AddSystemeForm";
 
 export default function ArmoiresSection() {
+  const navigate = useNavigate();
   const {
     coffrets,
     equipements,
@@ -42,10 +45,18 @@ export default function ArmoiresSection() {
   const [qrCodeCoffret, setQrCodeCoffret] = useState<Coffret | null>(null);
   const [selectedBatimentId, setSelectedBatimentId] = useState<number | undefined>(undefined);
   const [selectedSalleId, setSelectedSalleId] = useState<number | undefined>(undefined);
+  const [returnToArmoires, setReturnToArmoires] = useState(false);
 
-  // Retrieve selected cabinet from localStorage (if coming from dashboard)
+  // Retrieve selected cabinet from localStorage (if coming from dashboard or armoires page)
   useEffect(() => {
     const savedCoffretId = localStorage.getItem('selectedCoffretId');
+    const shouldReturnToArmoires = localStorage.getItem('returnToArmoires');
+
+    if (shouldReturnToArmoires === 'true') {
+      setReturnToArmoires(true);
+      localStorage.removeItem('returnToArmoires');
+    }
+
     if (savedCoffretId && coffrets.length > 0) {
       const coffret = coffrets.find(c => c.id.toString() === savedCoffretId);
       if (coffret) {
@@ -60,7 +71,12 @@ export default function ArmoiresSection() {
   };
 
   const handleBackToList = () => {
-    setSelectedCoffret(null);
+    // Si on vient de la page /armoires, retourner vers /armoires
+    if (returnToArmoires) {
+      navigate('/armoires');
+    } else {
+      setSelectedCoffret(null);
+    }
   };
 
   const handleRowClick = (item: any) => {
@@ -176,24 +192,32 @@ export default function ArmoiresSection() {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <span className="ml-2 text-muted-foreground">Loading cabinets...</span>
+        <span className="ml-2 text-muted-foreground">Chargement des armoires...</span>
       </div>
     );
   }
 
-  // Cabinet details view
+  // Vue détaillée de l'armoire
   if (selectedCoffret) {
     return (
       <div className="space-y-6">
-        {/* Header avec bouton retour */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
+        {/* Breadcrumb et header */}
+        <PageHeader
+          title={selectedCoffret.code}
+          description={selectedCoffret.nom}
+          icon={<Server className="h-6 w-6 text-primary" />}
+          breadcrumbs={[
+            { label: "Tableau de bord", href: "/" },
+            { label: "Armoires", onClick: handleBackToList },
+            { label: selectedCoffret.code },
+          ]}
+          actions={
             <Button variant="ghost" size="sm" onClick={handleBackToList}>
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to list
+              Retour à la liste
             </Button>
-          </div>
-        </div>
+          }
+        />
 
         {/* Infos du coffret */}
         <div className="bg-card border border-border rounded-lg p-6">
@@ -207,7 +231,7 @@ export default function ArmoiresSection() {
               <div className="flex items-center gap-4 text-sm text-muted-foreground mt-4">
                 <div className="flex items-center gap-1">
                   <MapPin className="h-4 w-4" />
-                  <span>Room: {selectedCoffret.piece || 'Not defined'}</span>
+                  <span>Salle: {salles.find(s => s.id === selectedCoffret.salle_id)?.nom || selectedCoffret.piece || 'Non définie'}</span>
                 </div>
                 {selectedCoffret.lat && selectedCoffret.long && (
                   <span>GPS: {selectedCoffret.lat}, {selectedCoffret.long}</span>
@@ -216,47 +240,47 @@ export default function ArmoiresSection() {
             </div>
             <div className="flex items-center gap-2">
               {selectedCoffret.qr_code && (
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   size="sm"
                   onClick={() => setIsQRCodeOpen(true)}
                 >
                   <QrCode className="h-4 w-4 mr-2" />
-                  View QR Code
+                  Voir QR Code
                 </Button>
               )}
               <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                selectedCoffret.status === 'actif' || selectedCoffret.status === 'Actif'
+                selectedCoffret.status === 'actif' || selectedCoffret.status === 'active' || selectedCoffret.status === 'Actif'
                   ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
                   : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
               }`}>
-                {selectedCoffret.status || 'Active'}
+                {selectedCoffret.status === 'active' || selectedCoffret.status === 'actif' ? 'Actif' : selectedCoffret.status || 'Actif'}
               </span>
             </div>
           </div>
         </div>
 
-        {/* Tabs pour les détails */}
+        {/* Onglets pour les détails */}
         <Tabs defaultValue="equipements" className="w-full">
           <TabsList className="grid w-full grid-cols-4 bg-secondary">
             <TabsTrigger value="equipements" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              Equipment ({coffretEquipements.length})
+              Équipements ({coffretEquipements.length})
             </TabsTrigger>
             <TabsTrigger value="ports" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               Ports
             </TabsTrigger>
             <TabsTrigger value="liaisons" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              Links
+              Liaisons
             </TabsTrigger>
             <TabsTrigger value="systemes" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              Systems ({coffretSystems.length})
+              Systèmes ({coffretSystems.length})
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="equipements" className="space-y-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">Equipment in this cabinet</h3>
-              <AddEquipmentForm 
+              <h3 className="text-lg font-semibold">Équipements de cette armoire</h3>
+              <AddEquipmentForm
                 defaultCoffretId={selectedCoffret?.id}
                 onSuccess={() => {
                   refetchEquipements();
@@ -264,7 +288,7 @@ export default function ArmoiresSection() {
                 trigger={
                   <Button size="sm">
                     <Plus className="h-4 w-4 mr-2" />
-                    Add
+                    Ajouter
                   </Button>
                 }
               />
@@ -272,7 +296,7 @@ export default function ArmoiresSection() {
 
             {coffretEquipements.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
-                No equipment in this cabinet
+                Aucun équipement dans cette armoire
               </div>
             ) : (
               <div className="bg-card border border-border rounded-lg overflow-hidden">
@@ -280,11 +304,11 @@ export default function ArmoiresSection() {
                   <thead className="bg-muted/50">
                     <tr className="text-left text-sm text-muted-foreground">
                       <th className="p-3">Code</th>
-                      <th className="p-3">Name</th>
+                      <th className="p-3">Nom</th>
                       <th className="p-3">Type</th>
                       <th className="p-3">IP</th>
                       <th className="p-3">VLAN</th>
-                      <th className="p-3">Status</th>
+                      <th className="p-3">Statut</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -301,11 +325,11 @@ export default function ArmoiresSection() {
                         <td className="p-3">{equip.vlan || '-'}</td>
                         <td className="p-3">
                           <span className={`px-2 py-1 rounded-full text-xs ${
-                            equip.status === 'actif' || equip.status === 'up'
+                            equip.status === 'actif' || equip.status === 'active' || equip.status === 'up'
                               ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
                               : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
                           }`}>
-                            {equip.status}
+                            {equip.status === 'active' ? 'Actif' : equip.status}
                           </span>
                         </td>
                       </tr>
@@ -318,8 +342,8 @@ export default function ArmoiresSection() {
 
           <TabsContent value="ports" className="space-y-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">Configured Ports</h3>
-              <AddPortForm 
+              <h3 className="text-lg font-semibold">Ports configurés</h3>
+              <AddPortForm
                 defaultCoffretId={selectedCoffret?.id}
                 onSuccess={() => {
                   refetchPorts();
@@ -327,7 +351,7 @@ export default function ArmoiresSection() {
                 trigger={
                   <Button size="sm">
                     <Plus className="h-4 w-4 mr-2" />
-                    Add
+                    Ajouter
                   </Button>
                 }
               />
@@ -335,7 +359,7 @@ export default function ArmoiresSection() {
 
             {coffretPorts.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
-                No ports configured
+                Aucun port configuré
               </div>
             ) : (
               <div className="bg-card border border-border rounded-lg overflow-hidden">
@@ -343,9 +367,9 @@ export default function ArmoiresSection() {
                   <thead className="bg-muted/50">
                     <tr className="text-left text-sm text-muted-foreground">
                       <th className="p-3">Label</th>
-                      <th className="p-3">Device</th>
+                      <th className="p-3">Équipement</th>
                       <th className="p-3">VLAN</th>
-                      <th className="p-3">Speed</th>
+                      <th className="p-3">Vitesse</th>
                       <th className="p-3">PoE</th>
                     </tr>
                   </thead>
@@ -360,7 +384,7 @@ export default function ArmoiresSection() {
                         <td className="p-3">{port.device_name}</td>
                         <td className="p-3">{port.vlan || '-'}</td>
                         <td className="p-3">{port.speed || '-'}</td>
-                        <td className="p-3">{port.poe_enabled ? 'Yes' : 'No'}</td>
+                        <td className="p-3">{port.poe_enabled ? 'Oui' : 'Non'}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -371,8 +395,8 @@ export default function ArmoiresSection() {
 
           <TabsContent value="liaisons" className="space-y-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">Liaisons</h3>
-              <AddLiaisonForm 
+              <h3 className="text-lg font-semibold">Liaisons de cette armoire</h3>
+              <AddLiaisonForm
                 defaultCoffretId={selectedCoffret?.id}
                 onSuccess={() => {
                   refetchLiaisons();
@@ -380,7 +404,7 @@ export default function ArmoiresSection() {
                 trigger={
                   <Button size="sm">
                     <Plus className="h-4 w-4 mr-2" />
-                    Add
+                    Ajouter
                   </Button>
                 }
               />
@@ -388,7 +412,7 @@ export default function ArmoiresSection() {
 
             {coffretLiaisons.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
-                No links configured
+                Aucune liaison configurée
               </div>
             ) : (
               <div className="bg-card border border-border rounded-lg overflow-hidden">
@@ -396,9 +420,9 @@ export default function ArmoiresSection() {
                   <thead className="bg-muted/50">
                     <tr className="text-left text-sm text-muted-foreground">
                       <th className="p-3">Label</th>
-                      <th className="p-3">Media</th>
-                      <th className="p-3">Length (m)</th>
-                      <th className="p-3">Status</th>
+                      <th className="p-3">Média</th>
+                      <th className="p-3">Longueur (m)</th>
+                      <th className="p-3">Statut</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -417,7 +441,7 @@ export default function ArmoiresSection() {
                               ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
                               : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
                           }`}>
-                            {liaison.status ? 'Active' : 'Inactive'}
+                            {liaison.status ? 'Actif' : 'Inactif'}
                           </span>
                         </td>
                       </tr>
@@ -430,8 +454,8 @@ export default function ArmoiresSection() {
 
           <TabsContent value="systemes" className="space-y-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">Monitoring Systems</h3>
-              <AddSystemeForm 
+              <h3 className="text-lg font-semibold">Systèmes de surveillance</h3>
+              <AddSystemeForm
                 defaultCoffretId={selectedCoffret?.id}
                 onSuccess={() => {
                   refetchSystems();
@@ -439,7 +463,7 @@ export default function ArmoiresSection() {
                 trigger={
                   <Button size="sm">
                     <Plus className="h-4 w-4 mr-2" />
-                    Add
+                    Ajouter
                   </Button>
                 }
               />
@@ -447,18 +471,18 @@ export default function ArmoiresSection() {
 
             {coffretSystems.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
-                No systems in this cabinet
+                Aucun système dans cette armoire
               </div>
             ) : (
               <div className="bg-card border border-border rounded-lg overflow-hidden">
                 <table className="w-full">
                   <thead className="bg-muted/50">
                     <tr className="text-left text-sm text-muted-foreground">
-                      <th className="p-3">Name</th>
+                      <th className="p-3">Nom</th>
                       <th className="p-3">Type</th>
-                      <th className="p-3">Vendor</th>
+                      <th className="p-3">Fournisseur</th>
                       <th className="p-3">Endpoint</th>
-                      <th className="p-3">Status</th>
+                      <th className="p-3">Statut</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -494,7 +518,7 @@ export default function ArmoiresSection() {
         <DetailsModal
           open={isDetailsOpen}
           onOpenChange={setIsDetailsOpen}
-          title="Details"
+          title="Détails"
           data={selectedItem}
           onEdit={() => {
             setIsDetailsOpen(false);
@@ -505,7 +529,7 @@ export default function ArmoiresSection() {
         <EditModal
           open={isEditOpen}
           onOpenChange={setIsEditOpen}
-          title="Edit"
+          title="Modifier"
           data={selectedItem}
           onSave={handleSave}
           fields={selectedItem?.code ? [
@@ -531,35 +555,38 @@ export default function ArmoiresSection() {
     );
   }
 
-  // Cabinets list view
+  // Vue liste des armoires
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-foreground">Cabinets</h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            {filteredCoffrets.length} cabinets in inventory
-          </p>
-        </div>
-        <Button>
-          <Plus className="h-4 w-4 mr-2" />
-          Add cabinet
-        </Button>
-      </div>
+      <PageHeader
+        title="Armoires"
+        description={`${filteredCoffrets.length} armoire${filteredCoffrets.length !== 1 ? 's' : ''} dans l'inventaire`}
+        icon={<Server className="h-6 w-6 text-primary" />}
+        breadcrumbs={[
+          { label: "Tableau de bord", href: "/" },
+          { label: "Armoires" },
+        ]}
+        actions={
+          <Button>
+            <Plus className="h-4 w-4 mr-2" />
+            Ajouter une armoire
+          </Button>
+        }
+      />
 
       {/* Filtres par bâtiment et salle */}
       <div className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg">
         <div className="flex items-center gap-2">
-          <label className="text-sm font-medium text-foreground">Building:</label>
+          <label className="text-sm font-medium text-foreground">Bâtiment:</label>
           <Select
             value={selectedBatimentId?.toString() || "all"}
             onValueChange={(value) => setSelectedBatimentId(value === "all" ? undefined : parseInt(value))}
           >
             <SelectTrigger className="w-48">
-              <SelectValue placeholder="All buildings" />
+              <SelectValue placeholder="Tous les bâtiments" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All buildings</SelectItem>
+              <SelectItem value="all">Tous les bâtiments</SelectItem>
               {batiments?.map((batiment) => (
                 <SelectItem key={batiment.id} value={batiment.id.toString()}>
                   {batiment.nom}
@@ -570,17 +597,17 @@ export default function ArmoiresSection() {
         </div>
 
         <div className="flex items-center gap-2">
-          <label className="text-sm font-medium text-foreground">Room:</label>
+          <label className="text-sm font-medium text-foreground">Salle:</label>
           <Select
             value={selectedSalleId?.toString() || "all"}
             onValueChange={(value) => setSelectedSalleId(value === "all" ? undefined : parseInt(value))}
             disabled={!selectedBatimentId && filteredSalles.length === 0}
           >
             <SelectTrigger className="w-48">
-              <SelectValue placeholder={selectedBatimentId ? "All rooms" : "Select a building first"} />
+              <SelectValue placeholder={selectedBatimentId ? "Toutes les salles" : "Sélectionnez d'abord un bâtiment"} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All rooms</SelectItem>
+              <SelectItem value="all">Toutes les salles</SelectItem>
               {filteredSalles?.map((salle) => (
                 <SelectItem key={salle.id} value={salle.id.toString()}>
                   {salle.nom}
@@ -599,7 +626,7 @@ export default function ArmoiresSection() {
               setSelectedSalleId(undefined);
             }}
           >
-            Clear filters
+            Effacer les filtres
           </Button>
         )}
       </div>
@@ -607,22 +634,22 @@ export default function ArmoiresSection() {
       {filteredCoffrets.length === 0 ? (
         <div className="text-center py-16 text-muted-foreground">
           <Server className="h-12 w-12 mx-auto mb-4 opacity-50" />
-          <p>No cabinets found</p>
-          <p className="text-sm">Add a cabinet to get started</p>
+          <p>Aucune armoire trouvée</p>
+          <p className="text-sm">Ajoutez une armoire pour commencer</p>
         </div>
       ) : (
         <DataTableEnhanced
-          title={`${filteredCoffrets.length} cabinets in inventory`}
-          columns={["Code", "Name", "Room", "Status", "Equipment"]}
+          title={`${filteredCoffrets.length} armoire${filteredCoffrets.length !== 1 ? 's' : ''} dans l'inventaire`}
+          columns={["Code", "Nom", "Salle", "Statut", "Équipements"]}
           data={filteredCoffrets.map((coffret) => {
             const equipCount = equipements.filter(e => e.coffret_id === coffret.id).length;
             return {
               id: coffret.id,
               Code: coffret.code,
-              Name: coffret.nom,
-              Room: coffret.piece || '-',
-              Status: coffret.status || 'active',
-              Equipment: `${equipCount} equipment`,
+              Nom: coffret.nom,
+              Salle: coffret.piece || '-',
+              Statut: coffret.status || 'actif',
+              Équipements: `${equipCount} équipement${equipCount !== 1 ? 's' : ''}`,
               _originalData: coffret // Conserver les données originales pour le QR code
             };
           })}
@@ -641,7 +668,7 @@ export default function ArmoiresSection() {
           renderRowActions={(row) => {
             const coffret = row._originalData as Coffret;
             if (!coffret || !coffret.qr_code) return null;
-            
+
             return (
               <Button
                 variant="ghost"
@@ -650,7 +677,7 @@ export default function ArmoiresSection() {
                   e.stopPropagation();
                   handleViewQRCode(coffret);
                 }}
-                title="View QR Code"
+                title="Voir QR Code"
               >
                 <QrCode className="h-4 w-4" />
               </Button>

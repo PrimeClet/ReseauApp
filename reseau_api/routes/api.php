@@ -13,6 +13,8 @@ use App\Http\Controllers\SalleController;
 use App\Http\Controllers\LanController;
 use App\Http\Controllers\MaintenanceController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\RoleController;
+use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\CartographyController;
 use App\Http\Controllers\ImportController;
 use App\Http\Controllers\SiteController;
@@ -141,6 +143,8 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/coffrets', [CoffretController::class, 'store']);
             Route::put('/coffrets/{coffret}', [CoffretController::class, 'update']);
             Route::delete('/coffrets/{coffret}', [CoffretController::class, 'destroy']);
+            Route::post('/coffrets/{id}/restore', [CoffretController::class, 'restore']);
+            Route::post('/coffrets/import', [CoffretController::class, 'import']);
 
             // Équipements
             Route::post('/equipements', [EquipementsController::class, 'store']);
@@ -151,6 +155,7 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/ports', [PortController::class, 'store']);
             Route::put('/ports/{port}', [PortController::class, 'update']);
             Route::delete('/ports/{port}', [PortController::class, 'destroy']);
+            Route::post('/ports/{id}/restore', [PortController::class, 'restore']);
 
             // Metrics
             Route::post('/metrics', [MetricController::class, 'store']);
@@ -161,6 +166,7 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/liaisons', [LiaisonController::class, 'store']);
             Route::put('/liaisons/{liaison}', [LiaisonController::class, 'update']);
             Route::delete('/liaisons/{liaison}', [LiaisonController::class, 'destroy']);
+            Route::post('/liaisons/{id}/restore', [LiaisonController::class, 'restore']);
 
             // Systèmes
             Route::post('/systems', [SystemController::class, 'store']);
@@ -171,11 +177,16 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/batiments', [BatimentController::class, 'store']);
             Route::put('/batiments/{batiment}', [BatimentController::class, 'update']);
             Route::delete('/batiments/{batiment}', [BatimentController::class, 'destroy']);
+            Route::post('/batiments/{id}/restore', [BatimentController::class, 'restore']);
+            Route::delete('/batiments/{id}/force', [BatimentController::class, 'forceDelete']);
+            Route::post('/batiments/import', [BatimentController::class, 'import']);
 
             // Salles
             Route::post('/salles', [SalleController::class, 'store']);
             Route::put('/salles/{salle}', [SalleController::class, 'update']);
             Route::delete('/salles/{salle}', [SalleController::class, 'destroy']);
+            Route::post('/salles/{id}/restore', [SalleController::class, 'restore']);
+            Route::post('/salles/import', [SalleController::class, 'import']);
 
             // LANs
             Route::post('/lans', [LanController::class, 'store']);
@@ -224,13 +235,27 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/import/template/{type}', [ImportController::class, 'template']);
         });
 
-        // Routes pour les utilisateurs (à activer si nécessaire)
-        // Route::middleware('permission:manage_users')->group(function () {
-        //     Route::get('/users', [UserController::class, 'index']);
-        //     Route::post('/users', [UserController::class, 'store']);
-        //     Route::get('/users/{user}', [UserController::class, 'show']);
-        //     Route::put('/users/{user}', [UserController::class, 'update']);
-        //     Route::delete('/users/{user}', [UserController::class, 'destroy']);
-        // });
+        // Gestion des utilisateurs
+        Route::get('/users', [UserController::class, 'index']);
+        Route::get('/users/{id}', [UserController::class, 'show']);
+        Route::post('/users', [UserController::class, 'store']);
+        Route::put('/users/{id}', [UserController::class, 'update']);
+        Route::delete('/users/{id}', [UserController::class, 'destroy']);
+        Route::post('/users/{id}/toggle-status', [UserController::class, 'toggleStatus']);
+        Route::post('/users/{id}/roles', [UserController::class, 'assignRoles']);
+        Route::post('/users/{id}/permissions', [UserController::class, 'assignPermissions']);
+
+        // Gestion des rôles
+        Route::get('/roles', [RoleController::class, 'index']);
+        Route::get('/roles/{id}', [RoleController::class, 'show']);
+        Route::post('/roles', [RoleController::class, 'store']);
+        Route::put('/roles/{id}', [RoleController::class, 'update']);
+        Route::delete('/roles/{id}', [RoleController::class, 'destroy']);
+        Route::post('/roles/{id}/permissions', [RoleController::class, 'assignPermissions']);
+
+        // Gestion des permissions
+        Route::get('/permissions', [PermissionController::class, 'index']);
+        Route::get('/permissions/modules', [PermissionController::class, 'modules']);
+        Route::get('/permissions/{id}', [PermissionController::class, 'show']);
     });
 });

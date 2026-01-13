@@ -3,12 +3,13 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useData } from "@/contexts/DataContext";
 import AppShell from "@/components/layout/AppShell";
+import PageHeader from "@/components/ui/page-header";
 import DataTableEnhanced from "@/components/ui/data-table-enhanced";
 import DetailsModal from "@/components/ui/details-modal";
 import EditModal from "@/components/ui/edit-modal";
 import AddLanForm from "@/components/forms/AddLanForm";
 import { toast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, Network } from "lucide-react";
 
 const Lans = () => {
   const { isAuthenticated, isLoading: isLoadingAuth } = useAuth();
@@ -128,15 +129,16 @@ const Lans = () => {
   return (
     <AppShell>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-foreground">Gestion des LANs</h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              Inventaire et configuration des segments LAN de l'entreprise.
-            </p>
-          </div>
-          <AddLanForm />
-        </div>
+        <PageHeader
+          title="Gestion des LANs"
+          description="Inventaire et configuration des segments LAN de l'entreprise"
+          icon={<Network className="h-6 w-6 text-primary" />}
+          breadcrumbs={[
+            { label: "Tableau de bord", href: "/" },
+            { label: "LANs" },
+          ]}
+          actions={<AddLanForm />}
+        />
 
         {isLoadingLans ? (
           <div className="flex items-center justify-center py-12">

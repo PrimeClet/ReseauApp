@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import PageHeader from "@/components/ui/page-header";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -100,15 +101,16 @@ const UsersSection = () => {
 
   return (
     <div className="space-y-8">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Gestion des utilisateurs</h1>
-          <p className="text-muted-foreground">
-            Gérez les comptes utilisateurs et leurs permissions
-          </p>
-        </div>
-        <div className="flex gap-2">
-          {user?.role === 'admin' && (
+      <PageHeader
+        title="Gestion des Utilisateurs"
+        description="Gérez les comptes utilisateurs et leurs permissions"
+        icon={<Users className="h-6 w-6 text-primary" />}
+        breadcrumbs={[
+          { label: "Tableau de bord", href: "/" },
+          { label: "Utilisateurs" },
+        ]}
+        actions={
+          user?.role === 'admin' ? (
             <Dialog open={open} onOpenChange={setOpen}>
               <DialogTrigger asChild>
                 <Button>
@@ -186,9 +188,9 @@ const UsersSection = () => {
                 </Form>
               </DialogContent>
             </Dialog>
-          )}
-        </div>
-      </div>
+          ) : undefined
+        }
+      />
 
       {/* Users List */}
       <Card>

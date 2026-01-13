@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useData } from "@/contexts/DataContext";
@@ -14,10 +13,6 @@ import { Plus } from "lucide-react";
 
 const batimentSchema = z.object({
   nom: z.string().min(1, "Le nom est requis"),
-  adresse: z.string().min(1, "L'adresse est requise"),
-  ville: z.string().min(1, "La ville est requise"),
-  code_postal: z.string().min(1, "Le code postal est requis"),
-  etat: z.string().min(1, "L'état est requis"),
   description: z.string().optional(),
 });
 
@@ -32,10 +27,6 @@ export default function AddBatimentForm() {
     resolver: zodResolver(batimentSchema),
     defaultValues: {
       nom: "",
-      adresse: "",
-      ville: "",
-      code_postal: "",
-      etat: "Actif",
       description: "",
     },
   });
@@ -66,7 +57,7 @@ export default function AddBatimentForm() {
           Ajouter un bâtiment
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Ajouter un nouveau bâtiment</DialogTitle>
         </DialogHeader>
@@ -88,78 +79,12 @@ export default function AddBatimentForm() {
 
             <FormField
               control={form.control}
-              name="adresse"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Adresse</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Ex: 123 Rue Principale" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="ville"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Ville</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Ex: Paris" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="code_postal"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Code postal</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Ex: 75001" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <FormField
-              control={form.control}
-              name="etat"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>État</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Sélectionner l'état" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="Actif">Actif</SelectItem>
-                      <SelectItem value="Inactif">Inactif</SelectItem>
-                      <SelectItem value="Maintenance">Maintenance</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
               name="description"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Description (optionnel)</FormLabel>
                   <FormControl>
-                    <Textarea 
+                    <Textarea
                       placeholder="Description du bâtiment..."
                       {...field}
                     />
@@ -181,4 +106,3 @@ export default function AddBatimentForm() {
     </Dialog>
   );
 }
-

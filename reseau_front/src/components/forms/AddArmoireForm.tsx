@@ -24,7 +24,7 @@ const armoireSchema = z.object({
   batiment_id: z.number().int().min(1, "Le bâtiment est requis"),
   salle_id: z.number().int().min(1, "La salle est requise"),
   emplacement: z.string().optional(),
-  status: z.enum(["active", "inactive"]),
+  status: z.enum(["active", "inactive"])
 });
 
 type ArmoireFormData = z.infer<typeof armoireSchema>;
@@ -45,12 +45,8 @@ const AddArmoireForm = () => {
       photo: undefined,
       long: undefined,
       lat: undefined,
-      site_id: undefined as unknown as number,
-      zone_id: undefined as unknown as number,
-      batiment_id: undefined as unknown as number,
-      salle_id: undefined as unknown as number,
-      emplacement: "",
-      status: "active",
+      batiment_id: undefined,
+      salle_id: undefined,
     },
   });
 
@@ -80,24 +76,16 @@ const AddArmoireForm = () => {
 
   const onSubmit = async (data: ArmoireFormData) => {
     try {
-      // Construire FormData pour upload fichier
-      const formData = new FormData();
-      formData.append('nom', data.nom);
-      formData.append('modele', data.modele);
-      if (data.photo && data.photo instanceof File) {
-        formData.append('photo', data.photo);
-      }
-      formData.append('piece', '');
-      if (data.emplacement) formData.append('emplacement', data.emplacement);
-      if (typeof data.long === 'number') formData.append('long', String(data.long));
-      if (typeof data.lat === 'number') formData.append('lat', String(data.lat));
-      formData.append('site_id', String(data.site_id));
-      formData.append('zone_id', String(data.zone_id));
-      formData.append('batiment_id', String(data.batiment_id));
-      formData.append('salle_id', String(data.salle_id));
-      formData.append('status', data.status);
-
-      await addCoffret(formData as unknown as CoffretCreateData);
+      const coffretData: CoffretCreateData = {
+        nom: data.nom,
+        piece: "", // Valeur par défaut vide (champ retiré du formulaire)
+        long: data.long ?? undefined,
+        lat: data.lat ?? undefined,
+        batiment_id: data.batiment_id || undefined,
+        salle_id: data.salle_id || undefined,
+      };
+      
+      await addCoffret(coffretData);
       toast({
         title: "Armoire ajoutée",
         description: `L'armoire ${data.nom} a été ajoutée avec succès`,
@@ -379,28 +367,6 @@ const AddArmoireForm = () => {
                 )}
               />
             </div>
-
-            <FormField
-              control={form.control}
-              name="status"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Statut *</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Sélectionner le statut" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="active">Actif</SelectItem>
-                      <SelectItem value="inactive">Inactif</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
 
             <div className="flex justify-end space-x-2">
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>

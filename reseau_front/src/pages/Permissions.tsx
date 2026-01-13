@@ -1,247 +1,273 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useQuery } from "@tanstack/react-query";
+import permissionService, { PermissionModule } from "@/services/permissionService";
 import AppShell from "@/components/layout/AppShell";
-import DataTableEnhanced from "@/components/ui/data-table-enhanced";
-import DetailsModal from "@/components/ui/details-modal";
-import EditModal from "@/components/ui/edit-modal";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
+import PageHeader from "@/components/ui/page-header";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
-import * as z from "zod";
-import { toast } from "@/hooks/use-toast";
-import { Plus } from "lucide-react";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { Key, Loader2, Search, Building2, DoorOpen, Server, HardDrive, Plug, Cable, Network, Wrench, Map, LayoutDashboard, Users, Shield, KeyRound } from "lucide-react";
 
-type PermissionEntry = {
-  id: string;
-  nom: string;
-  ressource: string;
-  description: string;
+// Mapping des icônes par module
+const moduleIcons: Record<string, any> = {
+  utilisateurs: Users,
+  roles: Shield,
+  permissions: KeyRound,
+  batiments: Building2,
+  salles: DoorOpen,
+  armoires: Server,
+  equipements: HardDrive,
+  ports: Plug,
+  liaisons: Cable,
+  lans: Network,
+  maintenance: Wrench,
+  cartographie: Map,
+  dashboard: LayoutDashboard,
 };
 
-const initialPermissions: PermissionEntry[] = [
-  {
-    id: "1",
-    nom: "coffrets.read",
-    ressource: "Coffrets",
-    description: "Lecture seule sur la liste des coffrets.",
-  },
-  {
-    id: "2",
-    nom: "equipements.manage",
-    ressource: "Équipements",
-    description: "Création, édition et suppression d’équipements.",
-  },
-  {
-    id: "3",
-    nom: "statistiques.view",
-    ressource: "Statistiques",
-    description: "Accès aux tableaux de bord et rapports.",
-  },
-];
+// Couleurs par module
+const moduleColors: Record<string, string> = {
+  utilisateurs: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
+  roles: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
+  permissions: "bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200",
+  batiments: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
+  salles: "bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200",
+  armoires: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+  equipements: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200",
+  ports: "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200",
+  liaisons: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
+  lans: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200",
+  maintenance: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
+  cartographie: "bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200",
+  dashboard: "bg-slate-100 text-slate-800 dark:bg-slate-900 dark:text-slate-200",
+};
 
-const permissionSchema = z.object({
-  nom: z.string().min(1, "Le nom de la permission est requis"),
-  ressource: z.string().min(1, "La ressource est requise"),
-  description: z.string().min(1, "La description est requise"),
-});
-
-type PermissionFormData = z.infer<typeof permissionSchema>;
-
-const Permissions = () => {
-  const { isAuthenticated, isLoading } = useAuth();
+const PermissionsPage = () => {
+  const { isAuthenticated, isLoading: isLoadingAuth } = useAuth();
   const navigate = useNavigate();
-  const [permissions, setPermissions] = useState<PermissionEntry[]>(initialPermissions);
-  const [selectedPermission, setSelectedPermission] = useState<PermissionEntry | null>(null);
-  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
-  const [isEditOpen, setIsEditOpen] = useState(false);
-  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  // Query
+  const { data: permissionsData, isLoading: isLoadingPermissions } = useQuery({
+    queryKey: ['permissions'],
+    queryFn: () => permissionService.getAll(),
+    enabled: isAuthenticated,
+  });
+
+  const permissionModules = permissionsData?.data || [];
+  const totalPermissions = permissionsData?.all_permissions?.length || 0;
+
+  // Filtrer les permissions par recherche
+  const filteredModules = useMemo(() => {
+    if (!searchTerm) return permissionModules;
+
+    const searchLower = searchTerm.toLowerCase();
+    return permissionModules
+      .map((module) => ({
+        ...module,
+        permissions: module.permissions.filter(
+          (perm) =>
+            perm.name.toLowerCase().includes(searchLower) ||
+            perm.action_label.toLowerCase().includes(searchLower) ||
+            module.module_label.toLowerCase().includes(searchLower)
+        ),
+      }))
+      .filter((module) => module.permissions.length > 0);
+  }, [permissionModules, searchTerm]);
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!isLoadingAuth && !isAuthenticated) {
       navigate("/login");
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, isLoadingAuth, navigate]);
 
-  const form = useForm<PermissionFormData>({
-    resolver: zodResolver(permissionSchema),
-    defaultValues: {
-      nom: "",
-      ressource: "",
-      description: "",
-    },
-  });
+  if (isLoadingAuth) {
+    return (
+      <AppShell>
+        <div className="flex items-center justify-center h-screen">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </AppShell>
+    );
+  }
 
   if (!isAuthenticated) {
     return null;
   }
 
-  const handleRowClick = (permission: PermissionEntry) => {
-    setSelectedPermission(permission);
-    setIsDetailsOpen(true);
-  };
-
-  const handleEdit = (permission: PermissionEntry) => {
-    setSelectedPermission(permission);
-    setIsEditOpen(true);
-  };
-
-  const handleSave = (updatedPermission: PermissionEntry) => {
-    setPermissions((prev) =>
-      prev.map((permission) => (permission.id === updatedPermission.id ? updatedPermission : permission)),
-    );
-    toast({
-      title: "Permission mise à jour",
-      description: "Les informations de la permission ont été enregistrées.",
-    });
-    setIsEditOpen(false);
-  };
-
-  const onSubmit = (data: PermissionFormData) => {
-    const newPermission: PermissionEntry = {
-      id: Date.now().toString(),
-      ...data,
-    };
-    setPermissions((prev) => [...prev, newPermission]);
-    toast({
-      title: "Permission créée",
-      description: `La permission ${data.nom} a été ajoutée.`,
-    });
-    form.reset();
-    setIsAddOpen(false);
-  };
-
-  const tableData = permissions.map((permission) => ({
-    nom: permission.nom,
-    ressource: permission.ressource,
-    description: permission.description,
-  }));
-
   return (
     <AppShell>
       <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-2xl font-bold text-foreground">Gestion des permissions</h2>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Définissez les permissions disponibles pour les rôles utilisateur.
-                  </p>
-                </div>
-                <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-                  <DialogTrigger asChild>
-                    <Button>
-                      <Plus className="mr-2 h-4 w-4" />
-                      Ajouter une permission
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="sm:max-w-[500px]">
-                    <DialogHeader>
-                      <DialogTitle>Nouvelle permission</DialogTitle>
-                      <DialogDescription>
-                        Indiquez la ressource concernée et la portée de la permission.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <Form {...form}>
-                      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                        <FormField
-                          control={form.control}
-                          name="nom"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Nom technique</FormLabel>
-                              <FormControl>
-                                <Input placeholder="ex: equipements.manage" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="ressource"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Ressource</FormLabel>
-                              <FormControl>
-                                <Input placeholder="Module ou entité concernée" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="description"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Description</FormLabel>
-                              <FormControl>
-                                <Textarea placeholder="Décrivez la portée de cette permission" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <div className="flex justify-end gap-2">
-                          <Button type="button" variant="outline" onClick={() => setIsAddOpen(false)}>
-                            Annuler
-                          </Button>
-                          <Button type="submit">Créer</Button>
-                        </div>
-                      </form>
-                    </Form>
-                  </DialogContent>
-                </Dialog>
+        <PageHeader
+          title="Gestion des Permissions"
+          description="Consultez les permissions disponibles pour les rôles utilisateur"
+          icon={<Key className="h-6 w-6 text-primary" />}
+          breadcrumbs={[
+            { label: "Tableau de bord", href: "/" },
+            { label: "Permissions" },
+          ]}
+        />
+
+        {/* Statistiques */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Total des permissions
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{totalPermissions}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Modules
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{permissionModules.length}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Résultats filtrés
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {filteredModules.reduce((acc, m) => acc + m.permissions.length, 0)}
               </div>
+            </CardContent>
+          </Card>
+        </div>
 
-              <DataTableEnhanced
-                title={`${permissions.length} permissions configurées`}
-                columns={["nom", "ressource", "description"]}
-                data={tableData}
-                onRowClick={handleRowClick}
-                onEdit={handleEdit}
-              />
+        {/* Barre de recherche */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Rechercher une permission..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+        </div>
 
-              <DetailsModal
-                open={isDetailsOpen}
-                onOpenChange={setIsDetailsOpen}
-                title="Détails de la permission"
-                data={selectedPermission}
-                onEdit={() => {
-                  setIsDetailsOpen(false);
-                  setIsEditOpen(true);
-                }}
-              />
+        {isLoadingPermissions ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <Accordion type="multiple" className="w-full" defaultValue={permissionModules.map(m => m.module)}>
+              {filteredModules.map((module) => {
+                const IconComponent = moduleIcons[module.module] || Key;
+                const colorClass = moduleColors[module.module] || "bg-gray-100 text-gray-800";
 
-              <EditModal
-                open={isEditOpen}
-                onOpenChange={setIsEditOpen}
-                title="Modifier la permission"
-                data={selectedPermission}
-                onSave={handleSave}
-              />
+                return (
+                  <AccordionItem key={module.module} value={module.module} className="border rounded-lg mb-2">
+                    <AccordionTrigger className="px-4 hover:no-underline">
+                      <div className="flex items-center gap-3">
+                        <div className={`p-2 rounded-lg ${colorClass}`}>
+                          <IconComponent className="h-4 w-4" />
+                        </div>
+                        <div className="text-left">
+                          <div className="font-semibold">{module.module_label}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {module.permissions.length} permission{module.permissions.length > 1 ? 's' : ''}
+                          </div>
+                        </div>
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent className="px-4 pb-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 pt-2">
+                        {module.permissions.map((perm) => (
+                          <div
+                            key={perm.id}
+                            className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="w-2 h-2 rounded-full bg-primary" />
+                              <div>
+                                <div className="font-medium text-sm">{perm.action_label}</div>
+                                <div className="text-xs text-muted-foreground font-mono">
+                                  {perm.name}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                );
+              })}
+            </Accordion>
+
+            {filteredModules.length === 0 && (
+              <div className="text-center py-12 text-muted-foreground">
+                Aucune permission trouvée pour "{searchTerm}"
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Légende */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">Légende des actions</CardTitle>
+            <CardDescription>Description des différentes actions possibles</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+              <div className="flex items-center gap-2">
+                <Badge variant="outline">voir</Badge>
+                <span className="text-muted-foreground">Consulter les données</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant="outline">creer</Badge>
+                <span className="text-muted-foreground">Ajouter des éléments</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant="outline">modifier</Badge>
+                <span className="text-muted-foreground">Éditer les données</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant="outline">supprimer</Badge>
+                <span className="text-muted-foreground">Retirer des éléments</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant="outline">restaurer</Badge>
+                <span className="text-muted-foreground">Récupérer supprimés</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant="outline">importer</Badge>
+                <span className="text-muted-foreground">Import de données</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant="outline">exporter</Badge>
+                <span className="text-muted-foreground">Export de données</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant="outline">attribuer</Badge>
+                <span className="text-muted-foreground">Assigner à des rôles</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </AppShell>
   );
 };
 
-export default Permissions;
-
+export default PermissionsPage;

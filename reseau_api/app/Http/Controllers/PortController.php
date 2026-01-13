@@ -14,6 +14,16 @@ class PortController extends Controller
     {
         $query = Port::query();
 
+        // Inclure les éléments supprimés si demandé
+        if ($request->get('with_trashed') === 'true') {
+            $query->withTrashed();
+        }
+
+        // Afficher uniquement les éléments supprimés
+        if ($request->get('only_trashed') === 'true') {
+            $query->onlyTrashed();
+        }
+
         if ($request->has('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
@@ -29,13 +39,13 @@ class PortController extends Controller
             $ports = $query->with(['equipement', 'connectedEquipment'])
                 ->orderBy('device_name')
                 ->paginate($perPage);
-            
+
             return response()->json($ports);
         } catch (\Exception $e) {
             \Log::error('Error in PortController@index: ' . $e->getMessage());
             \Log::error('File: ' . $e->getFile() . ' Line: ' . $e->getLine());
             \Log::error('Stack trace: ' . $e->getTraceAsString());
-            
+
             // Essayer sans relations pour voir si c'est le problème
             try {
                 $ports = $query->orderBy('device_name')->paginate($perPage);
@@ -81,10 +91,15 @@ class PortController extends Controller
         if (isset($portData['poe_enabled'])) {
             $portData['poe_enabled'] = filter_var($portData['poe_enabled'], FILTER_VALIDATE_BOOLEAN);
         }
-        
+
         // S'assurer que connected_equipment_id est null si non fourni
         if (!isset($portData['connected_equipment_id']) || $portData['connected_equipment_id'] === '') {
             $portData['connected_equipment_id'] = null;
+        }
+
+        // Définir le status par défaut
+        if (!isset($portData['status'])) {
+            $portData['status'] = 'active';
         }
 
         $port = Port::create($portData);
@@ -146,6 +161,24 @@ class PortController extends Controller
 
         return response()->json([
             'message' => 'Port supprimé avec succès.',
+        ], 200);
+    }
+
+    /**
+     * Restore the specified resource from storage.
+     */
+    public function restore($id)
+    {
+        if (!auth()->user()->isAdministrator()) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+
+        $port = Port::withTrashed()->findOrFail($id);
+        $port->restore();
+
+        return response()->json([
+            'message' => 'Port restauré avec succès.',
+            'data' => $port->load('equipement', 'connectedEquipment'),
         ], 200);
     }
 }

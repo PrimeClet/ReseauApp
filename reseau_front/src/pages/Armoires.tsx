@@ -1,23 +1,84 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useData } from "@/contexts/DataContext";
 import AppShell from "@/components/layout/AppShell";
+import PageHeader from "@/components/ui/page-header";
 import DataTableEnhanced from "@/components/ui/data-table-enhanced";
 import DetailsModal from "@/components/ui/details-modal";
 import EditModal from "@/components/ui/edit-modal";
 import AddArmoireForm from "@/components/forms/AddArmoireForm";
 import { toast } from "@/hooks/use-toast";
-import { Loader2, Trash2 } from "lucide-react";
+import { Loader2, X, Server } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 const Armoires = () => {
   const { isAuthenticated, isLoading: isLoadingAuth } = useAuth();
   const navigate = useNavigate();
-  const { coffrets, sites, zones, batiments, salles, isLoadingCoffrets, addCoffret, updateCoffret, deleteCoffret, refetchCoffrets } = useData();
+  const { coffrets, batiments, salles, isLoadingCoffrets, updateCoffret, deleteCoffret, restoreCoffret, importCoffrets, refetchCoffrets } = useData();
   const [selectedCoffret, setSelectedCoffret] = useState<any>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const [selectedSalle, setSelectedSalle] = useState<any>(null);
+  const [isSalleDetailsOpen, setIsSalleDetailsOpen] = useState(false);
+
+  // Filtres par bâtiment, salle et status
+  const [selectedBatimentId, setSelectedBatimentId] = useState<string>("");
+  const [selectedSalleId, setSelectedSalleId] = useState<string>("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+
+  // Salles filtrées par bâtiment sélectionné
+  const filteredSalles = useMemo(() => {
+    if (!selectedBatimentId) return salles;
+    return salles.filter(s => s.batiment_id === parseInt(selectedBatimentId));
+  }, [salles, selectedBatimentId]);
+
+  // Filtrer les coffrets par bâtiment, salle et status (déplacé avant les retours conditionnels)
+  const filteredCoffrets = useMemo(() => {
+    let filtered = coffrets;
+
+    if (selectedBatimentId) {
+      filtered = filtered.filter(c => c.batiment_id === parseInt(selectedBatimentId));
+    }
+
+    if (selectedSalleId) {
+      filtered = filtered.filter(c => c.salle_id === parseInt(selectedSalleId));
+    }
+
+    // Appliquer le filtre de status (Actif/Supprimé)
+    if (statusFilter !== "all") {
+      if (statusFilter === "Supprimé") {
+        filtered = filtered.filter(c => (c as any).deleted_at !== null && (c as any).deleted_at !== undefined);
+      } else if (statusFilter === "Actif") {
+        filtered = filtered.filter(c => (c as any).deleted_at === null || (c as any).deleted_at === undefined);
+      }
+    }
+
+    return filtered;
+  }, [coffrets, selectedBatimentId, selectedSalleId, statusFilter]);
+
+  // Réinitialiser la salle si le bâtiment change
+  useEffect(() => {
+    if (selectedBatimentId && selectedSalleId) {
+      const salleExists = filteredSalles.some(s => s.id === parseInt(selectedSalleId));
+      if (!salleExists) {
+        setSelectedSalleId("");
+      }
+    }
+  }, [selectedBatimentId, filteredSalles, selectedSalleId]);
 
   useEffect(() => {
     if (!isLoadingAuth && !isAuthenticated) {
@@ -51,47 +112,20 @@ const Armoires = () => {
 
   const handleSave = async (updatedCoffret: any) => {
     try {
-      // Convertir les IDs en nombres valides
-      const siteId = updatedCoffret.site_id ? Number(updatedCoffret.site_id) : undefined;
-      const zoneId = updatedCoffret.zone_id ? Number(updatedCoffret.zone_id) : undefined;
-      const batimentId = updatedCoffret.batiment_id ? Number(updatedCoffret.batiment_id) : undefined;
-      const salleId = updatedCoffret.salle_id ? Number(updatedCoffret.salle_id) : undefined;
-      
-      // Si un fichier photo est présent, utiliser FormData
-      if (updatedCoffret.photo && updatedCoffret.photo instanceof File) {
-        const formData = new FormData();
-        formData.append('nom', updatedCoffret.nom || '');
-        if (updatedCoffret.piece) formData.append('piece', updatedCoffret.piece);
-        if (updatedCoffret.emplacement) formData.append('emplacement', updatedCoffret.emplacement);
-        if (typeof updatedCoffret.long === 'number') formData.append('long', String(updatedCoffret.long));
-        if (typeof updatedCoffret.lat === 'number') formData.append('lat', String(updatedCoffret.lat));
-        if (siteId) formData.append('site_id', String(siteId));
-        if (zoneId) formData.append('zone_id', String(zoneId));
-        if (batimentId) formData.append('batiment_id', String(batimentId));
-        if (salleId) formData.append('salle_id', String(salleId));
-        if (updatedCoffret.status) formData.append('status', updatedCoffret.status);
-        if (updatedCoffret.modele) formData.append('modele', updatedCoffret.modele);
-        formData.append('photo', updatedCoffret.photo);
-        
-        await updateCoffret(updatedCoffret.id, formData as any);
-      } else {
-        const updateData: any = {
-          nom: updatedCoffret.nom,
-        };
-        
-        if (updatedCoffret.piece) updateData.piece = updatedCoffret.piece;
-        if (updatedCoffret.emplacement) updateData.emplacement = updatedCoffret.emplacement;
-        if (typeof updatedCoffret.long === 'number') updateData.long = updatedCoffret.long;
-        if (typeof updatedCoffret.lat === 'number') updateData.lat = updatedCoffret.lat;
-        if (siteId) updateData.site_id = siteId;
-        if (zoneId) updateData.zone_id = zoneId;
-        if (batimentId) updateData.batiment_id = batimentId;
-        if (salleId) updateData.salle_id = salleId;
-        if (updatedCoffret.status) updateData.status = updatedCoffret.status;
-        if (updatedCoffret.modele) updateData.modele = updatedCoffret.modele;
-        
-        await updateCoffret(updatedCoffret.id, updateData);
-      }
+      const salleId = typeof updatedCoffret.salle_id === 'string'
+        ? parseInt(updatedCoffret.salle_id, 10)
+        : updatedCoffret.salle_id;
+      // Trouver le batiment_id à partir de la salle
+      const salle = salles.find(s => s.id === salleId);
+      await updateCoffret(updatedCoffret.id, {
+        nom: updatedCoffret.nom,
+        code: updatedCoffret.code,
+        piece: updatedCoffret.piece,
+        long: updatedCoffret.long || undefined,
+        lat: updatedCoffret.lat || undefined,
+        batiment_id: salle?.batiment_id || updatedCoffret.batiment_id || undefined,
+        salle_id: salleId || undefined,
+      });
       toast({
         title: "Armoire mise à jour",
         description: "Les informations de l'armoire ont été enregistrées.",
@@ -109,40 +143,161 @@ const Armoires = () => {
   };
 
   const handleDelete = async (coffretId: number) => {
-    if (window.confirm("Êtes-vous sûr de vouloir supprimer cette armoire ?")) {
-      try {
-        await deleteCoffret(coffretId);
-        toast({
-          title: "Armoire supprimée",
-          description: "L'armoire a été supprimée avec succès.",
-        });
-        setIsDetailsOpen(false);
-        setSelectedCoffret(null);
-        refetchCoffrets();
-      } catch (error: any) {
-        toast({
-          title: "Erreur",
-          description: error.response?.data?.message || "Une erreur est survenue lors de la suppression de l'armoire.",
-          variant: "destructive",
-        });
-      }
+    try {
+      await deleteCoffret(coffretId);
+      refetchCoffrets();
+      toast({
+        title: "Armoire supprimée",
+        description: "L'armoire a été supprimée avec succès.",
+      });
+      setIsDetailsOpen(false);
+      setSelectedCoffret(null);
+    } catch (error: any) {
+      toast({
+        title: "Erreur",
+        description: error.response?.data?.message || "Une erreur est survenue lors de la suppression de l'armoire.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleRestore = async (coffretId: number) => {
+    try {
+      await restoreCoffret(coffretId);
+      refetchCoffrets();
+      toast({
+        title: "Armoire restaurée",
+        description: "L'armoire a été restaurée avec succès.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erreur",
+        description: error.response?.data?.message || "Une erreur est survenue lors de la restauration de l'armoire.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleImport = async (file: File) => {
+    try {
+      const result = await importCoffrets(file);
+      toast({
+        title: "Import terminé",
+        description: `${result.created} créée(s), ${result.updated} mise(s) à jour.${result.errors.length > 0 ? ` ${result.errors.length} erreur(s).` : ''}`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erreur",
+        description: error.response?.data?.message || "Une erreur est survenue lors de l'import.",
+        variant: "destructive",
+      });
     }
   };
 
   // Préparer les données pour le tableau
-  const tableData = coffrets.map((coffret) => ({
-    id: coffret.id,
-    code: coffret.code,
-    nom: coffret.nom,
-    modele: coffret.modele || "—",
-    photo: coffret.photo ? "Oui" : "Non",
-    piece: coffret.piece,
-    site: coffret.site?.libelle || (coffret.site_id ? `#${coffret.site_id}` : "—"),
-    zone: coffret.zone?.libelle || (coffret.zone_id ? `#${coffret.zone_id}` : "—"),
-    emplacement: coffret.emplacement || "—",
-    coordonnees: coffret.lat && coffret.long ? `${coffret.lat}, ${coffret.long}` : "Non définies",
-    status: coffret.status,
-  }));
+  const tableData = filteredCoffrets.map((coffret) => {
+    const batiment = batiments.find(b => b.id === coffret.batiment_id);
+    const salle = salles.find(s => s.id === coffret.salle_id);
+    const isDeleted = (coffret as any).deleted_at !== null && (coffret as any).deleted_at !== undefined;
+    return {
+      id: coffret.id,
+      Code: coffret.code,
+      Nom: coffret.nom,
+      Bâtiment: batiment?.nom || "-",
+      Salle: salle?.nom || "-",
+      salle_id: coffret.salle_id,
+      batiment_id: coffret.batiment_id,
+      Équipements: coffret.equipements?.length || 0,
+      Status: isDeleted ? "Supprimé" : "Actif",
+    };
+  });
+
+  // Réinitialiser les filtres
+  const clearFilters = () => {
+    setSelectedBatimentId("");
+    setSelectedSalleId("");
+    setStatusFilter("all");
+  };
+
+  const hasActiveFilters = selectedBatimentId || selectedSalleId || statusFilter !== "all";
+
+  // Formater les données de la salle pour le modal
+  const formatSalleForModal = (salleId: number) => {
+    const salle = salles.find(s => s.id === salleId);
+    if (!salle) return null;
+    const batiment = batiments.find(b => b.id === salle.batiment_id);
+    return {
+      id: salle.id,
+      nom: salle.nom,
+      batiment: batiment?.nom || "-",
+      etage: salle.etage,
+      capacite: salle.capacite,
+      type: salle.type,
+      description: salle.description || "",
+    };
+  };
+
+  // Rendu personnalisé pour la colonne Code avec lien vers la vue détaillée
+  const renderCodeCell = (value: string, row: any) => {
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span
+              className="cursor-pointer text-primary hover:underline font-medium"
+              onClick={(e) => {
+                e.stopPropagation();
+                // Rediriger directement vers ArmoiresSection avec la vue détaillée
+                localStorage.setItem('selectedCoffretId', row.id.toString());
+                localStorage.setItem('returnToArmoires', 'true');
+                navigate('/armoires-detail');
+              }}
+            >
+              {value}
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Cliquez pour voir les détails et composants de l'armoire</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  };
+
+  // Rendu personnalisé pour la colonne Salle avec lien vers le modal
+  const renderSalleCell = (value: string, row: any) => {
+    if (value === '-') return value;
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span
+              className="cursor-pointer text-primary hover:underline"
+              onClick={(e) => {
+                e.stopPropagation();
+                setSelectedSalle(formatSalleForModal(row.salle_id));
+                setIsSalleDetailsOpen(true);
+              }}
+            >
+              {value}
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Cliquez pour voir les détails de la salle</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  };
+
+  // Rendu pour la colonne Équipements (sans lien)
+  const renderEquipementsCell = (value: number) => {
+    return (
+      <span className="font-medium">
+        {value} équipement{value !== 1 ? 's' : ''}
+      </span>
+    );
+  };
 
   // Préparer les données pour les modals (format attendu)
   const formatCoffretForModal = (coffret: any) => {
@@ -161,15 +316,11 @@ const Armoires = () => {
       photo: originalCoffret.photo || "",
       photo_url: originalCoffret.photo_url || null,
       piece: originalCoffret.piece,
-      emplacement: originalCoffret.emplacement || "",
+      qr_code: originalCoffret.qr_code,
       long: originalCoffret.long || 0,
       lat: originalCoffret.lat || 0,
-      site: site?.libelle || null,
-      zone: zone?.libelle || null,
-      batiment: batiment?.nom || null,
-      salle: salle?.nom || null,
-      site_id: originalCoffret.site_id,
-      zone_id: originalCoffret.zone_id,
+      batiment: batiment ? { nom: batiment.nom } : null,
+      salle: salle ? { nom: salle.nom } : null,
       batiment_id: originalCoffret.batiment_id,
       salle_id: originalCoffret.salle_id,
       status: originalCoffret.status,
@@ -180,15 +331,16 @@ const Armoires = () => {
   return (
     <AppShell>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-foreground">Gestion des Armoires</h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              Configuration et gestion des armoires réseau (coffrets)
-            </p>
-          </div>
-          <AddArmoireForm />
-        </div>
+        <PageHeader
+          title="Gestion des Armoires"
+          description="Configuration et gestion des armoires réseau (coffrets)"
+          icon={<Server className="h-6 w-6 text-primary" />}
+          breadcrumbs={[
+            { label: "Tableau de bord", href: "/" },
+            { label: "Armoires" },
+          ]}
+          actions={<AddArmoireForm />}
+        />
 
         {isLoadingCoffrets ? (
           <div className="flex items-center justify-center py-12">
@@ -197,23 +349,82 @@ const Armoires = () => {
         ) : (
           <>
             <DataTableEnhanced
-              title={`${coffrets.length} armoire${coffrets.length > 1 ? 's' : ''} configurée${coffrets.length > 1 ? 's' : ''}`}
-              columns={["code", "nom", "modele", "photo", "site", "zone", "piece", "emplacement", "coordonnees", "status"]}
+              title={`${filteredCoffrets.length} armoire${filteredCoffrets.length > 1 ? 's' : ''} configurée${filteredCoffrets.length > 1 ? 's' : ''}`}
+              columns={["Code", "Nom", "Salle", "Équipements", "Status"]}
               data={tableData}
               onRowClick={handleRowClick}
               onEdit={handleEdit}
-              renderRowActions={(row) => (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDelete(row.id);
-                  }}
-                >
-                  <Trash2 className="h-4 w-4 text-destructive" />
-                </Button>
-              )}
+              onDelete={handleDelete}
+              onRestore={handleRestore}
+              onImport={handleImport}
+              enableImport={true}
+              importModalTitle="Importer des armoires"
+              importTemplateColumns={["nom", "batiment", "salle", "piece", "status"]}
+              importTemplateFileName="modele_armoires.csv"
+              deleteConfirmTitle="Supprimer l'armoire"
+              deleteConfirmDescription="Êtes-vous sûr de vouloir supprimer cette armoire ? Cette action est irréversible."
+              restoreConfirmTitle="Restaurer l'armoire"
+              restoreConfirmDescription="Êtes-vous sûr de vouloir restaurer cette armoire ?"
+              customCellRenderers={{
+                "Code": renderCodeCell,
+                "Salle": renderSalleCell,
+                "Équipements": renderEquipementsCell,
+              }}
+              customFilters={
+                <>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground whitespace-nowrap">Status:</span>
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                      <SelectTrigger className="w-28">
+                        <SelectValue placeholder="Tous" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Tous</SelectItem>
+                        <SelectItem value="Actif">Actif</SelectItem>
+                        <SelectItem value="Supprimé">Supprimé</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground whitespace-nowrap">Bâtiment:</span>
+                    <Select value={selectedBatimentId} onValueChange={setSelectedBatimentId}>
+                      <SelectTrigger className="w-40">
+                        <SelectValue placeholder="Tous" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Tous</SelectItem>
+                        {batiments.filter(b => !(b as any).deleted_at).map((batiment) => (
+                          <SelectItem key={batiment.id} value={batiment.id.toString()}>
+                            {batiment.nom}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground whitespace-nowrap">Salle:</span>
+                    <Select value={selectedSalleId} onValueChange={setSelectedSalleId}>
+                      <SelectTrigger className="w-40">
+                        <SelectValue placeholder="Toutes" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Toutes</SelectItem>
+                        {filteredSalles.filter(s => !(s as any).deleted_at).map((salle) => (
+                          <SelectItem key={salle.id} value={salle.id.toString()}>
+                            {salle.nom}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {hasActiveFilters && (
+                    <Button variant="ghost" size="sm" onClick={clearFilters} className="text-muted-foreground">
+                      <X className="h-4 w-4 mr-1" />
+                      Effacer
+                    </Button>
+                  )}
+                </>
+              }
             />
 
             <DetailsModal
@@ -225,6 +436,7 @@ const Armoires = () => {
                 setIsDetailsOpen(false);
                 setIsEditOpen(true);
               }}
+              onDelete={selectedCoffret ? () => handleDelete(selectedCoffret.id) : undefined}
             />
 
             <EditModal
@@ -233,20 +445,31 @@ const Armoires = () => {
               title="Modifier l'armoire"
               data={formatCoffretForModal(selectedCoffret)}
               onSave={handleSave}
-              className="w-[95vw] sm:max-w-none sm:w-[1200px] max-h-[70vh] overflow-y-auto"
               fields={[
-                { key: 'nom', label: 'Nom', type: 'text' },
-                { key: 'modele', label: 'Modèle', type: 'text' },
-                { key: 'photo', label: 'Photo (Upload)', type: 'file' },
-                { key: 'site_id', label: 'Site', type: 'select', options: sites.map(s => s.id.toString()) },
-                { key: 'zone_id', label: 'Zone', type: 'select', options: zones.map(z => z.id.toString()) },
-                { key: 'batiment_id', label: 'Bâtiment', type: 'select', options: batiments.map(b => b.id.toString()) },
-                { key: 'salle_id', label: 'Salle', type: 'select', options: salles.map(s => s.id.toString()) },
-                { key: 'emplacement', label: 'Emplacement détaillé', type: 'text' },
-                { key: 'long', label: 'Longitude', type: 'number' },
-                { key: 'lat', label: 'Latitude', type: 'number' },
-                { key: 'status', label: 'Statut', type: 'select', options: ['active', 'inactive'] },
+                { key: "nom", label: "Nom", type: "text" },
+                { key: "code", label: "Code", type: "text" },
+                {
+                  key: "salle_id",
+                  label: "Salle",
+                  type: "select",
+                  options: salles.filter(s => !(s as any).deleted_at).map(s => ({ value: s.id.toString(), label: s.nom }))
+                },
+                { key: "piece", label: "Pièce", type: "text" },
+                { key: "long", label: "Longitude", type: "number" },
+                { key: "lat", label: "Latitude", type: "number" },
               ]}
+            />
+
+            {/* Modal de détails de la salle */}
+            <DetailsModal
+              open={isSalleDetailsOpen}
+              onOpenChange={setIsSalleDetailsOpen}
+              title="Détails de la salle"
+              data={selectedSalle}
+              onEdit={() => {
+                setIsSalleDetailsOpen(false);
+                navigate('/salles');
+              }}
             />
           </>
         )}

@@ -14,6 +14,8 @@ export interface Port {
   downlink?: string;
   equipement_id: number;
   connected_equipment_id?: number;
+  status: string;
+  deleted_at?: string;
   created_at?: string;
   updated_at?: string;
   equipement?: {
@@ -52,7 +54,7 @@ export interface PortCreateData {
 }
 
 const portService = {
-  async getAll(params?: { page?: number; per_page?: number; search?: string }): Promise<PortListResponse> {
+  async getAll(params?: { page?: number; per_page?: number; search?: string; with_trashed?: string; only_trashed?: string }): Promise<PortListResponse> {
     const response = await api.get<PortListResponse>('/ports', { params });
     return response.data;
   },
@@ -74,6 +76,11 @@ const portService = {
 
   async delete(id: number): Promise<void> {
     await api.delete(`/ports/${id}`);
+  },
+
+  async restore(id: number): Promise<Port> {
+    const response = await api.post<{ data: Port }>(`/ports/${id}/restore`);
+    return response.data.data;
   },
 };
 

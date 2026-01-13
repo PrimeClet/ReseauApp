@@ -7,7 +7,9 @@ import DataTableEnhanced from "@/components/ui/data-table-enhanced";
 import DetailsModal from "@/components/ui/details-modal";
 import EditModal from "@/components/ui/edit-modal";
 import AddLiaisonForm from "@/components/forms/AddLiaisonForm";
+import PageHeader from "@/components/ui/page-header";
 import { useData } from "@/contexts/DataContext";
+import { Link2 } from "lucide-react";
 
 export default function LiaisonsSection() {
   const { liaisons } = useData();
@@ -31,15 +33,16 @@ export default function LiaisonsSection() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-foreground">Gestion des Liaisons</h2>
-          <div className="text-sm text-muted-foreground mt-1">
-            Configuration et monitoring des connexions réseau
-          </div>
-        </div>
-        <AddLiaisonForm />
-      </div>
+      <PageHeader
+        title="Gestion des Liaisons"
+        description="Configuration et monitoring des connexions réseau"
+        icon={<Link2 className="h-6 w-6 text-primary" />}
+        breadcrumbs={[
+          { label: "Tableau de bord", href: "/" },
+          { label: "Liaisons" },
+        ]}
+        actions={<AddLiaisonForm />}
+      />
 
       <DataTableEnhanced
         title={`${liaisons.length} liaisons configurées`}

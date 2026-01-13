@@ -14,8 +14,13 @@ import Salles from "./pages/Salles";
 import Sites from "./pages/Sites";
 import Zones from "./pages/Zones";
 import Armoires from "./pages/Armoires";
+import ArmoiresDetail from "./pages/ArmoiresDetail";
+import Equipements from "./pages/Equipements";
+import Ports from "./pages/Ports";
+import Liaisons from "./pages/Liaisons";
 import Roles from "./pages/Roles";
 import Permissions from "./pages/Permissions";
+import Users from "./pages/Users";
 import Lans from "./pages/Lans";
 import LanCartography from "./pages/LanCartography";
 import Modifications from "./pages/Modifications";
@@ -42,8 +47,13 @@ const App = () => (
               <Route path="/sites" element={<Sites />} />
               <Route path="/zones" element={<Zones />} />
               <Route path="/armoires" element={<Armoires />} />
+              <Route path="/armoires-detail" element={<ArmoiresDetail />} />
+              <Route path="/equipements" element={<Equipements />} />
+              <Route path="/ports" element={<Ports />} />
+              <Route path="/liaisons" element={<Liaisons />} />
               <Route path="/roles" element={<Roles />} />
               <Route path="/permissions" element={<Permissions />} />
+              <Route path="/users" element={<Users />} />
               <Route path="/lans" element={<Lans />} />
               <Route path="/cartographie-lan" element={<LanCartography />} />
               <Route path="/modifications" element={<Modifications />} />

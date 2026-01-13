@@ -17,6 +17,7 @@ export interface Coffret {
   site_id?: number;
   zone_id?: number;
   qr_code?: string;
+  deleted_at?: string | null;
   created_at?: string;
   updated_at?: string;
   equipements?: Equipement[];
@@ -64,7 +65,7 @@ export interface CoffretCreateData {
 }
 
 const coffretService = {
-  async getAll(params?: { page?: number; per_page?: number; search?: string }): Promise<CoffretListResponse> {
+  async getAll(params?: { page?: number; per_page?: number; search?: string; batiment_id?: number; salle_id?: number; with_trashed?: string; only_trashed?: string; status?: string }): Promise<CoffretListResponse> {
     const response = await api.get<CoffretListResponse>('/coffrets', { params });
     return response.data;
   },
@@ -96,6 +97,22 @@ const coffretService = {
 
   async delete(id: number): Promise<void> {
     await api.delete(`/coffrets/${id}`);
+  },
+
+  async restore(id: number): Promise<Coffret> {
+    const response = await api.post<{ data: Coffret }>(`/coffrets/${id}/restore`);
+    return response.data.data;
+  },
+
+  async import(file: File): Promise<{ message: string; created: number; updated: number; errors: string[] }> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post<{ message: string; created: number; updated: number; errors: string[] }>('/coffrets/import', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
   },
 };
 

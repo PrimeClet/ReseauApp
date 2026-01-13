@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Equipement;
 use Illuminate\Http\Request;
+use SimpleSoftwareIO\QrCode\Facades\QrCode;
 
 class EquipementsController extends Controller
 {
@@ -28,9 +29,18 @@ class EquipementsController extends Controller
         $perPage = (int) $request->get('per_page', 15);
         $perPage = $perPage > 0 && $perPage <= 100 ? $perPage : 15;
 
-        $equipement = $query->with('coffret.batiment', 'coffret.salle', 'batiment', 'salle', 'ports')->orderBy('name')->paginate($perPage);
+        $equipements = $query->with('coffret.batiment', 'coffret.salle', 'batiment', 'salle', 'ports')->orderBy('name')->paginate($perPage);
 
-        return response()->json($equipement);
+        // Générer les QR codes manquants
+        foreach ($equipements->items() as $equipement) {
+            if (!$equipement->qr_code) {
+                $qrCode = $this->generateQRCode($equipement);
+                $equipement->update(['qr_code' => $qrCode]);
+                $equipement->refresh();
+            }
+        }
+
+        return response()->json($equipements);
     }
 
     /**
@@ -73,6 +83,11 @@ class EquipementsController extends Controller
 
         $equipement = Equipement::create($equipementData);
 
+        // Générer et stocker le QR code
+        $qrCode = $this->generateQRCode($equipement);
+        $equipement->update(['qr_code' => $qrCode]);
+        $equipement->refresh();
+
         return response()->json([
             'message' => 'Équipement créé avec succès.',
             'data' => $equipement,
@@ -109,10 +124,38 @@ class EquipementsController extends Controller
     }
 
     /**
+     * Génère un QR code pour un équipement
+     */
+    private function generateQRCode(Equipement $equipement): string
+    {
+        // Créer les données à encoder dans le QR code
+        $qrData = json_encode([
+            'id' => $equipement->id,
+            'code' => $equipement->equipement_code,
+            'nom' => $equipement->name,
+            'type' => 'equipement'
+        ]);
+
+        // Générer le QR code en format SVG (string)
+        $qrCode = QrCode::size(300)
+            ->format('svg')
+            ->generate($qrData);
+
+        return $qrCode;
+    }
+
+    /**
      * Display the specified resource.
      */
     public function show(Equipement $equipement)
     {
+        // Générer le QR code s'il n'existe pas
+        if (!$equipement->qr_code) {
+            $qrCode = $this->generateQRCode($equipement);
+            $equipement->update(['qr_code' => $qrCode]);
+            $equipement->refresh();
+        }
+
         return response()->json([
             'data' => $equipement->load('coffret.batiment', 'coffret.salle', 'batiment', 'salle', 'ports')
         ]);
@@ -148,6 +191,13 @@ class EquipementsController extends Controller
         ]);
 
         $equipement->update($request->all());
+
+        // Régénérer le QR code si le code ou le nom a changé
+        if ($request->has('equipement_code') || $request->has('name')) {
+            $qrCode = $this->generateQRCode($equipement);
+            $equipement->update(['qr_code' => $qrCode]);
+            $equipement->refresh();
+        }
 
         return response()->json([
             'message' => 'Équipement mis à jour avec succès.',

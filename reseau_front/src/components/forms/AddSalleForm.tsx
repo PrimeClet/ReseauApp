@@ -15,10 +15,9 @@ import { Plus } from "lucide-react";
 const salleSchema = z.object({
   nom: z.string().min(1, "Le nom est requis"),
   batiment_id: z.string().min(1, "Le bâtiment est requis"),
-  etage: z.string().min(1, "L'étage est requis"),
+  etage: z.string().optional().transform((val) => val ? parseInt(val, 10) : 0),
   capacite: z.string().min(1, "La capacité est requise").transform((val) => parseInt(val, 10)),
   type: z.string().min(1, "Le type est requis"),
-  etat: z.string().min(1, "L'état est requis"),
   description: z.string().optional(),
 });
 
@@ -37,7 +36,6 @@ export default function AddSalleForm() {
       etage: "",
       capacite: "",
       type: "",
-      etat: "Actif",
       description: "",
     },
   });
@@ -47,6 +45,7 @@ export default function AddSalleForm() {
       await addSalle({
         ...data,
         batiment_id: parseInt(data.batiment_id, 10),
+        etat: "Actif",
       });
       toast({
         title: "Salle ajoutée",
@@ -116,15 +115,15 @@ export default function AddSalleForm() {
               )}
             />
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <FormField
                 control={form.control}
                 name="etage"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Étage</FormLabel>
+                    <FormLabel>Étage (optionnel)</FormLabel>
                     <FormControl>
-                      <Input placeholder="Ex: 1er étage" {...field} />
+                      <Input type="number" placeholder="0" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -143,9 +142,6 @@ export default function AddSalleForm() {
                   </FormItem>
                 )}
               />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
                 name="type"
@@ -165,28 +161,6 @@ export default function AddSalleForm() {
                         <SelectItem value="Stockage">Stockage</SelectItem>
                         <SelectItem value="Technique">Technique</SelectItem>
                         <SelectItem value="Autre">Autre</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="etat"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>État</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Sélectionner l'état" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="Actif">Actif</SelectItem>
-                        <SelectItem value="Inactif">Inactif</SelectItem>
-                        <SelectItem value="Maintenance">Maintenance</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
