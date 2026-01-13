@@ -14,6 +14,16 @@ class LiaisonController extends Controller
     {
         $query = Liaison::query();
 
+        // Inclure les éléments supprimés si demandé
+        if ($request->get('with_trashed') === 'true') {
+            $query->withTrashed();
+        }
+
+        // Afficher uniquement les éléments supprimés
+        if ($request->get('only_trashed') === 'true') {
+            $query->onlyTrashed();
+        }
+
         if ($request->has('status')) {
             $query->where('status', $request->status);
         }
@@ -21,7 +31,8 @@ class LiaisonController extends Controller
         if ($request->has('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%");
+                $q->where('label', 'like', "%{$search}%")
+                  ->orWhere('media', 'like', "%{$search}%");
             });
         }
 
@@ -109,6 +120,24 @@ class LiaisonController extends Controller
 
         return response()->json([
             'message' => 'Liaison supprimée avec succès.',
+        ], 200);
+    }
+
+    /**
+     * Restore the specified resource from storage.
+     */
+    public function restore($id)
+    {
+        if (!auth()->user()->isAdministrator()) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+
+        $liaison = Liaison::withTrashed()->findOrFail($id);
+        $liaison->restore();
+
+        return response()->json([
+            'message' => 'Liaison restaurée avec succès.',
+            'data' => $liaison->load(['fromPort.equipement', 'toPort.equipement']),
         ], 200);
     }
 }

@@ -12,8 +12,13 @@ import Profile from "./pages/Profile";
 import Batiments from "./pages/Batiments";
 import Salles from "./pages/Salles";
 import Armoires from "./pages/Armoires";
+import ArmoiresDetail from "./pages/ArmoiresDetail";
+import Equipements from "./pages/Equipements";
+import Ports from "./pages/Ports";
+import Liaisons from "./pages/Liaisons";
 import Roles from "./pages/Roles";
 import Permissions from "./pages/Permissions";
+import Users from "./pages/Users";
 import Lans from "./pages/Lans";
 import LanCartography from "./pages/LanCartography";
 
@@ -34,8 +39,13 @@ const App = () => (
               <Route path="/batiments" element={<Batiments />} />
               <Route path="/salles" element={<Salles />} />
               <Route path="/armoires" element={<Armoires />} />
+              <Route path="/armoires-detail" element={<ArmoiresDetail />} />
+              <Route path="/equipements" element={<Equipements />} />
+              <Route path="/ports" element={<Ports />} />
+              <Route path="/liaisons" element={<Liaisons />} />
               <Route path="/roles" element={<Roles />} />
               <Route path="/permissions" element={<Permissions />} />
+              <Route path="/users" element={<Users />} />
               <Route path="/lans" element={<Lans />} />
               <Route path="/cartographie-lan" element={<LanCartography />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

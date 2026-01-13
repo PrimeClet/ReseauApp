@@ -18,7 +18,6 @@ const armoireSchema = z.object({
   lat: z.number().optional().nullable(),
   batiment_id: z.number().optional().nullable(),
   salle_id: z.number().optional().nullable(),
-  status: z.enum(["active", "inactive"]),
 });
 
 type ArmoireFormData = z.infer<typeof armoireSchema>;
@@ -37,7 +36,6 @@ const AddArmoireForm = () => {
       lat: undefined,
       batiment_id: undefined,
       salle_id: undefined,
-      status: "active",
     },
   });
 
@@ -56,7 +54,6 @@ const AddArmoireForm = () => {
         lat: data.lat ?? undefined,
         batiment_id: data.batiment_id || undefined,
         salle_id: data.salle_id || undefined,
-        status: data.status,
       };
       
       await addCoffret(coffretData);
@@ -220,28 +217,6 @@ const AddArmoireForm = () => {
                 )}
               />
             </div>
-
-            <FormField
-              control={form.control}
-              name="status"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Statut *</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Sélectionner le statut" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="active">Actif</SelectItem>
-                      <SelectItem value="inactive">Inactif</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
 
             <div className="flex justify-end space-x-2">
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>

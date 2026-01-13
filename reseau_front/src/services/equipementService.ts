@@ -3,6 +3,7 @@ import api from '@/axios';
 export interface Equipement {
   id: number;
   equipement_code: string;
+  qr_code?: string;
   name: string;
   type: string;
   description?: string;
@@ -13,6 +14,7 @@ export interface Equipement {
   batiment_id?: number;
   salle_id?: number;
   status: string;
+  nombre_ports?: number;
   created_at?: string;
   updated_at?: string;
   coffret?: {
@@ -71,10 +73,11 @@ export interface EquipementCreateData {
   batiment_id?: number;
   salle_id?: number;
   status?: string;
+  nombre_ports?: number;
 }
 
 const equipementService = {
-  async getAll(params?: { page?: number; per_page?: number; search?: string }): Promise<EquipementListResponse> {
+  async getAll(params?: { page?: number; per_page?: number; search?: string; with_trashed?: string; only_trashed?: string }): Promise<EquipementListResponse> {
     const response = await api.get<EquipementListResponse>('/equipements', { params });
     return response.data;
   },
@@ -96,6 +99,22 @@ const equipementService = {
 
   async delete(id: number): Promise<void> {
     await api.delete(`/equipements/${id}`);
+  },
+
+  async restore(id: number): Promise<Equipement> {
+    const response = await api.post<{ data: Equipement }>(`/equipements/${id}/restore`);
+    return response.data.data;
+  },
+
+  async import(file: File): Promise<{ message: string; created: number; updated: number; errors: string[] }> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post<{ message: string; created: number; updated: number; errors: string[] }>('/equipements/import', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
   },
 };
 

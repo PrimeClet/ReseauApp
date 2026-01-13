@@ -128,18 +128,24 @@ interface DataContextType {
   addCoffret: (data: CoffretCreateData) => Promise<Coffret>;
   updateCoffret: (id: number, data: Partial<CoffretCreateData>) => Promise<Coffret>;
   deleteCoffret: (id: number) => Promise<void>;
+  restoreCoffret: (id: number) => Promise<Coffret>;
+  importCoffrets: (file: File) => Promise<{ message: string; created: number; updated: number; errors: string[] }>;
 
   addEquipement: (data: EquipementCreateData) => Promise<Equipement>;
   updateEquipement: (id: number, data: Partial<EquipementCreateData>) => Promise<Equipement>;
   deleteEquipement: (id: number) => Promise<void>;
+  restoreEquipement: (id: number) => Promise<Equipement>;
+  importEquipements: (file: File) => Promise<{ message: string; created: number; updated: number; errors: string[] }>;
 
   addPort: (data: PortCreateData) => Promise<Port>;
   updatePort: (id: number, data: Partial<PortCreateData>) => Promise<Port>;
   deletePort: (id: number) => Promise<void>;
+  restorePort: (id: number) => Promise<Port>;
 
   addLiaison: (data: LiaisonCreateData) => Promise<Liaison>;
   updateLiaison: (id: number, data: Partial<LiaisonCreateData>) => Promise<Liaison>;
   deleteLiaison: (id: number) => Promise<void>;
+  restoreLiaison: (id: number) => Promise<Liaison>;
 
   addSystem: (data: SystemCreateData) => Promise<System>;
   updateSystem: (id: number, data: Partial<SystemCreateData>) => Promise<System>;
@@ -152,10 +158,13 @@ interface DataContextType {
   addBatiment: (data: BatimentCreateData) => Promise<Batiment>;
   updateBatiment: (id: number, data: Partial<BatimentCreateData>) => Promise<Batiment>;
   deleteBatiment: (id: number) => Promise<void>;
+  restoreBatiment: (id: number) => Promise<Batiment>;
 
   addSalle: (data: SalleCreateData) => Promise<Salle>;
   updateSalle: (id: number, data: Partial<SalleCreateData>) => Promise<Salle>;
   deleteSalle: (id: number) => Promise<void>;
+  restoreSalle: (id: number) => Promise<Salle>;
+  importSalles: (file: File) => Promise<{ message: string; created: number; updated: number; errors: string[] }>;
 
   addMaintenance: (data: MaintenanceCreateData) => Promise<Maintenance>;
   updateMaintenance: (id: number, data: Partial<MaintenanceCreateData>) => Promise<Maintenance>;
@@ -169,6 +178,7 @@ interface DataContextType {
   refetchSystems: () => void;
   refetchLans: () => void;
   refetchBatiments: () => void;
+  importBatiments: (file: File) => Promise<{ message: string; created: number; updated: number; errors: string[] }>;
   refetchSalles: () => void;
   refetchMaintenances: () => void;
   refetchStats: () => void;
@@ -198,7 +208,7 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
     refetch: refetchCoffrets
   } = useQuery({
     queryKey: ['coffrets'],
-    queryFn: () => coffretService.getAll(),
+    queryFn: () => coffretService.getAll({ with_trashed: 'true' }),
     staleTime: 5 * 60 * 1000, // 5 minutes
     retry: 1, // Réessayer seulement 1 fois en cas d'erreur
     retryDelay: 1000, // Attendre 1 seconde avant de réessayer
@@ -212,7 +222,7 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
     refetch: refetchEquipements
   } = useQuery({
     queryKey: ['equipements'],
-    queryFn: () => equipementService.getAll(),
+    queryFn: () => equipementService.getAll({ with_trashed: 'true' }),
     staleTime: 5 * 60 * 1000,
     retry: 1,
     retryDelay: 1000,
@@ -226,7 +236,7 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
     refetch: refetchPorts
   } = useQuery({
     queryKey: ['ports'],
-    queryFn: () => portService.getAll(),
+    queryFn: () => portService.getAll({ with_trashed: 'true' }),
     staleTime: 5 * 60 * 1000,
     retry: 1,
     retryDelay: 1000,
@@ -240,7 +250,7 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
     refetch: refetchLiaisons
   } = useQuery({
     queryKey: ['liaisons'],
-    queryFn: () => liaisonService.getAll(),
+    queryFn: () => liaisonService.getAll({ with_trashed: 'true' }),
     staleTime: 5 * 60 * 1000,
     retry: 1,
     retryDelay: 1000,
@@ -282,7 +292,7 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
     refetch: refetchBatiments
   } = useQuery({
     queryKey: ['batiments'],
-    queryFn: () => batimentService.getAll(),
+    queryFn: () => batimentService.getAll({ with_trashed: 'true' }),
     staleTime: 5 * 60 * 1000,
     retry: 1,
     retryDelay: 1000,
@@ -296,7 +306,7 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
     refetch: refetchSalles
   } = useQuery({
     queryKey: ['salles'],
-    queryFn: () => salleService.getAll(),
+    queryFn: () => salleService.getAll({ with_trashed: 'true' }),
     staleTime: 5 * 60 * 1000,
     retry: 1,
     retryDelay: 1000,
@@ -345,6 +355,11 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['coffrets'] }),
   });
 
+  const restoreCoffretMutation = useMutation({
+    mutationFn: coffretService.restore,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['coffrets'] }),
+  });
+
   // Mutations - Equipements
   const createEquipementMutation = useMutation({
     mutationFn: equipementService.create,
@@ -359,6 +374,11 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
 
   const deleteEquipementMutation = useMutation({
     mutationFn: equipementService.delete,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['equipements'] }),
+  });
+
+  const restoreEquipementMutation = useMutation({
+    mutationFn: equipementService.restore,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['equipements'] }),
   });
 
@@ -379,6 +399,11 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['ports'] }),
   });
 
+  const restorePortMutation = useMutation({
+    mutationFn: portService.restore,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['ports'] }),
+  });
+
   // Mutations - Liaisons
   const createLiaisonMutation = useMutation({
     mutationFn: liaisonService.create,
@@ -393,6 +418,11 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
 
   const deleteLiaisonMutation = useMutation({
     mutationFn: liaisonService.delete,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['liaisons'] }),
+  });
+
+  const restoreLiaisonMutation = useMutation({
+    mutationFn: liaisonService.restore,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['liaisons'] }),
   });
 
@@ -447,6 +477,11 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['batiments'] }),
   });
 
+  const restoreBatimentMutation = useMutation({
+    mutationFn: batimentService.restore,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['batiments'] }),
+  });
+
   // Mutations - Salles
   const createSalleMutation = useMutation({
     mutationFn: salleService.create,
@@ -461,6 +496,11 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
 
   const deleteSalleMutation = useMutation({
     mutationFn: salleService.delete,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['salles'] }),
+  });
+
+  const restoreSalleMutation = useMutation({
+    mutationFn: salleService.restore,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['salles'] }),
   });
 
@@ -494,6 +534,16 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
     return deleteCoffretMutation.mutateAsync(id);
   };
 
+  const restoreCoffret = async (id: number) => {
+    return restoreCoffretMutation.mutateAsync(id);
+  };
+
+  const importCoffrets = async (file: File) => {
+    const result = await coffretService.import(file);
+    queryClient.invalidateQueries({ queryKey: ['coffrets'] });
+    return result;
+  };
+
   const addEquipement = async (data: EquipementCreateData) => {
     return createEquipementMutation.mutateAsync(data);
   };
@@ -504,6 +554,16 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
 
   const deleteEquipement = async (id: number) => {
     return deleteEquipementMutation.mutateAsync(id);
+  };
+
+  const restoreEquipement = async (id: number) => {
+    return restoreEquipementMutation.mutateAsync(id);
+  };
+
+  const importEquipements = async (file: File) => {
+    const result = await equipementService.import(file);
+    queryClient.invalidateQueries({ queryKey: ['equipements'] });
+    return result;
   };
 
   const addPort = async (data: PortCreateData) => {
@@ -518,6 +578,10 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
     return deletePortMutation.mutateAsync(id);
   };
 
+  const restorePort = async (id: number) => {
+    return restorePortMutation.mutateAsync(id);
+  };
+
   const addLiaison = async (data: LiaisonCreateData) => {
     return createLiaisonMutation.mutateAsync(data);
   };
@@ -528,6 +592,10 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
 
   const deleteLiaison = async (id: number) => {
     return deleteLiaisonMutation.mutateAsync(id);
+  };
+
+  const restoreLiaison = async (id: number) => {
+    return restoreLiaisonMutation.mutateAsync(id);
   };
 
   const addSystem = async (data: SystemCreateData) => {
@@ -566,6 +634,16 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
     return deleteBatimentMutation.mutateAsync(id);
   };
 
+  const restoreBatiment = async (id: number) => {
+    return restoreBatimentMutation.mutateAsync(id);
+  };
+
+  const importBatiments = async (file: File) => {
+    const result = await batimentService.import(file);
+    queryClient.invalidateQueries({ queryKey: ['batiments'] });
+    return result;
+  };
+
   const addSalle = async (data: SalleCreateData) => {
     return createSalleMutation.mutateAsync(data);
   };
@@ -576,6 +654,16 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
 
   const deleteSalle = async (id: number) => {
     return deleteSalleMutation.mutateAsync(id);
+  };
+
+  const restoreSalle = async (id: number) => {
+    return restoreSalleMutation.mutateAsync(id);
+  };
+
+  const importSalles = async (file: File) => {
+    const result = await salleService.import(file);
+    queryClient.invalidateQueries({ queryKey: ['salles'] });
+    return result;
   };
 
   const addMaintenance = async (data: MaintenanceCreateData) => {
@@ -644,15 +732,21 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
     addCoffret,
     updateCoffret,
     deleteCoffret,
+    restoreCoffret,
+    importCoffrets,
     addEquipement,
     updateEquipement,
     deleteEquipement,
+    restoreEquipement,
+    importEquipements,
     addPort,
     updatePort,
     deletePort,
+    restorePort,
     addLiaison,
     updateLiaison,
     deleteLiaison,
+    restoreLiaison,
     addSystem,
     updateSystem,
     deleteSystem,
@@ -662,9 +756,12 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
     addBatiment,
     updateBatiment,
     deleteBatiment,
+    restoreBatiment,
     addSalle,
     updateSalle,
     deleteSalle,
+    restoreSalle,
+    importSalles,
     addMaintenance,
     updateMaintenance,
     deleteMaintenance,
@@ -677,6 +774,7 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
     refetchSystems,
     refetchLans,
     refetchBatiments,
+    importBatiments,
     refetchSalles,
     refetchMaintenances,
     refetchStats,

@@ -19,8 +19,9 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { toast } from "@/hooks/use-toast";
-import { User, Mail, Shield, Save, Lock, ArrowLeft } from "lucide-react";
+import { User, Mail, Shield, Save, Lock, UserCog } from "lucide-react";
 import AppShell from "@/components/layout/AppShell";
+import PageHeader from "@/components/ui/page-header";
 
 const profileSchema = z.object({
   name: z.string().min(2, "Le nom doit contenir au moins 2 caractères"),
@@ -139,29 +140,19 @@ const Profile = () => {
   return (
     <AppShell>
       <div className="space-y-6">
-              {/* Header */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => navigate("/")}
-                    className="mb-2"
-                  >
-                    <ArrowLeft className="h-5 w-5" />
-                  </Button>
-                  <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Mon profil</h1>
-                    <p className="text-muted-foreground">
-                      Gérez vos informations personnelles et vos paramètres de compte
-                    </p>
-                  </div>
-                </div>
-              </div>
+        <PageHeader
+          title="Mon Profil"
+          description="Gérez vos informations personnelles et vos paramètres de compte"
+          icon={<UserCog className="h-6 w-6 text-primary" />}
+          breadcrumbs={[
+            { label: "Tableau de bord", href: "/" },
+            { label: "Profil" },
+          ]}
+        />
 
-              <div className="grid gap-6 md:grid-cols-2">
-                {/* Informations du profil */}
-                <Card>
+        <div className="grid gap-6 md:grid-cols-2">
+          {/* Informations du profil */}
+          <Card>
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <div>

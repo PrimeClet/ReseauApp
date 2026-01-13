@@ -4,11 +4,12 @@ export interface Salle {
   id: number;
   nom: string;
   batiment_id: number;
-  etage: string;
+  etage: number;
   capacite: number;
   type: string;
   etat: string;
   description?: string;
+  deleted_at?: string | null;
   created_at?: string;
   updated_at?: string;
   batiment?: {
@@ -28,15 +29,15 @@ export interface SalleListResponse {
 export interface SalleCreateData {
   nom: string;
   batiment_id: number;
-  etage: string;
+  etage?: number;
   capacite: number;
   type: string;
-  etat: string;
+  etat?: string;
   description?: string;
 }
 
 const salleService = {
-  async getAll(params?: { page?: number; per_page?: number; search?: string; batiment_id?: number }): Promise<SalleListResponse> {
+  async getAll(params?: { page?: number; per_page?: number; search?: string; batiment_id?: number; with_trashed?: string; only_trashed?: string; etat?: string }): Promise<SalleListResponse> {
     const response = await api.get<SalleListResponse>('/salles', { params });
     return response.data;
   },
@@ -58,6 +59,22 @@ const salleService = {
 
   async delete(id: number): Promise<void> {
     await api.delete(`/salles/${id}`);
+  },
+
+  async restore(id: number): Promise<Salle> {
+    const response = await api.post<{ data: Salle }>(`/salles/${id}/restore`);
+    return response.data.data;
+  },
+
+  async import(file: File): Promise<{ message: string; created: number; updated: number; errors: string[] }> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post<{ message: string; created: number; updated: number; errors: string[] }>('/salles/import', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
   },
 };
 

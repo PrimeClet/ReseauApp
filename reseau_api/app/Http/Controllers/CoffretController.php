@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Coffret;
+use App\Models\Batiment;
+use App\Models\Salle;
 use Illuminate\Http\Request;
 use OpenApi\Annotations as OA;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
@@ -68,10 +70,24 @@ class CoffretController extends Controller
          */
         $query = Coffret::with('equipements', 'metrics', 'batiment', 'salle');
 
-         // Filtrage par statut et recherche par nom
+        // Filtrer les supprimés ou non
+        if ($request->has('with_trashed') && $request->with_trashed === 'true') {
+            $query->withTrashed();
+        } elseif ($request->has('only_trashed') && $request->only_trashed === 'true') {
+            $query->onlyTrashed();
+        }
 
+        // Filtrage par statut et recherche par nom
         if ($request->has('status')) {
             $query->where('status', $request->status);
+        }
+
+        if ($request->has('batiment_id')) {
+            $query->where('batiment_id', $request->batiment_id);
+        }
+
+        if ($request->has('salle_id')) {
+            $query->where('salle_id', $request->salle_id);
         }
 
         if ($request->has('search')) {
@@ -82,7 +98,10 @@ class CoffretController extends Controller
             });
         }
 
-        $coffrets = $query->orderBy('nom')->paginate(15);
+        $perPage = (int) $request->get('per_page', 15);
+        $perPage = $perPage > 0 && $perPage <= 100 ? $perPage : 15;
+
+        $coffrets = $query->orderBy('nom')->paginate($perPage);
 
         return response()->json($coffrets);
     }
@@ -356,6 +375,147 @@ class CoffretController extends Controller
         // Retourner une réponse JSON
         return response()->json([
             'message' => 'Coffret supprimé avec succès.',
-        ], 200);  
+        ], 200);
+    }
+
+    /**
+     * Restore a soft deleted coffret.
+     */
+    public function restore($id)
+    {
+        if (!auth()->user()->isAdministrator()) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+
+        $coffret = Coffret::withTrashed()->findOrFail($id);
+        $coffret->restore();
+        $coffret->load('equipements', 'metrics', 'batiment', 'salle');
+
+        return response()->json([
+            'message' => 'Coffret restauré avec succès.',
+            'data' => $coffret,
+        ], 200);
+    }
+
+    /**
+     * Import coffrets from CSV file.
+     */
+    public function import(Request $request)
+    {
+        if (!auth()->user()->isAdministrator()) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+
+        $request->validate([
+            'file' => 'required|file|mimes:csv,txt|max:2048',
+        ]);
+
+        $file = $request->file('file');
+        $handle = fopen($file->getPathname(), 'r');
+
+        if (!$handle) {
+            return response()->json(['message' => 'Impossible de lire le fichier.'], 400);
+        }
+
+        $header = fgetcsv($handle, 0, ',');
+        if (!$header) {
+            fclose($handle);
+            return response()->json(['message' => 'Fichier CSV vide ou invalide.'], 400);
+        }
+
+        // Normaliser les headers (enlever BOM, trim, lowercase)
+        $header = array_map(function ($h) {
+            return strtolower(trim(preg_replace('/[\x00-\x1F\x80-\xFF]/', '', $h)));
+        }, $header);
+
+        $created = 0;
+        $updated = 0;
+        $errors = [];
+        $lineNumber = 1;
+
+        while (($row = fgetcsv($handle, 0, ',')) !== false) {
+            $lineNumber++;
+
+            if (count($row) !== count($header)) {
+                $errors[] = "Ligne {$lineNumber}: nombre de colonnes incorrect";
+                continue;
+            }
+
+            $data = array_combine($header, $row);
+
+            // Vérifier que le nom existe
+            $nom = $data['nom'] ?? null;
+            if (empty($nom)) {
+                $errors[] = "Ligne {$lineNumber}: le nom est requis";
+                continue;
+            }
+
+            // Trouver le bâtiment par nom si fourni
+            $batiment = null;
+            if (!empty($data['batiment'])) {
+                $batiment = Batiment::where('nom', $data['batiment'])->first();
+                if (!$batiment) {
+                    $errors[] = "Ligne {$lineNumber}: bâtiment '{$data['batiment']}' non trouvé";
+                    continue;
+                }
+            }
+
+            // Trouver la salle par nom si fournie
+            $salle = null;
+            if (!empty($data['salle'])) {
+                $salleQuery = Salle::where('nom', $data['salle']);
+                if ($batiment) {
+                    $salleQuery->where('batiment_id', $batiment->id);
+                }
+                $salle = $salleQuery->first();
+                if (!$salle) {
+                    $errors[] = "Ligne {$lineNumber}: salle '{$data['salle']}' non trouvée";
+                    continue;
+                }
+            }
+
+            // Chercher si le coffret existe déjà (par nom ou code)
+            $coffretQuery = Coffret::withTrashed()->where('nom', $nom);
+            $coffret = $coffretQuery->first();
+
+            if ($coffret) {
+                // Mise à jour
+                if ($batiment) $coffret->batiment_id = $batiment->id;
+                if ($salle) $coffret->salle_id = $salle->id;
+                if (isset($data['piece'])) $coffret->piece = $data['piece'];
+                if (isset($data['status'])) $coffret->status = $data['status'];
+                if ($coffret->trashed()) {
+                    $coffret->restore();
+                }
+                $coffret->save();
+                $updated++;
+            } else {
+                // Création
+                $code = $this->generateCoffretCode();
+                $newCoffret = Coffret::create([
+                    'code' => $code,
+                    'nom' => $nom,
+                    'batiment_id' => $batiment?->id,
+                    'salle_id' => $salle?->id,
+                    'piece' => $data['piece'] ?? '',
+                    'long' => isset($data['long']) && $data['long'] !== '' ? (float) $data['long'] : 0,
+                    'lat' => isset($data['lat']) && $data['lat'] !== '' ? (float) $data['lat'] : 0,
+                    'status' => $data['status'] ?? 'active',
+                ]);
+                // Générer le QR code
+                $qrCode = $this->generateQRCode($newCoffret);
+                $newCoffret->update(['qr_code' => $qrCode]);
+                $created++;
+            }
+        }
+
+        fclose($handle);
+
+        return response()->json([
+            'message' => 'Import terminé.',
+            'created' => $created,
+            'updated' => $updated,
+            'errors' => $errors,
+        ], 200);
     }
 }

@@ -111,17 +111,27 @@ class AuthController extends Controller
 
         Log::info(message: $token);
 
-
-        // AuditLog::log('User Login', $user);
+        // Charger les rôles et permissions
+        $user->load('roles.permissions');
 
         return response()->json([
             'status' => 200,
             'data' => [
-                'user' => $user,
+                'user' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'surname' => $user->surname,
+                    'username' => $user->username,
+                    'email' => $user->email,
+                    'phone' => $user->phone,
+                    'is_active' => $user->is_active,
+                    'roles' => $user->roles->pluck('name'),
+                    'permissions' => $user->getAllPermissions()->pluck('name'),
+                ],
                 'token' => $token,
             ],
             'message' => ['Connexion réussie'],
-            
+
         ]);
     }
 
@@ -167,6 +177,19 @@ class AuthController extends Controller
          *     )
          * )
          */
-        return response()->json($request->user());
+        $user = $request->user();
+        $user->load('roles.permissions');
+
+        return response()->json([
+            'id' => $user->id,
+            'name' => $user->name,
+            'surname' => $user->surname,
+            'username' => $user->username,
+            'email' => $user->email,
+            'phone' => $user->phone,
+            'is_active' => $user->is_active,
+            'roles' => $user->roles->pluck('name'),
+            'permissions' => $user->getAllPermissions()->pluck('name'),
+        ]);
     }
 }

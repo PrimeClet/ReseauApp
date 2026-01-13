@@ -27,12 +27,17 @@ export function PaginationEnhanced({
   const endItem = Math.min(currentPage * itemsPerPage, totalItems);
 
   const getVisiblePages = () => {
+    // Si une seule page, retourner juste [1]
+    if (totalPages <= 1) {
+      return [1];
+    }
+
     const delta = 2;
     const range = [];
     const rangeWithDots = [];
 
-    for (let i = Math.max(2, currentPage - delta); 
-         i <= Math.min(totalPages - 1, currentPage + delta); 
+    for (let i = Math.max(2, currentPage - delta);
+         i <= Math.min(totalPages - 1, currentPage + delta);
          i++) {
       range.push(i);
     }
@@ -47,20 +52,18 @@ export function PaginationEnhanced({
 
     if (currentPage + delta < totalPages - 1) {
       rangeWithDots.push('...', totalPages);
-    } else {
+    } else if (totalPages > 1) {
       rangeWithDots.push(totalPages);
     }
 
     return rangeWithDots;
   };
 
-  if (totalPages <= 1) return null;
-
   return (
     <div className={cn("flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between", className)}>
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <span>
-          Affichage de {startItem} à {endItem} sur {totalItems} éléments
+          Affichage de {totalItems > 0 ? startItem : 0} à {endItem} sur {totalItems} éléments
         </span>
         <div className="flex items-center gap-2">
           <span>Éléments par page:</span>

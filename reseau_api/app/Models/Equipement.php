@@ -11,6 +11,7 @@ class Equipement extends Model
     
     protected $fillable = [
         'equipement_code',
+        'qr_code',
         'name',
         'type',
         'description',
@@ -20,7 +21,8 @@ class Equipement extends Model
         'coffret_id',
         'batiment_id',
         'salle_id',
-        'status'
+        'status',
+        'nombre_ports'
     ];
 
     public function coffret()

@@ -28,7 +28,61 @@ import {
 } from "@/components/ui/dialog";
 import { jsPDF } from "jspdf";
 import { cartographyService } from "@/services";
-import { dia, shapes } from "@joint/core";
+import { dia, shapes, util } from "@joint/core";
+import { networkIconPaths, networkIconColors } from "@/assets/icons/network-icons";
+
+// Nœud réseau avec icône SVG intégrée
+const NetworkNodeWithIcon = dia.Element.define('network.NodeWithIcon', {
+  size: { width: 140, height: 90 },
+  attrs: {
+    body: {
+      refWidth: '100%',
+      refHeight: '100%',
+      rx: 12,
+      ry: 12,
+      strokeWidth: 2,
+      cursor: 'pointer',
+    },
+    iconBackground: {
+      r: 22,
+      refX: '50%',
+      refY: '38%',
+      fill: '#ffffff',
+      stroke: 'none',
+    },
+    icon: {
+      refX: '50%',
+      refY: '38%',
+      d: '',
+      fill: '#6b7280',
+      transform: 'translate(-12, -12) scale(1)',
+    },
+    label: {
+      fontSize: 11,
+      fontWeight: 600,
+      fontFamily: 'system-ui, -apple-system, sans-serif',
+      textAnchor: 'middle',
+      refX: '50%',
+      refY: '78%',
+      fill: '#1f2937',
+    },
+    statusBadge: {
+      r: 8,
+      refX: '90%',
+      refY: '12%',
+      stroke: '#ffffff',
+      strokeWidth: 2,
+    },
+  },
+}, {
+  markup: util.svg`
+    <rect @selector="body"/>
+    <circle @selector="iconBackground"/>
+    <path @selector="icon"/>
+    <text @selector="label"/>
+    <circle @selector="statusBadge"/>
+  `,
+});
 
 type LanNode = {
   id: string;
@@ -73,8 +127,6 @@ type LanTopology = {
   links: LanLink[];
 };
 
-// Les topologies seront chargées depuis l'API
-
 const statusColors: Record<string, string> = {
   up: "#10b981",
   warn: "#f59e0b",
@@ -82,83 +134,13 @@ const statusColors: Record<string, string> = {
   maintenance: "#64748b",
 };
 
-const roleColors: Record<LanNode["role"], string> = {
-  core: "#3b82f6",
-  distribution: "#2563eb",
-  access: "#10b981",
-  endpoint: "#64748b",
+// Obtenir les couleurs et l'icône pour un type d'équipement
+const getEquipmentStyle = (role: LanNode["role"], icon?: string) => {
+  const type = icon || role;
+  const colors = networkIconColors[type] || networkIconColors.default;
+  const iconPath = networkIconPaths[type] || networkIconPaths.default;
+  return { colors, iconPath };
 };
-
-const roleHierarchy: LanNode["role"][] = ["core", "distribution", "access", "endpoint"];
-
-// Icônes SVG pour les différents types d'équipements (encodées en data URI)
-const equipmentIcons: Record<string, string> = {
-  // Router/Core
-  router: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%233b82f6' stroke-width='2'%3E%3Crect x='2' y='6' width='20' height='12' rx='2'/%3E%3Cline x1='6' y1='10' x2='6' y2='14'/%3E%3Cline x1='10' y1='10' x2='10' y2='14'/%3E%3Cline x1='14' y1='10' x2='14' y2='14'/%3E%3Cline x1='18' y1='10' x2='18' y2='14'/%3E%3C/svg%3E",
-  // Switch/Distribution
-  switch: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%232563eb' stroke-width='2'%3E%3Crect x='2' y='4' width='20' height='16' rx='2'/%3E%3Cline x1='6' y1='8' x2='18' y2='8'/%3E%3Ccircle cx='6' cy='12' r='1.5' fill='%2310b981'/%3E%3Ccircle cx='10' cy='12' r='1.5' fill='%2310b981'/%3E%3Ccircle cx='14' cy='12' r='1.5' fill='%23f59e0b'/%3E%3Ccircle cx='18' cy='12' r='1.5' fill='%2310b981'/%3E%3Ccircle cx='6' cy='16' r='1.5' fill='%2310b981'/%3E%3Ccircle cx='10' cy='16' r='1.5' fill='%2364748b'/%3E%3Ccircle cx='14' cy='16' r='1.5' fill='%2310b981'/%3E%3Ccircle cx='18' cy='16' r='1.5' fill='%2310b981'/%3E%3C/svg%3E",
-  // Access Point
-  access: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2310b981' stroke-width='2'%3E%3Cpath d='M5 12.55a11 11 0 0 1 14.08 0'/%3E%3Cpath d='M1.42 9a16 16 0 0 1 21.16 0'/%3E%3Cpath d='M8.53 16.11a6 6 0 0 1 6.95 0'/%3E%3Ccircle cx='12' cy='20' r='1' fill='%2310b981'/%3E%3C/svg%3E",
-  // Server/Endpoint
-  server: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2'%3E%3Crect x='2' y='2' width='20' height='8' rx='2'/%3E%3Crect x='2' y='14' width='20' height='8' rx='2'/%3E%3Ccircle cx='6' cy='6' r='1' fill='%2310b981'/%3E%3Ccircle cx='6' cy='18' r='1' fill='%2310b981'/%3E%3Cline x1='10' y1='6' x2='18' y2='6'/%3E%3Cline x1='10' y1='18' x2='18' y2='18'/%3E%3C/svg%3E",
-  // Computer/Workstation
-  computer: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2'%3E%3Crect x='2' y='3' width='20' height='14' rx='2'/%3E%3Cline x1='8' y1='21' x2='16' y2='21'/%3E%3Cline x1='12' y1='17' x2='12' y2='21'/%3E%3C/svg%3E",
-  // Firewall
-  firewall: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ef4444' stroke-width='2'%3E%3Cpath d='M12 2L3 7v6c0 5.5 3.8 10.7 9 12 5.2-1.3 9-6.5 9-12V7l-9-5z'/%3E%3Cline x1='9' y1='12' x2='15' y2='12'/%3E%3C/svg%3E",
-  // Default network device
-  default: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cline x1='2' y1='12' x2='22' y2='12'/%3E%3Cpath d='M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z'/%3E%3C/svg%3E",
-};
-
-// Mapper le rôle vers l'icône appropriée
-const getIconForRole = (role: LanNode["role"], icon?: string): string => {
-  if (icon && equipmentIcons[icon]) return equipmentIcons[icon];
-  switch (role) {
-    case "core": return equipmentIcons.router;
-    case "distribution": return equipmentIcons.switch;
-    case "access": return equipmentIcons.access;
-    case "endpoint": return equipmentIcons.server;
-    default: return equipmentIcons.default;
-  }
-};
-
-// Créer un élément personnalisé avec icône
-const NetworkNode = shapes.standard.Rectangle.define("network.Node", {
-  attrs: {
-    body: {},
-    icon: {},
-    label: {},
-    siteLabel: {},
-    ipLabel: {},
-    statusIndicator: {},
-  },
-}, {
-  markup: [
-    {
-      tagName: "rect",
-      selector: "body",
-    },
-    {
-      tagName: "image",
-      selector: "icon",
-    },
-    {
-      tagName: "text",
-      selector: "label",
-    },
-    {
-      tagName: "text",
-      selector: "siteLabel",
-    },
-    {
-      tagName: "text",
-      selector: "ipLabel",
-    },
-    {
-      tagName: "circle",
-      selector: "statusIndicator",
-    },
-  ],
-});
 
 // Calculer les positions automatiques en topologie hiérarchique (arbre)
 const computeAutoLayoutPositions = (nodes: LanNode[], links: LanLink[]) => {
@@ -166,7 +148,7 @@ const computeAutoLayoutPositions = (nodes: LanNode[], links: LanLink[]) => {
   const centerX = 600;
   const startY = 80;
   const levelSpacing = 180;
-  const nodeWidth = 180;
+  const nodeWidth = 200;
 
   // Grouper par rôle avec ordre hiérarchique
   const coreNodes = nodes.filter((n) => n.role === "core");
@@ -246,7 +228,6 @@ const LanCartographyContent = () => {
 
   // Callback ref pour détecter quand le container est monté
   const setContainerRef = useCallback((node: HTMLDivElement | null) => {
-    // Nettoyer l'ancien graphe si on reçoit un nouveau container
     if (node && node !== containerRef.current) {
       if (paperRef.current) {
         paperRef.current.remove();
@@ -259,7 +240,6 @@ const LanCartographyContent = () => {
     }
     containerRef.current = node;
     setContainerReady(!!node);
-    console.log('Container ref updated:', !!node);
   }, []);
 
   // Charger la liste des LANs
@@ -312,7 +292,6 @@ const LanCartographyContent = () => {
         setIsLoadingSalles(true);
         const sallesList = await cartographyService.getSalles(selectedBatimentId);
         setSalles(sallesList);
-        // Réinitialiser la salle sélectionnée si elle n'appartient plus au bâtiment
         if (selectedSalleId && !sallesList.find(s => s.id === selectedSalleId)) {
           setSelectedSalleId(undefined);
         }
@@ -331,15 +310,12 @@ const LanCartographyContent = () => {
     const loadTopology = async () => {
       try {
         setIsLoadingTopology(true);
-        // Reset containerReady pour forcer le re-mount du container
         setContainerReady(false);
-        // Reset l'alerte pour qu'elle s'affiche à nouveau si nécessaire
         setShowNoLinksAlert(true);
 
         let response: LanTopology;
 
         if (filterMode === "all") {
-          // Charger toute la topologie sans filtre
           response = await cartographyService.getLanTopology();
         } else if (filterMode === "lan" && selectedTopologyId) {
           response = await cartographyService.getLanTopology(selectedTopologyId);
@@ -348,13 +324,11 @@ const LanCartographyContent = () => {
         } else if (filterMode === "batiment" && selectedBatimentId) {
           response = await cartographyService.getLanTopology(undefined, { batiment_id: selectedBatimentId });
         } else {
-          // Réinitialiser la topologie si les conditions ne sont pas remplies
           setTopology(null);
           setIsLoadingTopology(false);
           return;
         }
 
-        console.log('Topologie chargée:', response.nodes.length, 'nodes,', response.links.length, 'links');
         setTopology(response);
       } catch (error) {
         console.error('Erreur lors du chargement de la topologie:', error);
@@ -367,21 +341,12 @@ const LanCartographyContent = () => {
     loadTopology();
   }, [filterMode, selectedTopologyId, selectedBatimentId, selectedSalleId]);
 
-  // Initialisation de JointJS
+  // Initialisation de JointJS avec les nouveaux noeuds personnalisés
   useEffect(() => {
-    console.log('JointJS useEffect triggered:', {
-      containerRef: !!containerRef.current,
-      containerReady,
-      topology: topology ? `${topology.nodes.length} nodes` : 'null',
-      isLoadingTopology
-    });
-
     if (!containerRef.current || !containerReady || !topology || isLoadingTopology) {
-      console.log('JointJS: Conditions not met, skipping initialization');
       return;
     }
     if (topology.nodes.length === 0) {
-      console.log('JointJS: No nodes, skipping initialization');
       return;
     }
 
@@ -398,9 +363,7 @@ const LanCartographyContent = () => {
     }
     container.innerHTML = '';
 
-    console.log('JointJS: Initialisation avec', topology.nodes.length, 'nodes et', topology.links.length, 'links');
-
-    // Créer le graphique - utiliser shapes standard sans namespace personnalisé
+    // Créer le graphique
     const graph = new dia.Graph();
     graphRef.current = graph;
 
@@ -415,17 +378,16 @@ const LanCartographyContent = () => {
       background: {
         color: "#f8fafc",
       },
-      async: true, // Améliore les performances
+      async: true,
       sorting: dia.Paper.sorting.APPROX,
     });
     paperRef.current = paper;
 
-    // Implémenter le pan (déplacement du diagramme)
+    // Pan et zoom
     let isPanning = false;
     let lastPanPoint: { x: number; y: number } | null = null;
     let spacePressed = false;
 
-    // Détecter si la touche Espace est enfoncée
     const handlePanKeyDown = (evt: KeyboardEvent) => {
       if (evt.code === 'Space') {
         spacePressed = true;
@@ -442,7 +404,6 @@ const LanCartographyContent = () => {
     };
 
     const handlePanStart = (evt: MouseEvent) => {
-      // Démarrer le pan avec clic droit, molette, ou clic gauche + Espace
       if (evt.button === 2 || evt.button === 1 || (evt.button === 0 && spacePressed)) {
         isPanning = true;
         lastPanPoint = { x: evt.clientX, y: evt.clientY };
@@ -465,14 +426,9 @@ const LanCartographyContent = () => {
     const handlePanEnd = () => {
       isPanning = false;
       lastPanPoint = null;
-      if (!spacePressed) {
-        container.style.cursor = 'default';
-      } else {
-        container.style.cursor = 'grab';
-      }
+      container.style.cursor = spacePressed ? 'grab' : 'default';
     };
 
-    // Gérer le zoom avec la molette
     const handleWheel = (evt: WheelEvent) => {
       if (evt.ctrlKey || evt.metaKey) {
         evt.preventDefault();
@@ -483,7 +439,6 @@ const LanCartographyContent = () => {
       }
     };
 
-    // Ajouter les événements
     window.addEventListener('keydown', handlePanKeyDown);
     window.addEventListener('keyup', handlePanKeyUp);
     container.addEventListener('mousedown', handlePanStart);
@@ -491,7 +446,7 @@ const LanCartographyContent = () => {
     container.addEventListener('mouseup', handlePanEnd);
     container.addEventListener('mouseleave', handlePanEnd);
     container.addEventListener('wheel', handleWheel, { passive: false });
-    container.addEventListener('contextmenu', (e) => e.preventDefault()); // Désactiver le menu contextuel pour le clic droit
+    container.addEventListener('contextmenu', (e) => e.preventDefault());
 
     // Calculer les positions
     const layoutPositions = computeAutoLayoutPositions(topology.nodes, topology.links);
@@ -499,121 +454,55 @@ const LanCartographyContent = () => {
     // Map pour associer nos IDs aux éléments JointJS
     const nodeMap = new Map<string, dia.Element>();
 
-    // Créer les éléments pour chaque nœud avec icône
+    // Créer les éléments pour chaque nœud avec icône SVG
     topology.nodes.forEach((nodeData) => {
       const position = layoutPositions.get(nodeData.id) || { x: 100, y: 100 };
-      const roleColor = roleColors[nodeData.role] || roleColors.endpoint;
+      const { colors, iconPath } = getEquipmentStyle(nodeData.role, nodeData.icon);
       const statusColor = statusColors[nodeData.status] || statusColors.down;
-      const iconUrl = getIconForRole(nodeData.role, nodeData.icon);
+      const truncatedName = nodeData.name.length > 16 ? nodeData.name.substring(0, 16) + '...' : nodeData.name;
 
-      // Créer un groupe avec icône et texte
-      const nodeElement = new shapes.standard.Rectangle({
+      // Créer le nœud avec icône intégrée
+      const nodeElement = new NetworkNodeWithIcon({
         position: { x: position.x, y: position.y },
-        size: { width: 160, height: 90 },
+        size: { width: 140, height: 90 },
         attrs: {
           body: {
-            fill: "#ffffff",
-            stroke: statusColor === statusColors.up ? roleColor : statusColor,
-            strokeWidth: 3,
-            rx: 10,
-            ry: 10,
-            cursor: "pointer",
+            fill: colors.bg,
+            stroke: colors.border,
+            filter: 'drop-shadow(0 3px 6px rgba(0, 0, 0, 0.15))',
+          },
+          iconBackground: {
+            fill: '#ffffff',
+            opacity: 0.9,
+          },
+          icon: {
+            d: iconPath,
+            fill: colors.icon,
           },
           label: {
-            text: `${nodeData.name}`,
-            fill: "#1f2937",
-            fontSize: 12,
-            fontWeight: "bold",
-            textAnchor: "middle",
-            refY: 55,
-            refX: "50%",
+            text: truncatedName,
+          },
+          statusBadge: {
+            fill: statusColor,
           },
         },
       });
 
-      // Stocker les données du nœud pour les événements
+      // Stocker les données du nœud
       (nodeElement as any).nodeData = nodeData;
 
       graph.addCell(nodeElement);
       nodeMap.set(nodeData.id, nodeElement);
-
-      // Ajouter l'icône comme élément séparé positionné sur le noeud
-      const iconElement = new shapes.standard.Image({
-        position: { x: position.x + 56, y: position.y + 8 },
-        size: { width: 48, height: 36 },
-        attrs: {
-          image: {
-            xlinkHref: iconUrl,
-            cursor: "pointer",
-          },
-          body: {
-            fill: "transparent",
-            stroke: "none",
-          },
-        },
-      });
-      (iconElement as any).nodeData = nodeData;
-      (iconElement as any).parentNodeId = nodeData.id;
-      graph.addCell(iconElement);
-
-      // Ajouter le badge de statut
-      const statusBadge = new shapes.standard.Circle({
-        position: { x: position.x + 140, y: position.y + 5 },
-        size: { width: 16, height: 16 },
-        attrs: {
-          body: {
-            fill: statusColor,
-            stroke: "#ffffff",
-            strokeWidth: 2,
-            cursor: "pointer",
-          },
-        },
-      });
-      (statusBadge as any).nodeData = nodeData;
-      (statusBadge as any).parentNodeId = nodeData.id;
-      graph.addCell(statusBadge);
-
-      // Ajouter l'IP sous le nom
-      const ipLabel = new shapes.standard.Rectangle({
-        position: { x: position.x + 10, y: position.y + 68 },
-        size: { width: 140, height: 18 },
-        attrs: {
-          body: {
-            fill: "transparent",
-            stroke: "none",
-          },
-          label: {
-            text: nodeData.ip,
-            fill: "#6b7280",
-            fontSize: 10,
-            fontFamily: "monospace",
-            textAnchor: "middle",
-            refX: "50%",
-            refY: "50%",
-            cursor: "pointer",
-          },
-        },
-      });
-      (ipLabel as any).nodeData = nodeData;
-      (ipLabel as any).parentNodeId = nodeData.id;
-      graph.addCell(ipLabel);
-
-      console.log(`Node créé: ${nodeData.id} -> JointJS ID: ${nodeElement.id}`);
     });
 
     // Créer les liens
-    console.log('JointJS: Création de', topology.links.length, 'liens');
     topology.links.forEach((linkData, index) => {
       const sourceElement = nodeMap.get(linkData.from);
       const targetElement = nodeMap.get(linkData.to);
 
       if (!sourceElement || !targetElement) {
-        console.warn(`Lien ${index}: source=${linkData.from} ou target=${linkData.to} non trouvé dans nodeMap`);
-        console.warn('NodeMap keys:', Array.from(nodeMap.keys()));
         return;
       }
-
-      console.log(`Lien ${index}: ${linkData.from} -> ${linkData.to}`);
 
       const strokeColor =
         linkData.status === "up"
@@ -622,63 +511,54 @@ const LanCartographyContent = () => {
             ? "#f59e0b"
             : "#ef4444";
       const strokeWidth = linkData.type === "fiber" ? 4 : linkData.type === "copper" ? 3 : 2;
-      const strokeDasharray = linkData.type === "wireless" ? "6 4" : undefined;
+      const strokeDasharray = linkData.type === "wireless" ? "8 4" : undefined;
 
       const labels: any[] = [];
 
-      // Ajouter le label du port source
       if (linkData.fromPort) {
         labels.push({
-          position: {
-            distance: 0.15,
-            offset: { x: 0, y: -12 },
-          },
+          position: { distance: 0.15, offset: { x: 0, y: -12 } },
           attrs: {
             text: {
               text: linkData.fromPort,
               fill: "#1f2937",
               fontSize: 9,
               fontWeight: "bold",
-              fontFamily: "monospace",
+              fontFamily: "ui-monospace, monospace",
             },
             rect: {
               fill: "#ffffff",
               stroke: "#d1d5db",
               strokeWidth: 1,
-              rx: 2,
-              ry: 2,
+              rx: 3,
+              ry: 3,
             },
           },
         });
       }
 
-      // Ajouter le label du port cible
       if (linkData.toPort) {
         labels.push({
-          position: {
-            distance: 0.85,
-            offset: { x: 0, y: -12 },
-          },
+          position: { distance: 0.85, offset: { x: 0, y: -12 } },
           attrs: {
             text: {
               text: linkData.toPort,
               fill: "#1f2937",
               fontSize: 9,
               fontWeight: "bold",
-              fontFamily: "monospace",
+              fontFamily: "ui-monospace, monospace",
             },
             rect: {
               fill: "#ffffff",
               stroke: "#d1d5db",
               strokeWidth: 1,
-              rx: 2,
-              ry: 2,
+              rx: 3,
+              ry: 3,
             },
           },
         });
       }
 
-      // IMPORTANT: Utiliser les éléments JointJS directement comme source/target
       const link = new shapes.standard.Link({
         source: { id: sourceElement.id },
         target: { id: targetElement.id },
@@ -700,123 +580,24 @@ const LanCartographyContent = () => {
         },
         router: {
           name: "manhattan",
-          args: {
-            padding: 20,
-          },
+          args: { padding: 20 },
         },
         connector: {
           name: "rounded",
-          args: {
-            radius: 10,
-          },
+          args: { radius: 10 },
         },
       });
 
-      // Stocker les données du lien
       (link as any).linkData = linkData;
-
       graph.addCell(link);
     });
 
-    console.log('JointJS: Graph contient', graph.getCells().length, 'cellules (nodes:', graph.getElements().length, ', links:', graph.getLinks().length, ')');
-
-    // Gérer la création de liens en mode édition
-    const handleNodeClick = (nodeView: dia.CellView, evt: dia.Event) => {
-      if (!isEditMode) return;
-      
-      const nodeId = nodeView.model.id as string;
-      
-      if (!sourceNodeId) {
-        // Sélectionner le nœud source
-        setSourceNodeId(nodeId);
-        nodeView.highlight();
-      } else if (sourceNodeId !== nodeId) {
-        // Créer un lien entre le nœud source et le nœud cible
-        const sourceNode = nodeMap.get(sourceNodeId);
-        const targetNode = nodeMap.get(nodeId);
-        
-        if (sourceNode && targetNode) {
-          // Vérifier si le lien existe déjà
-          const existingLink = graph.getLinks().find((link) => {
-            const source = link.getSourceElement();
-            const target = link.getTargetElement();
-            return source?.id === sourceNodeId && target?.id === nodeId;
-          });
-
-          if (!existingLink) {
-            // Créer un nouveau lien
-            const newLinkData: LanLink = {
-              id: `link-${Date.now()}`,
-              from: sourceNodeId,
-              to: nodeId,
-              type: "copper",
-              vlan: topology.vlan,
-              status: "up",
-              bandwidth: "1 Gbps",
-            };
-
-            const newLink = new shapes.standard.Link({
-              source: { id: sourceNodeId },
-              target: { id: nodeId },
-              attrs: {
-                line: {
-                  stroke: "#10b981",
-                  strokeWidth: 2,
-                  strokeLinecap: "round",
-                  strokeLinejoin: "round",
-                  connection: true,
-                  targetMarker: null,
-                  sourceMarker: null,
-                },
-              },
-              router: {
-                name: "orthogonal",
-                args: {
-                  padding: 10,
-                },
-              },
-              connector: {
-                name: "rounded",
-              },
-            });
-
-            (newLink as any).linkData = newLinkData;
-            newLink.set("id", newLinkData.id);
-
-            newLink.on("pointerclick", () => {
-              setSelectedLink(newLinkData);
-            });
-
-            graph.addCell(newLink);
-          }
-        }
-
-        // Réinitialiser la sélection
-        const sourceView = paper.findViewByModel(sourceNodeId);
-        if (sourceView) {
-          sourceView.unhighlight();
-        }
-        setSourceNodeId(null);
-      } else {
-        // Désélectionner si on clique sur le même nœud
-        nodeView.unhighlight();
-        setSourceNodeId(null);
-      }
-    };
-
-    // Utiliser les événements du Paper (plus fiables que findViewByModel)
+    // Événements du Paper
     paper.on('element:pointerclick', (elementView: dia.ElementView) => {
       const element = elementView.model;
       const nodeData = (element as any).nodeData;
 
-      console.log('Element clicked:', element.id, 'nodeData:', nodeData?.name);
-
       if (!nodeData) return;
-
-      if (isEditMode) {
-        handleNodeClick(elementView, {} as dia.Event);
-        return;
-      }
 
       setSelectedLink(null);
       setSelectedNode(nodeData);
@@ -826,15 +607,12 @@ const LanCartographyContent = () => {
       const link = linkView.model;
       const linkData = (link as any).linkData;
 
-      console.log('Link clicked:', link.id, 'linkData:', linkData);
-
       if (linkData) {
         setSelectedNode(null);
         setSelectedLink(linkData);
       }
     });
 
-    // Gérer le clic droit sur les liens
     paper.on('link:contextmenu', (linkView: dia.LinkView, evt: dia.Event) => {
       evt.preventDefault();
       if (confirm("Voulez-vous supprimer ce lien ?")) {
@@ -842,35 +620,10 @@ const LanCartographyContent = () => {
       }
     });
 
-    // Gérer la suppression de liens avec la touche Suppr
-    handleKeyDownRef.current = (evt: KeyboardEvent) => {
-      if ((evt.key === "Delete" || evt.key === "Backspace") && isEditMode) {
-        const selectedLinks: dia.Link[] = [];
-        if (graphRef.current) {
-          graphRef.current.getLinks().forEach((link) => {
-            if (paperRef.current) {
-              const linkView = paperRef.current.findViewByModel(link.id);
-              if (linkView && (linkView as any).isSelected?.()) {
-                selectedLinks.push(link);
-              }
-            }
-          });
-          if (selectedLinks.length > 0) {
-            graphRef.current.removeCells(selectedLinks);
-          }
-        }
-      }
-    };
-
-    if (handleKeyDownRef.current) {
-      window.addEventListener("keydown", handleKeyDownRef.current);
-    }
-
-    // Ajuster la vue pour voir tous les éléments
-    paper.scaleContentToFit({ padding: 20, minScale: 0.5, maxScale: 1 });
+    // Ajuster la vue
+    paper.scaleContentToFit({ padding: 40, minScale: 0.4, maxScale: 1.2 });
 
     return () => {
-      // Nettoyer les événements de pan
       window.removeEventListener('keydown', handlePanKeyDown);
       window.removeEventListener('keyup', handlePanKeyUp);
       container.removeEventListener('mousedown', handlePanStart);
@@ -878,10 +631,7 @@ const LanCartographyContent = () => {
       container.removeEventListener('mouseup', handlePanEnd);
       container.removeEventListener('mouseleave', handlePanEnd);
       container.removeEventListener('wheel', handleWheel);
-      
-      if (handleKeyDownRef.current) {
-        window.removeEventListener("keydown", handleKeyDownRef.current);
-      }
+
       if (paperRef.current) {
         paperRef.current.remove();
         paperRef.current = null;
@@ -891,7 +641,6 @@ const LanCartographyContent = () => {
         graphRef.current = null;
       }
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [topology, isLoadingTopology, containerReady]);
 
   const exportTopology = useCallback(
@@ -905,7 +654,7 @@ const LanCartographyContent = () => {
           `VLAN;${topology.vlan}`,
           "",
           "Équipements",
-          "ID;Nom;Rôle;Statut;Site;IP;Modèle;Position X (%);Position Y (%)",
+          "ID;Nom;Rôle;Statut;Site;IP;Modèle",
           ...topology.nodes.map((node) => {
             return [
               node.id,
@@ -915,8 +664,6 @@ const LanCartographyContent = () => {
               node.site,
               node.ip,
               node.model,
-              node.position.x.toFixed(2),
-              node.position.y.toFixed(2),
             ].join(";");
           }),
           "",
@@ -967,28 +714,22 @@ const LanCartographyContent = () => {
           if (y > pageHeight - 40) {
             doc.addPage();
             y = 60;
-            doc.setFontSize(14);
-            doc.text(`${title} (suite)`, 40, y);
-            y += 18;
-            doc.setFontSize(11);
           }
           doc.text(row, 40, y);
           y += 14;
         });
-        if (rows.length) {
-          y += 12;
-        }
+        if (rows.length) y += 12;
       };
 
       const nodeRows = topology.nodes.map((node) => {
-        return `${node.name} (${node.role}) — IP ${node.ip} — ${node.site} — Position ${node.position.x.toFixed(1)}% / ${node.position.y.toFixed(1)}%`;
+        return `${node.name} (${node.role}) — IP ${node.ip} — ${node.site}`;
       });
       addSection("Équipements", nodeRows);
 
       const linkRows = topology.links.map((link) => {
         const fromName = topology.nodes.find((n) => n.id === link.from)?.name ?? link.from;
         const toName = topology.nodes.find((n) => n.id === link.to)?.name ?? link.to;
-        return `${link.id} : ${fromName} (${link.fromPort ?? "?"}) → ${toName} (${link.toPort ?? "?"}) — ${link.type} ${link.bandwidth} — VLAN ${link.vlan}`;
+        return `${fromName} (${link.fromPort ?? "?"}) → ${toName} (${link.toPort ?? "?"}) — ${link.type} ${link.bandwidth}`;
       });
       addSection("Liaisons", linkRows);
 
@@ -1003,7 +744,7 @@ const LanCartographyContent = () => {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Cartographie des LANs</h1>
           <p className="text-muted-foreground">
-            Visualisation interactive des équipements et de leurs interconnexions réseau avec JointJS
+            Visualisation interactive des équipements et de leurs interconnexions réseau
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap justify-end">
@@ -1040,8 +781,8 @@ const LanCartographyContent = () => {
           )}
 
           {filterMode === "batiment" && (
-            <Select 
-              value={selectedBatimentId?.toString()} 
+            <Select
+              value={selectedBatimentId?.toString()}
               onValueChange={(value) => setSelectedBatimentId(value ? parseInt(value) : undefined)}
               disabled={isLoadingBatiments}
             >
@@ -1060,8 +801,8 @@ const LanCartographyContent = () => {
 
           {filterMode === "salle" && (
             <>
-              <Select 
-                value={selectedBatimentId?.toString()} 
+              <Select
+                value={selectedBatimentId?.toString()}
                 onValueChange={(value) => {
                   setSelectedBatimentId(value ? parseInt(value) : undefined);
                   setSelectedSalleId(undefined);
@@ -1079,8 +820,8 @@ const LanCartographyContent = () => {
                   ))}
                 </SelectContent>
               </Select>
-              <Select 
-                value={selectedSalleId?.toString()} 
+              <Select
+                value={selectedSalleId?.toString()}
                 onValueChange={(value) => setSelectedSalleId(value ? parseInt(value) : undefined)}
                 disabled={isLoadingSalles || !selectedBatimentId}
               >
@@ -1098,25 +839,13 @@ const LanCartographyContent = () => {
             </>
           )}
           <Button
-            variant={isEditMode ? "default" : "outline"}
-            size="sm"
-            onClick={() => {
-              setIsEditMode(!isEditMode);
-              setSourceNodeId(null);
-            }}
-            className="gap-2"
-          >
-            <Plus className="h-4 w-4" />
-            {isEditMode ? "Mode édition" : "Mode visualisation"}
-          </Button>
-          <Button
             variant="outline"
             size="icon"
             onClick={() => {
               if (paperRef.current && graphRef.current) {
                 const cells = graphRef.current.getCells();
                 if (cells.length > 0) {
-                  paperRef.current.scaleContentToFit({ padding: 20, minScale: 0.5, maxScale: 1 });
+                  paperRef.current.scaleContentToFit({ padding: 40, minScale: 0.4, maxScale: 1.2 });
                 }
               }
             }}
@@ -1125,26 +854,26 @@ const LanCartographyContent = () => {
           </Button>
           <Button variant="outline" size="sm" className="gap-2" onClick={() => exportTopology("csv")}>
             <FileSpreadsheet className="h-4 w-4" />
-            Export CSV
+            CSV
           </Button>
           <Button variant="outline" size="sm" className="gap-2" onClick={() => exportTopology("pdf")}>
             <FileDown className="h-4 w-4" />
-            Export PDF
+            PDF
           </Button>
         </div>
       </div>
 
       <div className="grid grid-cols-1">
         <Card>
-          <CardHeader>
-            <CardTitle>{topology?.name || 'Chargement...'}</CardTitle>
-            <CardDescription>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg">{topology?.name || 'Chargement...'}</CardTitle>
+            <CardDescription className="text-sm">
               {topology?.description || ''}
               {topology?.subnet && ` — ${topology.subnet}`}
               {topology?.vlan && ` (VLAN ${topology.vlan})`}
             </CardDescription>
           </CardHeader>
-          <CardContent className="flex flex-col justify-center overflow-auto">
+          <CardContent className="flex flex-col justify-center overflow-auto p-4">
             {isLoadingTopology ? (
               <div className="flex items-center justify-center h-[600px]">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -1162,9 +891,6 @@ const LanCartographyContent = () => {
                         : filterMode === "salle" && selectedBatimentId && !selectedSalleId
                           ? "Sélectionnez une salle"
                           : "Chargement..."}
-                </p>
-                <p className="text-sm mt-2">
-                  Utilisez les filtres ci-dessus pour afficher la cartographie
                 </p>
               </div>
             ) : topology.nodes.length === 0 ? (
@@ -1199,7 +925,6 @@ const LanCartographyContent = () => {
                       <button
                         onClick={() => setShowNoLinksAlert(false)}
                         className="text-white hover:text-red-200 transition-colors p-1"
-                        aria-label="Fermer"
                       >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -1215,10 +940,10 @@ const LanCartographyContent = () => {
                     width: "100%",
                     maxWidth: "1400px",
                     margin: "0 auto",
-                    height: "900px",
+                    height: "800px",
                     minHeight: "600px",
                     border: "1px solid #e5e7eb",
-                    borderRadius: "8px",
+                    borderRadius: "12px",
                     backgroundColor: "#f9fafb",
                     position: "relative",
                     overflow: "auto",
@@ -1233,22 +958,84 @@ const LanCartographyContent = () => {
       <Tabs defaultValue="legend" className="w-full">
         <TabsList>
           <TabsTrigger value="legend">Légende</TabsTrigger>
-          <TabsTrigger value="actions">Actions rapides</TabsTrigger>
+          <TabsTrigger value="actions">Contrôles</TabsTrigger>
         </TabsList>
         <TabsContent value="legend" className="mt-4">
           <Card>
-            <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-6 text-sm">
-              <div>
-                <p className="font-semibold">Rôles</p>
-                <p className="text-muted-foreground">Core (Bleu), Distribution (Bleu foncé), Access (Vert), Endpoint (Gris)</p>
-              </div>
-              <div>
-                <p className="font-semibold">Statuts</p>
-                <p className="text-muted-foreground">Vert = up, Orange = instable, Rouge = down, Gris = maintenance</p>
-              </div>
-              <div>
-                <p className="font-semibold">Types de lien</p>
-                <p className="text-muted-foreground">Fibre (épais), Cuivre (moyen), Sans-fil (pointillé)</p>
+            <CardContent className="pt-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div>
+                  <p className="font-semibold mb-3 text-sm">Types d'équipements</p>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 rounded" style={{ backgroundColor: "#3b82f6" }}></div>
+                      <span>Router / Core</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 rounded" style={{ backgroundColor: "#8b5cf6" }}></div>
+                      <span>Switch / Distribution</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 rounded" style={{ backgroundColor: "#10b981" }}></div>
+                      <span>Access Point</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 rounded" style={{ backgroundColor: "#64748b" }}></div>
+                      <span>Server / Endpoint</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 rounded" style={{ backgroundColor: "#ef4444" }}></div>
+                      <span>Firewall</span>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <p className="font-semibold mb-3 text-sm">Statuts</p>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: "#10b981" }}></div>
+                      <span>En ligne (up)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: "#f59e0b" }}></div>
+                      <span>Instable (warn)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: "#ef4444" }}></div>
+                      <span>Hors ligne (down)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: "#64748b" }}></div>
+                      <span>Maintenance</span>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <p className="font-semibold mb-3 text-sm">Types de liaison</p>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-1 rounded" style={{ backgroundColor: "#10b981" }}></div>
+                      <span>Fibre (épais)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-0.5 rounded" style={{ backgroundColor: "#10b981" }}></div>
+                      <span>Cuivre (moyen)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 border-t-2 border-dashed" style={{ borderColor: "#10b981" }}></div>
+                      <span>Sans-fil (pointillé)</span>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <p className="font-semibold mb-3 text-sm">Éléments visuels</p>
+                  <div className="space-y-2 text-sm text-muted-foreground">
+                    <p>• Points de connexion aux 4 coins</p>
+                    <p>• Badge de statut en haut à droite</p>
+                    <p>• Nom de l'équipement en bas</p>
+                    <p>• Labels de ports sur les liaisons</p>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -1256,16 +1043,26 @@ const LanCartographyContent = () => {
         <TabsContent value="actions" className="mt-4">
           <Card>
             <CardContent className="pt-6">
-              <p className="text-sm text-muted-foreground mb-2">
-                <strong>Contrôles JointJS :</strong>
-              </p>
-              <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
-                <li>Glisser-déposer : Déplacer les nœuds en cliquant dessus et en les déplaçant</li>
-                <li>Déplacer le diagramme : Maintenir la touche <strong>Espace</strong> + clic gauche, ou utiliser le clic droit ou la molette pour déplacer tout le diagramme</li>
-                <li>Zoom : Maintenir <strong>Ctrl</strong> (ou <strong>Cmd</strong> sur Mac) + molette de la souris pour zoomer</li>
-                <li>Connexions : Les connexions sont automatiquement mises à jour lors du déplacement des nœuds</li>
-                <li>Cliquer sur un lien : Afficher les détails de la connexion</li>
-              </ul>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
+                <div>
+                  <p className="font-semibold mb-2">Navigation</p>
+                  <ul className="text-muted-foreground space-y-1 list-disc list-inside">
+                    <li><strong>Espace + clic gauche</strong> ou <strong>clic droit</strong> : Déplacer le diagramme</li>
+                    <li><strong>Ctrl/Cmd + molette</strong> : Zoomer</li>
+                    <li><strong>Clic</strong> sur un nœud : Voir les détails</li>
+                    <li><strong>Clic</strong> sur une liaison : Voir les informations</li>
+                  </ul>
+                </div>
+                <div>
+                  <p className="font-semibold mb-2">Interaction</p>
+                  <ul className="text-muted-foreground space-y-1 list-disc list-inside">
+                    <li>Glisser-déposer pour déplacer les nœuds</li>
+                    <li>Les liaisons suivent automatiquement</li>
+                    <li>Clic droit sur une liaison pour la supprimer</li>
+                    <li>Bouton Recadrer pour ajuster la vue</li>
+                  </ul>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -1274,10 +1071,10 @@ const LanCartographyContent = () => {
       <Dialog open={!!selectedLink} onOpenChange={(open) => !open && setSelectedLink(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Informations de la connexion</DialogTitle>
-            <DialogDescription>Détails de la liaison entre les équipements</DialogDescription>
+            <DialogTitle>Informations de la liaison</DialogTitle>
+            <DialogDescription>Détails de la connexion entre les équipements</DialogDescription>
           </DialogHeader>
-          {selectedLink && (
+          {selectedLink && topology && (
             <div className="space-y-4 mt-4">
               <div className="grid grid-cols-1 gap-4">
                 <div className="space-y-2">
@@ -1287,16 +1084,11 @@ const LanCartographyContent = () => {
                       {topology.nodes.find((n) => n.id === selectedLink.from)?.name || selectedLink.from}
                     </span>
                     {selectedLink.fromPort && (
-                      <span className="text-sm text-muted-foreground bg-muted px-2 py-1 rounded">
-                        Port: {selectedLink.fromPort}
+                      <span className="text-sm text-muted-foreground bg-muted px-2 py-1 rounded font-mono">
+                        {selectedLink.fromPort}
                       </span>
                     )}
                   </div>
-                  {topology.nodes.find((n) => n.id === selectedLink.from)?.ip && (
-                    <div className="text-sm text-muted-foreground font-mono">
-                      {topology.nodes.find((n) => n.id === selectedLink.from)?.ip}
-                    </div>
-                  )}
                 </div>
                 <div className="space-y-2">
                   <div className="text-sm font-semibold text-muted-foreground">Destination</div>
@@ -1305,27 +1097,14 @@ const LanCartographyContent = () => {
                       {topology.nodes.find((n) => n.id === selectedLink.to)?.name || selectedLink.to}
                     </span>
                     {selectedLink.toPort && (
-                      <span className="text-sm text-muted-foreground bg-muted px-2 py-1 rounded">
-                        Port: {selectedLink.toPort}
+                      <span className="text-sm text-muted-foreground bg-muted px-2 py-1 rounded font-mono">
+                        {selectedLink.toPort}
                       </span>
                     )}
                   </div>
-                  {topology.nodes.find((n) => n.id === selectedLink.to)?.ip && (
-                    <div className="text-sm text-muted-foreground font-mono">
-                      {topology.nodes.find((n) => n.id === selectedLink.to)?.ip}
-                    </div>
-                  )}
                 </div>
               </div>
               <div className="pt-4 border-t space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-semibold text-muted-foreground">Port origine</span>
-                  <span className="font-medium font-mono">{selectedLink.fromPort || 'N/A'}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-semibold text-muted-foreground">Port destination</span>
-                  <span className="font-medium font-mono">{selectedLink.toPort || 'N/A'}</span>
-                </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-semibold text-muted-foreground">Type</span>
                   <span className="capitalize font-medium">{selectedLink.type}</span>
@@ -1343,13 +1122,13 @@ const LanCartographyContent = () => {
                   <span
                     className={`px-2 py-1 rounded text-xs font-medium ${
                       selectedLink.status === "up"
-                        ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                        ? "bg-green-100 text-green-800"
                         : selectedLink.status === "warn"
-                          ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
-                          : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+                          ? "bg-yellow-100 text-yellow-800"
+                          : "bg-red-100 text-red-800"
                     }`}
                   >
-                    {selectedLink.status === "up" ? "Actif" : selectedLink.status === "warn" ? "Avertissement" : "Inactif"}
+                    {selectedLink.status === "up" ? "Actif" : selectedLink.status === "warn" ? "Instable" : "Inactif"}
                   </span>
                 </div>
               </div>
@@ -1357,6 +1136,7 @@ const LanCartographyContent = () => {
           )}
         </DialogContent>
       </Dialog>
+
       <Dialog open={!!selectedNode} onOpenChange={(open) => !open && setSelectedNode(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -1375,16 +1155,20 @@ const LanCartographyContent = () => {
                   <span className="capitalize">{selectedNode.role}</span>
                 </div>
                 <div className="flex items-center justify-between">
+                  <span className="font-medium">Type</span>
+                  <span className="capitalize">{selectedNode.icon || selectedNode.role}</span>
+                </div>
+                <div className="flex items-center justify-between">
                   <span className="font-medium">Statut</span>
                   <span
                     className={`px-2 py-1 rounded text-xs font-medium ${
                       selectedNode.status === "up"
-                        ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                        ? "bg-green-100 text-green-800"
                         : selectedNode.status === "warn"
-                          ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
+                          ? "bg-yellow-100 text-yellow-800"
                           : selectedNode.status === "down"
-                            ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
-                            : "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200"
+                            ? "bg-red-100 text-red-800"
+                            : "bg-gray-100 text-gray-800"
                     }`}
                   >
                     {selectedNode.status}
@@ -1400,7 +1184,7 @@ const LanCartographyContent = () => {
                 </div>
               </div>
               {selectedNode.notes && (
-                <div className="space-y-1">
+                <div className="space-y-1 pt-4 border-t">
                   <span className="font-medium">Notes</span>
                   <p className="text-muted-foreground">{selectedNode.notes}</p>
                 </div>
@@ -1414,7 +1198,7 @@ const LanCartographyContent = () => {
                         <div className="flex items-center justify-between mb-1">
                           <span className="font-medium font-mono">{port.label}</span>
                           {port.poe_enabled && (
-                            <span className="text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 px-2 py-0.5 rounded">
+                            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">
                               PoE
                             </span>
                           )}
