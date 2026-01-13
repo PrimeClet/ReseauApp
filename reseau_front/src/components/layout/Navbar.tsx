@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Bell, LogOut, User, Network, Menu, X } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useSidebarToggle } from "@/components/layout/AppShell";
+import NotificationBell from "@/components/notifications/NotificationBell";
 
 export default function Navbar() {
   const { user, logout } = useAuth();
@@ -108,11 +109,8 @@ export default function Navbar() {
 
         {/* Right side - Status and user menu */}
         <div className="flex items-center gap-2 sm:gap-4">
-          {/* Notifications button */}
-          <Button variant="ghost" size="icon" className="relative">
-            <Bell className="h-5 w-5" />
-            <span className="absolute top-1 right-1 h-2 w-2 bg-destructive rounded-full"></span>
-          </Button>
+          {/* Notifications bell */}
+          <NotificationBell />
 
           {/* User menu */}
           <DropdownMenu>

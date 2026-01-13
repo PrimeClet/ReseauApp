@@ -77,6 +77,11 @@ class PortController extends Controller
             'poe_enabled' => 'required|boolean',
             'vlan' => 'nullable|string|max:255',
             'speed' => 'nullable|string|max:255',
+            'type_reseau' => 'nullable|in:IT,OT',
+            'statut' => 'nullable|in:actif,inactif,reserve',
+            'connexion_type' => 'nullable|in:fibre,cuivre',
+            'uplink' => 'nullable|string|max:255',
+            'downlink' => 'nullable|string|max:255',
             'equipement_id' => 'required|exists:equipements,id',
             'connected_equipment_id' => 'nullable|exists:equipements,id',
         ]);
@@ -130,6 +135,11 @@ class PortController extends Controller
             'poe_enabled' => 'sometimes|boolean',
             'vlan' => 'nullable|string|max:255',
             'speed' => 'nullable|string|max:255',
+            'type_reseau' => 'sometimes|in:IT,OT|nullable',
+            'statut' => 'sometimes|in:actif,inactif,reserve|nullable',
+            'connexion_type' => 'sometimes|in:fibre,cuivre|nullable',
+            'uplink' => 'sometimes|string|max:255|nullable',
+            'downlink' => 'sometimes|string|max:255|nullable',
             'equipement_id' => 'sometimes|exists:equipements,id',
             'connected_equipment_id' => 'nullable|exists:equipements,id',
         ]);

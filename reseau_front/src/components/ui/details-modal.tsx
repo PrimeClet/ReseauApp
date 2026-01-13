@@ -46,6 +46,16 @@ export default function DetailsModal({
     // Mapping des labels personnalisés
     const labelMap: { [key: string]: string } = {
       'media': 'Type de liaison',
+      'user': 'Utilisateur',
+      'type_modification': 'Type de modification',
+      'description': 'Description',
+      'raison': 'Raison / Justification',
+      'date_intervention': 'Date d\'intervention',
+      'heure_intervention': 'Heure d\'intervention',
+      'statut': 'Statut',
+      'commentaire_validation': 'Commentaire de validation',
+      'validated_by': 'Validé par',
+      'validated_at': 'Date de validation',
     };
     return labelMap[key] || key.replace(/_/g, ' ');
   };
@@ -79,7 +89,7 @@ export default function DetailsModal({
 
     const stringValue = String(value);
     
-    if (key.toLowerCase().includes('état') || key.toLowerCase().includes('status') || key.toLowerCase().includes('etat')) {
+    if (key.toLowerCase().includes('état') || key.toLowerCase().includes('status') || key.toLowerCase().includes('etat') || key.toLowerCase().includes('statut')) {
       const statusMapping: { [key: string]: "up" | "down" | "warn" | "maintenance" | "ok" | "actif" | "fermee" } = {
         'actif': 'actif',
         'active': 'actif', 
@@ -95,11 +105,28 @@ export default function DetailsModal({
         'alerte': 'warn',
         'ok': 'ok',
         'fermee': 'fermee',
-        'fermée': 'fermee'
+        'fermée': 'fermee',
+        'en attente': 'warn',
+        'approuvée': 'ok',
+        'approuvee': 'ok',
+        'rejetée': 'down',
+        'rejetee': 'down',
+        'en révision': 'maintenance',
+        'en_revision': 'maintenance',
       };
       
       const mappedStatus = statusMapping[stringValue.toLowerCase()] || 'ok';
       return <StatusBadge status={mappedStatus} />;
+    }
+
+    // Formatage pour validated_at
+    if (key === 'validated_at' || key === 'created_at' || key === 'updated_at') {
+      try {
+        const date = new Date(stringValue);
+        return <span className="text-foreground">{date.toLocaleString('fr-FR')}</span>;
+      } catch {
+        return <span className="text-foreground">{stringValue}</span>;
+      }
     }
     
     return <span className="text-foreground">{stringValue}</span>;

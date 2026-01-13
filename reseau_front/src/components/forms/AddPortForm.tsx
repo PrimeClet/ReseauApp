@@ -20,6 +20,11 @@ const portSchema = z.object({
   poe_enabled: z.boolean(),
   vlan: z.string().optional(),
   speed: z.string().optional(),
+  type_reseau: z.enum(["IT", "OT"]).default("IT"),
+  statut: z.enum(["actif", "inactif", "reserve"]).default("actif"),
+  connexion_type: z.enum(["fibre", "cuivre"]).optional(),
+  uplink: z.string().optional(),
+  downlink: z.string().optional(),
   equipement_id: z.number().min(1, "L'équipement est requis"),
   connected_equipment_id: z.number().optional().nullable(),
 });
@@ -50,6 +55,11 @@ const AddPortForm = ({ defaultCoffretId, onSuccess, trigger }: AddPortFormProps)
       poe_enabled: false,
       vlan: "",
       speed: "",
+      type_reseau: "IT",
+      statut: "actif",
+      connexion_type: undefined,
+      uplink: "",
+      downlink: "",
       equipement_id: undefined,
       connected_equipment_id: undefined,
     },
@@ -63,6 +73,11 @@ const AddPortForm = ({ defaultCoffretId, onSuccess, trigger }: AddPortFormProps)
         poe_enabled: data.poe_enabled,
         vlan: data.vlan || undefined,
         speed: data.speed || undefined,
+        type_reseau: data.type_reseau,
+        statut: data.statut,
+        connexion_type: data.connexion_type,
+        uplink: data.uplink || undefined,
+        downlink: data.downlink || undefined,
         equipement_id: data.equipement_id,
         connected_equipment_id: data.connected_equipment_id || undefined,
       };
@@ -95,7 +110,7 @@ const AddPortForm = ({ defaultCoffretId, onSuccess, trigger }: AddPortFormProps)
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Ajouter un nouveau port</DialogTitle>
           <DialogDescription>
@@ -214,6 +229,101 @@ const AddPortForm = ({ defaultCoffretId, onSuccess, trigger }: AddPortFormProps)
               />
             </div>
 
+            <div className="grid grid-cols-3 gap-4">
+              <FormField
+                control={form.control}
+                name="type_reseau"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Type</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="IT/OT" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="IT">IT</SelectItem>
+                        <SelectItem value="OT">OT</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="statut"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Statut</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Statut" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="actif">Actif</SelectItem>
+                        <SelectItem value="inactif">Inactif</SelectItem>
+                        <SelectItem value="reserve">Réservé</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="connexion_type"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Connexion</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Type connexion" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="fibre">Fibre optique</SelectItem>
+                        <SelectItem value="cuivre">Cuivre (RJ45)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="uplink"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Uplink (source)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Ex: Port Gi0/1 du cœur" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="downlink"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Downlink (destination)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Ex: Prise murale 3B-12" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
             <FormField
               control={form.control}
               name="vlan"

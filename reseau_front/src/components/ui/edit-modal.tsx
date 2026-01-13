@@ -20,6 +20,7 @@ interface EditModalProps {
     options?: Array<{ value: string; label: string }> | string[];
     disabled?: boolean;
   }>;
+  className?: string;
 }
 
 export default function EditModal({ 
@@ -28,7 +29,8 @@ export default function EditModal({
   title, 
   data, 
   onSave,
-  fields
+  fields,
+  className
 }: EditModalProps) {
   const [formData, setFormData] = useState<any>({});
 
@@ -39,8 +41,10 @@ export default function EditModal({
       const initialData: any = { ...data };
       if (fields) {
         fields.forEach(field => {
-          // Pour les champs select, garder la valeur telle quelle (même si undefined/null), pour les autres mettre '' si undefined
-          if (field.type === 'select') {
+          // Pour les champs file, ne pas pré-remplir (on ne peut pas pré-remplir un input file)
+          if (field.type === 'file') {
+            initialData[field.key] = undefined;
+          } else if (field.type === 'select') {
             const value = data[field.key];
             // Si la valeur existe mais ne correspond à aucune option, essayer de trouver une correspondance
             if (value !== undefined && value !== null && field.options) {
@@ -92,7 +96,10 @@ export default function EditModal({
   const formFields = fields || defaultFields;
 
   const handleSave = () => {
-    onSave(formData);
+    const payload = data && data.id !== undefined
+      ? { id: data.id, ...formData }
+      : formData;
+    onSave(payload);
     onOpenChange(false);
   };
 
@@ -105,7 +112,7 @@ export default function EditModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className={className || "max-w-2xl"}>
         <DialogHeader>
           <DialogTitle className="text-xl font-semibold">{title}</DialogTitle>
         </DialogHeader>
@@ -151,7 +158,7 @@ export default function EditModal({
               ) : (
                 <Input
                   id={key}
-                  type={type === 'number' ? 'number' : 'text'}
+                  type={type === 'number' ? 'number' : type === 'date' ? 'date' : type === 'time' ? 'time' : 'text'}
                   value={formData[key] ?? ''}
                   onChange={(e) => handleChange(key, type === 'number' ? (e.target.value === '' ? '' : parseInt(e.target.value, 10)) : e.target.value)}
                   placeholder={`Entrer ${label}`}

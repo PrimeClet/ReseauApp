@@ -11,6 +11,8 @@ import NotFound from "./pages/NotFound";
 import Profile from "./pages/Profile";
 import Batiments from "./pages/Batiments";
 import Salles from "./pages/Salles";
+import Sites from "./pages/Sites";
+import Zones from "./pages/Zones";
 import Armoires from "./pages/Armoires";
 import ArmoiresDetail from "./pages/ArmoiresDetail";
 import Equipements from "./pages/Equipements";
@@ -21,6 +23,10 @@ import Permissions from "./pages/Permissions";
 import Users from "./pages/Users";
 import Lans from "./pages/Lans";
 import LanCartography from "./pages/LanCartography";
+import Modifications from "./pages/Modifications";
+import ValidationModifications from "./pages/ValidationModifications";
+import Notifications from "./pages/Notifications";
+import ModificationHistory from "./pages/ModificationHistory";
 
 const queryClient = new QueryClient();
 
@@ -38,6 +44,8 @@ const App = () => (
               <Route path="/profile" element={<Profile />} />
               <Route path="/batiments" element={<Batiments />} />
               <Route path="/salles" element={<Salles />} />
+              <Route path="/sites" element={<Sites />} />
+              <Route path="/zones" element={<Zones />} />
               <Route path="/armoires" element={<Armoires />} />
               <Route path="/armoires-detail" element={<ArmoiresDetail />} />
               <Route path="/equipements" element={<Equipements />} />
@@ -48,6 +56,10 @@ const App = () => (
               <Route path="/users" element={<Users />} />
               <Route path="/lans" element={<Lans />} />
               <Route path="/cartographie-lan" element={<LanCartography />} />
+              <Route path="/modifications" element={<Modifications />} />
+              <Route path="/validation-modifications" element={<ValidationModifications />} />
+              <Route path="/notifications" element={<Notifications />} />
+              <Route path="/modification-history" element={<ModificationHistory />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

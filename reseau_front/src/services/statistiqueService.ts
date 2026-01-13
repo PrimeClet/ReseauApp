@@ -31,6 +31,15 @@ export interface PortsByVlan {
   count: number;
 }
 
+export interface ModificationsStats {
+  total: number;
+  en_cours: number;
+  en_attente: number;
+  en_revision: number;
+  approuvee: number;
+  rejetee: number;
+}
+
 const statistiqueService = {
   async getGlobalStats(): Promise<GlobalStats> {
     const response = await api.get<GlobalStats>('/stats/global');
@@ -49,6 +58,11 @@ const statistiqueService = {
 
   async getPortsByVlan(): Promise<PortsByVlan[]> {
     const response = await api.get<PortsByVlan[]>('/stats/ports-by-vlan');
+    return response.data;
+  },
+
+  async getModificationsStats(): Promise<ModificationsStats> {
+    const response = await api.get<ModificationsStats>('/stats/modifications');
     return response.data;
   },
 };

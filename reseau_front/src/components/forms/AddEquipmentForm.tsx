@@ -50,6 +50,12 @@ export default function AddEquipmentForm({ defaultCoffretId, onSuccess, trigger 
     defaultValues: {
       name: "",
       type: "",
+      modele: "",
+      fabricant: "",
+      numero_serie: "",
+      type_reseau: "IT",
+      nb_ports_fibre: 0,
+      nb_ports_rj45: 0,
       description: "",
       direction_in_out: "",
       vlan: "",
@@ -123,6 +129,12 @@ export default function AddEquipmentForm({ defaultCoffretId, onSuccess, trigger 
       const equipementData: EquipementCreateData = {
         name: data.name,
         type: data.type,
+        modele: data.modele || undefined,
+        fabricant: data.fabricant || undefined,
+        numero_serie: data.numero_serie || undefined,
+        type_reseau: data.type_reseau || undefined,
+        nb_ports_fibre: data.nb_ports_fibre ?? 0,
+        nb_ports_rj45: data.nb_ports_rj45 ?? 0,
         description: data.description || undefined,
         direction_in_out: data.direction_in_out || undefined,
         vlan: data.vlan || undefined,
@@ -276,6 +288,101 @@ export default function AddEquipmentForm({ defaultCoffretId, onSuccess, trigger 
                         </Command>
                       </PopoverContent>
                     </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="modele"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Model</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Ex: Catalyst 2960X" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="fabricant"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Manufacturer</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Ex: Cisco, HP, Huawei..." {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="numero_serie"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Serial number</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Ex: SN123456789" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="type_reseau"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Network type</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="IT">IT</SelectItem>
+                        <SelectItem value="OT">OT</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="nb_ports_fibre"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Fibre ports</FormLabel>
+                    <FormControl>
+                      <Input type="number" min={0} {...field} onChange={(e) => field.onChange(parseInt(e.target.value || '0'))} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="nb_ports_rj45"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>RJ45 ports</FormLabel>
+                    <FormControl>
+                      <Input type="number" min={0} {...field} onChange={(e) => field.onChange(parseInt(e.target.value || '0'))} />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}

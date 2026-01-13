@@ -68,7 +68,7 @@ class CoffretController extends Controller
          *     )
          * )
          */
-        $query = Coffret::with('equipements', 'metrics', 'batiment', 'salle');
+        $query = Coffret::with('equipements', 'metrics', 'batiment', 'salle', 'site', 'zone');
 
         // Filtrer les supprimés ou non
         if ($request->has('with_trashed') && $request->with_trashed === 'true') {
@@ -153,11 +153,16 @@ class CoffretController extends Controller
 
         $request->validate([
             'nom' => 'required|string|max:255',
+            'modele' => 'nullable|string|max:255',
+            'photo' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:4096',
             'piece' => 'nullable|string|max:255',
+            'emplacement' => 'nullable|string|max:255',
             'long' => 'nullable|numeric',
             'lat' => 'nullable|numeric',
-            'batiment_id' => 'nullable|exists:batiments,id',
-            'salle_id' => 'nullable|exists:salles,id',
+            'site_id' => 'required|exists:sites,id',
+            'zone_id' => 'required|exists:zones,id',
+            'batiment_id' => 'required|exists:batiments,id',
+            'salle_id' => 'required|exists:salles,id',
             'status' => 'sometimes|in:active,inactive',
         ]);
 
@@ -170,13 +175,23 @@ class CoffretController extends Controller
         $coffret = Coffret::create([
             'code' => $code,
             'nom' => $request->nom,
+            'modele' => $request->modele ?? null,
             'piece' => $request->piece ?? '',
+            'emplacement' => $request->emplacement ?? null,
             'long' => $request->long ?? 0,
             'lat' => $request->lat ?? 0,
+            'site_id' => $request->site_id,
+            'zone_id' => $request->zone_id,
             'batiment_id' => $request->batiment_id,
             'salle_id' => $request->salle_id,
             'status' => $request->status ?? 'active',
         ]);
+
+        // Gérer l'upload de photo si présent
+        if ($request->hasFile('photo')) {
+            $path = $request->file('photo')->store('coffrets', 'public');
+            $coffret->update(['photo' => $path]);
+        }
 
         // Générer et stocker le QR code
         $qrCode = $this->generateQRCode($coffret);
@@ -227,7 +242,7 @@ class CoffretController extends Controller
         }
 
         return response()->json([
-            'data' => $coffret->load('equipements', 'metrics', 'batiment', 'salle')
+            'data' => $coffret->load('equipements', 'metrics', 'batiment', 'salle', 'site', 'zone')
         ]);
     }
 
@@ -322,16 +337,29 @@ class CoffretController extends Controller
         $request->validate([
             'code' => 'sometimes|string|max:255|unique:coffrets,code,' . $coffret->id,
             'nom' => 'sometimes|string|max:255',
+            'modele' => 'sometimes|string|max:255|nullable',
+            'photo' => 'sometimes|image|mimes:jpeg,png,jpg,gif,webp|max:4096|nullable',
             'piece' => 'sometimes|string|max:255',
+            'emplacement' => 'sometimes|string|max:255|nullable',
             'long' => 'sometimes|numeric',
             'lat' => 'sometimes|numeric',
-            'batiment_id' => 'nullable|exists:batiments,id',
-            'salle_id' => 'nullable|exists:salles,id',
+            'site_id' => 'sometimes|exists:sites,id',
+            'zone_id' => 'sometimes|exists:zones,id',
+            'batiment_id' => 'sometimes|exists:batiments,id',
+            'salle_id' => 'sometimes|exists:salles,id',
             'status' => 'sometimes|in:active,inactive',
         ]);
 
         // Mise à jour des champs fournis
-        $coffret->update($request->only(['code', 'nom', 'piece', 'long', 'lat', 'batiment_id', 'salle_id', 'status']));
+        $coffret->update($request->only(['code', 'nom', 'modele', 'piece', 'emplacement', 'long', 'lat', 'site_id', 'zone_id', 'batiment_id', 'salle_id', 'status']));
+
+        // Upload de nouvelle photo si fournie
+        if ($request->hasFile('photo')) {
+            // Optionnel: supprimer l'ancienne si stockée
+            // if ($coffret->photo) { \Illuminate\Support\Facades\Storage::disk('public')->delete($coffret->photo); }
+            $path = $request->file('photo')->store('coffrets', 'public');
+            $coffret->update(['photo' => $path]);
+        }
 
         // Régénérer le QR code si le code ou le nom a changé
         if ($request->has('code') || $request->has('nom')) {
@@ -350,6 +378,33 @@ class CoffretController extends Controller
     /**
      * Remove the specified resource from storage.
      */
+    /**
+     * Retourne l'image d'un coffret
+     */
+    public function photo(Coffret $coffret)
+    {
+        if (!$coffret->photo) {
+            return response()->json(['message' => 'Photo non trouvée'], 404);
+        }
+
+        $path = storage_path('app/public/' . $coffret->photo);
+        
+        if (!file_exists($path)) {
+            return response()->json(['message' => 'Fichier image non trouvé'], 404);
+        }
+
+        // Déterminer le type MIME
+        $mimeType = mime_content_type($path);
+        if (!$mimeType) {
+            $mimeType = 'image/jpeg'; // Par défaut
+        }
+
+        return response()->file($path, [
+            'Content-Type' => $mimeType,
+            'Cache-Control' => 'public, max-age=31536000', // Cache pour 1 an
+        ]);
+    }
+
     public function destroy(Coffret $coffret)
     {
         /**

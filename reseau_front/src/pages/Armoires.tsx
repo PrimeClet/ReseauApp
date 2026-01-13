@@ -304,12 +304,17 @@ const Armoires = () => {
     if (!coffret) return null;
     // Trouver le coffret original dans la liste pour avoir les IDs
     const originalCoffret = coffrets.find(c => c.id === coffret.id) || coffret;
+    const site = sites.find(s => s.id === originalCoffret.site_id);
+    const zone = zones.find(z => z.id === originalCoffret.zone_id);
     const batiment = batiments.find(b => b.id === originalCoffret.batiment_id);
     const salle = salles.find(s => s.id === originalCoffret.salle_id);
     return {
       id: originalCoffret.id,
       code: originalCoffret.code,
       nom: originalCoffret.nom,
+      modele: originalCoffret.modele || "",
+      photo: originalCoffret.photo || "",
+      photo_url: originalCoffret.photo_url || null,
       piece: originalCoffret.piece,
       qr_code: originalCoffret.qr_code,
       long: originalCoffret.long || 0,
@@ -319,6 +324,7 @@ const Armoires = () => {
       batiment_id: originalCoffret.batiment_id,
       salle_id: originalCoffret.salle_id,
       status: originalCoffret.status,
+      qr_code: originalCoffret.qr_code || null,
     };
   };
 

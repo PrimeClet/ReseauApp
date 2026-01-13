@@ -17,6 +17,10 @@ use App\Http\Controllers\RoleController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\CartographyController;
 use App\Http\Controllers\ImportController;
+use App\Http\Controllers\SiteController;
+use App\Http\Controllers\ZoneController;
+use App\Http\Controllers\ModificationController;
+use App\Http\Controllers\NotificationController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -39,6 +43,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::get('/auth/me', [AuthController::class, 'me']);
 
+    // Notifications (accessible à tous les utilisateurs authentifiés)
+    Route::get('/notifications', [NotificationController::class, 'index']);
+    Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount']);
+    Route::get('/notifications/unread', [NotificationController::class, 'unread']);
+    Route::post('/notifications/{notification}/read', [NotificationController::class, 'markAsRead']);
+    Route::post('/notifications/read-all', [NotificationController::class, 'markAllAsRead']);
+    Route::get('/notifications/{notification}', [NotificationController::class, 'show']);
+    Route::delete('/notifications/{notification}', [NotificationController::class, 'destroy']);
+
     // Toutes les routes suivantes nécessitent un rôle (administrator ou directeur)
     Route::middleware('role:administrator,directeur')->group(function () {
 
@@ -48,6 +61,7 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/stats/systems-by-type', [StatistiqueController::class, 'systemsByType']);
             Route::get('/stats/equipements-by-coffret', [StatistiqueController::class, 'equipementsByCoffret']);
             Route::get('/stats/ports-by-vlan', [StatistiqueController::class, 'portsByVlan']);
+            Route::get('/stats/modifications', [StatistiqueController::class, 'modificationsStats']);
         });
 
         // INVENTAIRE : lecture
@@ -55,6 +69,7 @@ Route::middleware('auth:sanctum')->group(function () {
             // Coffrets
             Route::get('/coffrets', [CoffretController::class, 'index']);
             Route::get('/coffrets/{coffret}', [CoffretController::class, 'show']);
+            Route::get('/coffrets/{coffret}/photo', [CoffretController::class, 'photo']);
 
             // Équipements
             Route::get('/equipements', [EquipementsController::class, 'index']);
@@ -91,6 +106,35 @@ Route::middleware('auth:sanctum')->group(function () {
             // Maintenances
             Route::get('/maintenances', [MaintenanceController::class, 'index']);
             Route::get('/maintenances/{maintenance}', [MaintenanceController::class, 'show']);
+
+            // Sites
+            Route::get('/sites', [SiteController::class, 'index']);
+            Route::get('/sites/{site}', [SiteController::class, 'show']);
+
+            // Zones
+            Route::get('/zones', [ZoneController::class, 'index']);
+            Route::get('/zones/{zone}', [ZoneController::class, 'show']);
+
+            // Modifications
+            Route::get('/modifications', [ModificationController::class, 'index']);
+            
+            // Validation des modifications (administrateurs uniquement) - DOIT être avant /modifications/{modification}
+            Route::get('/modifications/pending', [ModificationController::class, 'pending'])->middleware('role:administrator');
+            Route::post('/modifications/{modification}/approve', [ModificationController::class, 'approve'])->middleware('role:administrator');
+            Route::post('/modifications/{modification}/reject', [ModificationController::class, 'reject'])->middleware('role:administrator');
+            Route::post('/modifications/{modification}/request-more-info', [ModificationController::class, 'requestMoreInfo'])->middleware('role:administrator');
+            
+            Route::get('/modifications/{modification}', [ModificationController::class, 'show']);
+            Route::get('/modifications/{modification}/photo/avant', [ModificationController::class, 'photoAvant']);
+            Route::get('/modifications/{modification}/photo/apres', [ModificationController::class, 'photoApres']);
+            
+            // Historique des modifications par coffret
+            Route::get('/coffrets/{coffret}/history', [ModificationController::class, 'history']);
+            Route::get('/coffrets/{coffret}/history/export/csv', [ModificationController::class, 'exportHistoryCsv']);
+            Route::get('/coffrets/{coffret}/history/export/pdf', [ModificationController::class, 'exportHistoryPdf']);
+            
+            // Rollback
+            Route::post('/modifications/{modification}/rollback', [ModificationController::class, 'rollback'])->middleware('role:administrator,directeur');
         });
 
         // INVENTAIRE : écriture (création / modification / suppression)
@@ -153,6 +197,21 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/maintenances', [MaintenanceController::class, 'store']);
             Route::put('/maintenances/{maintenance}', [MaintenanceController::class, 'update']);
             Route::delete('/maintenances/{maintenance}', [MaintenanceController::class, 'destroy']);
+
+            // Sites
+            Route::post('/sites', [SiteController::class, 'store']);
+            Route::put('/sites/{site}', [SiteController::class, 'update']);
+            Route::delete('/sites/{site}', [SiteController::class, 'destroy']);
+
+            // Zones
+            Route::post('/zones', [ZoneController::class, 'store']);
+            Route::put('/zones/{zone}', [ZoneController::class, 'update']);
+            Route::delete('/zones/{zone}', [ZoneController::class, 'destroy']);
+
+            // Modifications
+            Route::post('/modifications', [ModificationController::class, 'store']);
+            Route::put('/modifications/{modification}', [ModificationController::class, 'update']);
+            Route::delete('/modifications/{modification}', [ModificationController::class, 'destroy']);
         });
 
         // Exemple futur : routes pour la cartographie (LANs)

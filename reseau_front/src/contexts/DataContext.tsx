@@ -10,7 +10,10 @@ import {
   lanService,
   batimentService,
   salleService,
+  siteService,
+  zoneService,
   maintenanceService,
+  modificationService,
   statistiqueService
 } from '@/services';
 import type {
@@ -30,13 +33,20 @@ import type {
   BatimentCreateData,
   Salle,
   SalleCreateData,
+  Site,
+  SiteCreateData,
+  Zone,
+  ZoneCreateData,
   Maintenance,
   MaintenanceCreateData,
-  GlobalStats
+  Modification,
+  ModificationCreateData,
+  GlobalStats,
+  ModificationsStats
 } from '@/services';
 
 // Re-export types for compatibility
-export type { Coffret, Equipement, Port, Liaison, System, Lan, Batiment, Salle, Maintenance };
+export type { Coffret, Equipement, Port, Liaison, System, Lan, Batiment, Salle, Site, Zone, Maintenance, Modification };
 
 // Legacy interfaces for backwards compatibility
 export interface Armoire {
@@ -98,8 +108,12 @@ interface DataContextType {
   lans: Lan[];
   batiments: Batiment[];
   salles: Salle[];
+  sites: Site[];
+  zones: Zone[];
   maintenances: Maintenance[];
+  modifications: Modification[];
   globalStats: GlobalStats | null;
+  modificationsStats: ModificationsStats | null;
 
   // Loading states
   isLoadingCoffrets: boolean;
@@ -110,8 +124,12 @@ interface DataContextType {
   isLoadingLans: boolean;
   isLoadingBatiments: boolean;
   isLoadingSalles: boolean;
+  isLoadingSites: boolean;
+  isLoadingZones: boolean;
   isLoadingMaintenances: boolean;
+  isLoadingModifications: boolean;
   isLoadingStats: boolean;
+  isLoadingModificationsStats: boolean;
 
   // Error states
   coffretError: Error | null;
@@ -122,7 +140,10 @@ interface DataContextType {
   lanError: Error | null;
   batimentError: Error | null;
   salleError: Error | null;
+  siteError: Error | null;
+  zoneError: Error | null;
   maintenanceError: Error | null;
+  modificationError: Error | null;
 
   // CRUD operations
   addCoffret: (data: CoffretCreateData) => Promise<Coffret>;
@@ -166,9 +187,21 @@ interface DataContextType {
   restoreSalle: (id: number) => Promise<Salle>;
   importSalles: (file: File) => Promise<{ message: string; created: number; updated: number; errors: string[] }>;
 
+  addSite: (data: SiteCreateData) => Promise<Site>;
+  updateSite: (id: number, data: Partial<SiteCreateData>) => Promise<Site>;
+  deleteSite: (id: number) => Promise<void>;
+
+  addZone: (data: ZoneCreateData) => Promise<Zone>;
+  updateZone: (id: number, data: Partial<ZoneCreateData>) => Promise<Zone>;
+  deleteZone: (id: number) => Promise<void>;
+
   addMaintenance: (data: MaintenanceCreateData) => Promise<Maintenance>;
   updateMaintenance: (id: number, data: Partial<MaintenanceCreateData>) => Promise<Maintenance>;
   deleteMaintenance: (id: number) => Promise<void>;
+
+  addModification: (data: ModificationCreateData) => Promise<Modification>;
+  updateModification: (id: number, data: Partial<ModificationCreateData>) => Promise<Modification>;
+  deleteModification: (id: number) => Promise<void>;
 
   // Refresh functions
   refetchCoffrets: () => void;
@@ -180,7 +213,10 @@ interface DataContextType {
   refetchBatiments: () => void;
   importBatiments: (file: File) => Promise<{ message: string; created: number; updated: number; errors: string[] }>;
   refetchSalles: () => void;
+  refetchSites: () => void;
+  refetchZones: () => void;
   refetchMaintenances: () => void;
+  refetchModifications: () => void;
   refetchStats: () => void;
 
   // Legacy compatibility (will be removed later)
@@ -314,6 +350,34 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
   });
 
   const {
+    data: siteData,
+    isLoading: isLoadingSites,
+    error: siteError,
+    refetch: refetchSites
+  } = useQuery({
+    queryKey: ['sites'],
+    queryFn: () => siteService.getAll(),
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+    retryDelay: 1000,
+    enabled: isAuthenticated,
+  });
+
+  const {
+    data: zoneData,
+    isLoading: isLoadingZones,
+    error: zoneError,
+    refetch: refetchZones
+  } = useQuery({
+    queryKey: ['zones'],
+    queryFn: () => zoneService.getAll(),
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+    retryDelay: 1000,
+    enabled: isAuthenticated,
+  });
+
+  const {
     data: maintenanceData,
     isLoading: isLoadingMaintenances,
     error: maintenanceError,
@@ -328,12 +392,37 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
   });
 
   const {
+    data: modificationData,
+    isLoading: isLoadingModifications,
+    error: modificationError,
+    refetch: refetchModifications
+  } = useQuery({
+    queryKey: ['modifications'],
+    queryFn: () => modificationService.getAll(),
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+    retryDelay: 1000,
+    enabled: isAuthenticated,
+  });
+
+  const {
     data: globalStats,
     isLoading: isLoadingStats,
     refetch: refetchStats
   } = useQuery({
     queryKey: ['globalStats'],
     queryFn: () => statistiqueService.getGlobalStats(),
+    staleTime: 5 * 60 * 1000,
+    enabled: isAuthenticated,
+  });
+
+  const {
+    data: modificationsStats,
+    isLoading: isLoadingModificationsStats,
+    refetch: refetchModificationsStats
+  } = useQuery({
+    queryKey: ['modifications', 'stats'],
+    queryFn: () => statistiqueService.getModificationsStats(),
     staleTime: 5 * 60 * 1000,
     enabled: isAuthenticated,
   });
@@ -521,6 +610,33 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['maintenances'] }),
   });
 
+  // Mutations - Modifications
+  const createModificationMutation = useMutation({
+    mutationFn: modificationService.create,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['modifications'] });
+      queryClient.invalidateQueries({ queryKey: ['modifications', 'stats'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
+
+  const updateModificationMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: Partial<ModificationCreateData> }) =>
+      modificationService.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['modifications'] });
+      queryClient.invalidateQueries({ queryKey: ['modifications', 'stats'] });
+    },
+  });
+
+  const deleteModificationMutation = useMutation({
+    mutationFn: modificationService.delete,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['modifications'] });
+      queryClient.invalidateQueries({ queryKey: ['modifications', 'stats'] });
+    },
+  });
+
   // Helper functions
   const addCoffret = async (data: CoffretCreateData) => {
     return createCoffretMutation.mutateAsync(data);
@@ -678,6 +794,18 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
     return deleteMaintenanceMutation.mutateAsync(id);
   };
 
+  const addModification = async (data: ModificationCreateData) => {
+    return createModificationMutation.mutateAsync(data);
+  };
+
+  const updateModification = async (id: number, data: Partial<ModificationCreateData>) => {
+    return updateModificationMutation.mutateAsync({ id, data });
+  };
+
+  const deleteModification = async (id: number) => {
+    return deleteModificationMutation.mutateAsync(id);
+  };
+
   // Legacy compatibility functions (no-op for now)
   const addArmoire = () => {
     console.warn('addArmoire is deprecated, use addCoffret instead');
@@ -702,8 +830,12 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
     lans: lanData?.data || [],
     batiments: batimentData?.data || [],
     salles: salleData?.data || [],
+    sites: siteData?.data || [],
+    zones: zoneData?.data || [],
     maintenances: maintenanceData?.data || [],
+    modifications: modificationData?.data || [],
     globalStats: globalStats || null,
+    modificationsStats: modificationsStats || null,
 
     // Loading states
     isLoadingCoffrets,
@@ -714,8 +846,12 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
     isLoadingLans,
     isLoadingBatiments,
     isLoadingSalles,
+    isLoadingSites,
+    isLoadingZones,
     isLoadingMaintenances,
+    isLoadingModifications,
     isLoadingStats,
+    isLoadingModificationsStats,
 
     // Error states
     coffretError: coffretError as Error | null,
@@ -726,7 +862,10 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
     lanError: lanError as Error | null,
     batimentError: batimentError as Error | null,
     salleError: salleError as Error | null,
+    siteError: siteError as Error | null,
+    zoneError: zoneError as Error | null,
     maintenanceError: maintenanceError as Error | null,
+    modificationError: modificationError as Error | null,
 
     // CRUD operations
     addCoffret,
@@ -765,6 +904,9 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
     addMaintenance,
     updateMaintenance,
     deleteMaintenance,
+    addModification,
+    updateModification,
+    deleteModification,
 
     // Refresh functions
     refetchCoffrets,
@@ -776,7 +918,10 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
     refetchBatiments,
     importBatiments,
     refetchSalles,
+    refetchZones,
+    refetchSites,
     refetchMaintenances,
+    refetchModifications,
     refetchStats,
 
     // Legacy compatibility

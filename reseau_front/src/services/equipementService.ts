@@ -6,6 +6,12 @@ export interface Equipement {
   qr_code?: string;
   name: string;
   type: string;
+  modele?: string;
+  fabricant?: string;
+  numero_serie?: string;
+  type_reseau?: 'IT' | 'OT';
+  nb_ports_fibre?: number;
+  nb_ports_rj45?: number;
   description?: string;
   direction_in_out?: string;
   vlan?: string;
@@ -65,6 +71,12 @@ export interface EquipementCreateData {
   equipement_code?: string;
   name: string;
   type: string;
+  modele?: string;
+  fabricant?: string;
+  numero_serie?: string;
+  type_reseau?: 'IT' | 'OT';
+  nb_ports_fibre?: number;
+  nb_ports_rj45?: number;
   description?: string;
   direction_in_out?: string;
   vlan?: string;
