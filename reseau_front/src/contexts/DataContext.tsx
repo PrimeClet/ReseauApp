@@ -190,10 +190,18 @@ interface DataContextType {
   addSite: (data: SiteCreateData) => Promise<Site>;
   updateSite: (id: number, data: Partial<SiteCreateData>) => Promise<Site>;
   deleteSite: (id: number) => Promise<void>;
+  restoreSite: (id: number) => Promise<Site>;
+  trashedSites: Site[];
+  isLoadingTrashedSites: boolean;
+  refetchTrashedSites: () => void;
 
   addZone: (data: ZoneCreateData) => Promise<Zone>;
   updateZone: (id: number, data: Partial<ZoneCreateData>) => Promise<Zone>;
   deleteZone: (id: number) => Promise<void>;
+  restoreZone: (id: number) => Promise<Zone>;
+  trashedZones: Zone[];
+  isLoadingTrashedZones: boolean;
+  refetchTrashedZones: () => void;
 
   addMaintenance: (data: MaintenanceCreateData) => Promise<Maintenance>;
   updateMaintenance: (id: number, data: Partial<MaintenanceCreateData>) => Promise<Maintenance>;
@@ -364,6 +372,19 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
   });
 
   const {
+    data: trashedSiteData,
+    isLoading: isLoadingTrashedSites,
+    refetch: refetchTrashedSites
+  } = useQuery({
+    queryKey: ['sites', 'trashed'],
+    queryFn: () => siteService.getTrashed(),
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+    retryDelay: 1000,
+    enabled: isAuthenticated,
+  });
+
+  const {
     data: zoneData,
     isLoading: isLoadingZones,
     error: zoneError,
@@ -371,6 +392,19 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
   } = useQuery({
     queryKey: ['zones'],
     queryFn: () => zoneService.getAll(),
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+    retryDelay: 1000,
+    enabled: isAuthenticated,
+  });
+
+  const {
+    data: trashedZoneData,
+    isLoading: isLoadingTrashedZones,
+    refetch: refetchTrashedZones
+  } = useQuery({
+    queryKey: ['zones', 'trashed'],
+    queryFn: () => zoneService.getTrashed(),
     staleTime: 5 * 60 * 1000,
     retry: 1,
     retryDelay: 1000,
@@ -593,6 +627,86 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['salles'] }),
   });
 
+  // Mutations - Sites
+  const createSiteMutation = useMutation({
+    mutationFn: siteService.create,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['sites'] });
+      queryClient.invalidateQueries({ queryKey: ['sites', 'trashed'] });
+      queryClient.refetchQueries({ queryKey: ['sites'] });
+    },
+  });
+
+  const updateSiteMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: Partial<SiteCreateData> }) =>
+      siteService.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['sites'] });
+      queryClient.invalidateQueries({ queryKey: ['sites', 'trashed'] });
+      queryClient.refetchQueries({ queryKey: ['sites'] });
+    },
+  });
+
+  const deleteSiteMutation = useMutation({
+    mutationFn: siteService.delete,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['sites'] });
+      queryClient.invalidateQueries({ queryKey: ['sites', 'trashed'] });
+      queryClient.refetchQueries({ queryKey: ['sites'] });
+      queryClient.refetchQueries({ queryKey: ['sites', 'trashed'] });
+    },
+  });
+
+  const restoreSiteMutation = useMutation({
+    mutationFn: siteService.restore,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['sites'] });
+      queryClient.invalidateQueries({ queryKey: ['sites', 'trashed'] });
+      queryClient.refetchQueries({ queryKey: ['sites'] });
+      queryClient.refetchQueries({ queryKey: ['sites', 'trashed'] });
+    },
+  });
+
+  // Mutations - Zones
+  const createZoneMutation = useMutation({
+    mutationFn: zoneService.create,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['zones'] });
+      queryClient.invalidateQueries({ queryKey: ['zones', 'trashed'] });
+      queryClient.refetchQueries({ queryKey: ['zones'] });
+    },
+  });
+
+  const updateZoneMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: Partial<ZoneCreateData> }) =>
+      zoneService.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['zones'] });
+      queryClient.invalidateQueries({ queryKey: ['zones', 'trashed'] });
+      queryClient.refetchQueries({ queryKey: ['zones'] });
+    },
+  });
+
+  const deleteZoneMutation = useMutation({
+    mutationFn: zoneService.delete,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['zones'] });
+      queryClient.invalidateQueries({ queryKey: ['zones', 'trashed'] });
+      queryClient.refetchQueries({ queryKey: ['zones'] });
+      queryClient.refetchQueries({ queryKey: ['zones', 'trashed'] });
+    },
+  });
+
+  const restoreZoneMutation = useMutation({
+    mutationFn: zoneService.restore,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['zones'] });
+      queryClient.invalidateQueries({ queryKey: ['zones', 'trashed'] });
+      queryClient.refetchQueries({ queryKey: ['zones'] });
+      queryClient.refetchQueries({ queryKey: ['zones', 'trashed'] });
+    },
+  });
+
   // Mutations - Maintenances
   const createMaintenanceMutation = useMutation({
     mutationFn: maintenanceService.create,
@@ -782,6 +896,38 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
     return result;
   };
 
+  const addSite = async (data: SiteCreateData) => {
+    return createSiteMutation.mutateAsync(data);
+  };
+
+  const updateSite = async (id: number, data: Partial<SiteCreateData>) => {
+    return updateSiteMutation.mutateAsync({ id, data });
+  };
+
+  const deleteSite = async (id: number) => {
+    return deleteSiteMutation.mutateAsync(id);
+  };
+
+  const restoreSite = async (id: number) => {
+    return restoreSiteMutation.mutateAsync(id);
+  };
+
+  const addZone = async (data: ZoneCreateData) => {
+    return createZoneMutation.mutateAsync(data);
+  };
+
+  const updateZone = async (id: number, data: Partial<ZoneCreateData>) => {
+    return updateZoneMutation.mutateAsync({ id, data });
+  };
+
+  const deleteZone = async (id: number) => {
+    return deleteZoneMutation.mutateAsync(id);
+  };
+
+  const restoreZone = async (id: number) => {
+    return restoreZoneMutation.mutateAsync(id);
+  };
+
   const addMaintenance = async (data: MaintenanceCreateData) => {
     return createMaintenanceMutation.mutateAsync(data);
   };
@@ -901,6 +1047,20 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
     deleteSalle,
     restoreSalle,
     importSalles,
+    addSite,
+    updateSite,
+    deleteSite,
+    restoreSite,
+    trashedSites: trashedSiteData?.data || [],
+    isLoadingTrashedSites,
+    refetchTrashedSites,
+    addZone,
+    updateZone,
+    deleteZone,
+    restoreZone,
+    trashedZones: trashedZoneData?.data || [],
+    isLoadingTrashedZones,
+    refetchTrashedZones,
     addMaintenance,
     updateMaintenance,
     deleteMaintenance,

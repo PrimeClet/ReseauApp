@@ -42,6 +42,11 @@ export default function DetailsModal({
   const isEquipement = data.equipement_code && data.name;
   const hasQRCode = data.qr_code;
 
+  // Vérifier si une photo est disponible
+  const hasPhoto = data.photo_url || data.photo;
+  // Utiliser photo_url si disponible (URL complète de l'API), sinon construire l'URL
+  const photoUrl = data.photo_url || null;
+
   const getLabel = (key: string) => {
     // Mapping des labels personnalisés
     const labelMap: { [key: string]: string } = {
@@ -56,6 +61,11 @@ export default function DetailsModal({
       'commentaire_validation': 'Commentaire de validation',
       'validated_by': 'Validé par',
       'validated_at': 'Date de validation',
+      'emplacement': 'Emplacement détaillé',
+      'modele': 'Modèle',
+      'piece': 'Pièce',
+      'long': 'Longitude',
+      'lat': 'Latitude',
     };
     return labelMap[key] || key.replace(/_/g, ' ');
   };
@@ -139,11 +149,13 @@ export default function DetailsModal({
           <div className="flex items-center justify-between relative">
             <DialogTitle className="text-xl font-semibold">{title}</DialogTitle>
             <div className="absolute right-14 top-0 flex gap-2">
-              {hasQRCode && (isCoffret || isEquipement) && (
+              {(isCoffret || isEquipement) && (
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setIsQRCodeOpen(true)}
+                  disabled={!hasQRCode}
+                  title={hasQRCode ? "Voir le QR Code" : "QR Code non disponible"}
                 >
                   <QrCode className="h-4 w-4 mr-2" />
                   QR Code
@@ -194,13 +206,34 @@ export default function DetailsModal({
           </div>
         </DialogHeader>
 
+        {/* Affichage de la photo si disponible */}
+        {hasPhoto && isCoffret && (
+          <div className="mt-4 mb-6">
+            <label className="text-sm font-medium text-muted-foreground">Photo de l'armoire</label>
+            <div className="mt-2 rounded-lg overflow-hidden border border-border bg-muted/30 max-w-md">
+              <img
+                src={photoUrl}
+                alt={data.nom || "Photo de l'armoire"}
+                className="w-full h-auto object-contain max-h-64"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = 'none';
+                }}
+              />
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
           {Object.entries(data)
-            .filter(([key]) => {
-              // Exclure les champs système, les IDs si la relation existe, et les relations de localisation
-              if (key === 'ports' || key === 'created_at' || key === 'updated_at') return false;
-              if (key === 'coffret' || key === 'batiment' || key === 'salle') return false;
+            .filter(([key, value]) => {
+              // Exclure l'id principal
+              if (key === 'id') return false;
+              // Exclure les champs système
+              if (key === 'ports' || key === 'created_at' || key === 'updated_at' || key === 'deleted_at') return false;
+              // Exclure les objets de relation (mais pas les chaînes de caractères formatées)
+              if ((key === 'coffret' || key === 'batiment' || key === 'salle' || key === 'site' || key === 'zone') && typeof value === 'object') return false;
               if (key === 'qr_code') return false; // Exclure le QR code du rendu texte
+              if (key === 'photo' || key === 'photo_url') return false; // Exclure photo du texte (affichée en image)
               if (key.endsWith('_id')) {
                 // Ne pas afficher l'ID si la relation existe (ex: coffret_id si coffret existe)
                 const relationKey = key.replace('_id', '');

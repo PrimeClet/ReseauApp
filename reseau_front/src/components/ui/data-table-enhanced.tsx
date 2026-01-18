@@ -387,9 +387,12 @@ export default function DataTableEnhanced({
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
-                              <AlertDialogCancel>Annuler</AlertDialogCancel>
+                              <AlertDialogCancel onClick={(e) => e.stopPropagation()}>Annuler</AlertDialogCancel>
                               <AlertDialogAction
-                                onClick={() => onDelete(row.id)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onDelete(row.id);
+                                }}
                                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                               >
                                 Supprimer
@@ -419,9 +422,12 @@ export default function DataTableEnhanced({
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
-                              <AlertDialogCancel>Annuler</AlertDialogCancel>
+                              <AlertDialogCancel onClick={(e) => e.stopPropagation()}>Annuler</AlertDialogCancel>
                               <AlertDialogAction
-                                onClick={() => onRestore(row.id)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onRestore(row.id);
+                                }}
                                 className="bg-green-600 text-white hover:bg-green-700"
                               >
                                 Restaurer

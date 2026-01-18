@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -15,16 +15,16 @@ import type { CoffretCreateData } from "@/services/coffretService";
 
 const armoireSchema = z.object({
   nom: z.string().min(1, "Le nom est requis"),
-  modele: z.string().min(1, "Le modèle est requis"),
+  modele: z.string().optional(),
   photo: z.any().optional(),
   long: z.number().optional().nullable(),
   lat: z.number().optional().nullable(),
-  site_id: z.number().int({ message: "Le site est requis" }),
-  zone_id: z.number().int({ message: "La zone est requise" }),
+  site_id: z.number().int().min(1, "Le site est requis (sélectionnez une salle avec un bâtiment lié à une zone et un site)"),
+  zone_id: z.number().int().min(1, "La zone est requise (sélectionnez une salle avec un bâtiment lié à une zone)"),
   batiment_id: z.number().int().min(1, "Le bâtiment est requis"),
   salle_id: z.number().int().min(1, "La salle est requise"),
   emplacement: z.string().optional(),
-  status: z.enum(["active", "inactive"])
+  status: z.enum(["active", "inactive"]).optional()
 });
 
 type ArmoireFormData = z.infer<typeof armoireSchema>;
@@ -32,10 +32,7 @@ type ArmoireFormData = z.infer<typeof armoireSchema>;
 const AddArmoireForm = () => {
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
-  const { addCoffret, refetchCoffrets, sites, zones, batiments, salles, isLoadingBatiments, isLoadingSalles } = useData();
-  const [selectedSiteId, setSelectedSiteId] = useState<number | undefined>(undefined);
-  const [selectedZoneId, setSelectedZoneId] = useState<number | undefined>(undefined);
-  const [selectedBatimentId, setSelectedBatimentId] = useState<number | undefined>(undefined);
+  const { addCoffret, refetchCoffrets, sites, zones, batiments, salles, isLoadingSalles } = useData();
 
   const form = useForm<ArmoireFormData>({
     resolver: zodResolver(armoireSchema),
@@ -45,42 +42,70 @@ const AddArmoireForm = () => {
       photo: undefined,
       long: undefined,
       lat: undefined,
+      site_id: undefined,
+      zone_id: undefined,
       batiment_id: undefined,
       salle_id: undefined,
     },
   });
 
-  useEffect(() => {
-    if (selectedSiteId) {
-      setSelectedZoneId(undefined);
-      setSelectedBatimentId(undefined);
-      form.setValue("zone_id", undefined as unknown as number);
-      form.setValue("batiment_id", undefined as unknown as number);
-      form.setValue("salle_id", undefined as unknown as number);
-    }
-  }, [selectedSiteId, form]);
+  // Créer des maps pour accéder rapidement aux relations
+  const batimentMap = useMemo(() => {
+    const map = new Map<number, { id: number; nom: string; zone_id?: number }>();
+    batiments.forEach(b => map.set(b.id, b));
+    return map;
+  }, [batiments]);
 
-  useEffect(() => {
-    if (selectedZoneId) {
-      setSelectedBatimentId(undefined);
-      form.setValue("batiment_id", undefined as unknown as number);
-      form.setValue("salle_id", undefined as unknown as number);
-    }
-  }, [selectedZoneId, form]);
+  const zoneMap = useMemo(() => {
+    const map = new Map<number, { id: number; libelle: string; site_id: number }>();
+    zones.forEach(z => map.set(z.id, z));
+    return map;
+  }, [zones]);
 
-  useEffect(() => {
-    if (selectedBatimentId) {
-      form.setValue("salle_id", undefined as unknown as number);
+  const siteMap = useMemo(() => {
+    const map = new Map<number, { id: number; libelle: string }>();
+    sites.forEach(s => map.set(s.id, s));
+    return map;
+  }, [sites]);
+
+  // Fonction pour remplir automatiquement les champs parent lors de la sélection de salle
+  const handleSalleChange = (salleId: number) => {
+    form.setValue("salle_id", salleId);
+
+    // Trouver la salle sélectionnée
+    const salle = salles.find(s => s.id === salleId);
+    if (!salle) return;
+
+    // Remplir le bâtiment
+    const batimentId = salle.batiment_id;
+    if (batimentId) {
+      form.setValue("batiment_id", batimentId);
+
+      // Trouver le bâtiment pour obtenir la zone
+      const batiment = batimentMap.get(batimentId);
+      if (batiment?.zone_id) {
+        form.setValue("zone_id", batiment.zone_id);
+
+        // Trouver la zone pour obtenir le site
+        const zone = zoneMap.get(batiment.zone_id);
+        if (zone?.site_id) {
+          form.setValue("site_id", zone.site_id);
+        }
+      }
     }
-  }, [selectedBatimentId, form]);
+  };
 
   const onSubmit = async (data: ArmoireFormData) => {
     try {
       const coffretData: CoffretCreateData = {
         nom: data.nom,
+        modele: data.modele || undefined,
         piece: "", // Valeur par défaut vide (champ retiré du formulaire)
+        emplacement: data.emplacement || undefined,
         long: data.long ?? undefined,
         lat: data.lat ?? undefined,
+        site_id: data.site_id || undefined,
+        zone_id: data.zone_id || undefined,
         batiment_id: data.batiment_id || undefined,
         salle_id: data.salle_id || undefined,
       };
@@ -91,7 +116,6 @@ const AddArmoireForm = () => {
         description: `L'armoire ${data.nom} a été ajoutée avec succès`,
       });
       form.reset();
-      setSelectedBatimentId(undefined);
       setOpen(false);
       refetchCoffrets();
     } catch (error: any) {
@@ -172,143 +196,44 @@ const AddArmoireForm = () => {
                 )}
               />
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="site_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Site *</FormLabel>
-                    <Select
-                      onValueChange={(value) => {
-                        const v = parseInt(value);
-                        field.onChange(v);
-                        setSelectedSiteId(v);
-                      }}
-                      value={field.value?.toString() || ""}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Sélectionner le site" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {sites?.map((s) => (
-                          <SelectItem key={s.id} value={s.id.toString()}>
-                            {s.libelle}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="zone_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Zone *</FormLabel>
-                    <Select
-                      onValueChange={(value) => {
-                        const v = parseInt(value);
-                        field.onChange(v);
-                        setSelectedZoneId(v);
-                      }}
-                      value={field.value?.toString() || ""}
-                      disabled={!selectedSiteId}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder={selectedSiteId ? "Sélectionner la zone" : "Sélectionnez d'abord un site"} />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {zones
-                          ?.filter((z) => z.site_id === selectedSiteId)
-                          .map((z) => (
-                            <SelectItem key={z.id} value={z.id.toString()}>
-                              {z.libelle}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="batiment_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Bâtiment *</FormLabel>
-                    <Select
-                      onValueChange={(value) => {
-                        const numericValue = parseInt(value);
-                        field.onChange(numericValue);
-                        setSelectedBatimentId(numericValue);
-                      }}
-                      value={field.value?.toString() || ""}
-                      disabled={isLoadingBatiments}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Sélectionner le bâtiment" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {batiments?.map((batiment) => (
-                          <SelectItem key={batiment.id} value={batiment.id.toString()}>
-                            {batiment.nom}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="salle_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Salle *</FormLabel>
-                    <Select
-                      onValueChange={(value) => {
-                        const numericValue = parseInt(value);
-                        field.onChange(numericValue);
-                      }}
-                      value={field.value?.toString() || ""}
-                      disabled={isLoadingSalles || !selectedBatimentId}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder={selectedBatimentId ? "Sélectionner la salle" : "Sélectionnez d'abord un bâtiment"} />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {salles
-                          ?.filter((salle) => salle.batiment_id === selectedBatimentId)
-                          .map((salle) => (
+            {/* Sélection de la salle */}
+            <FormField
+              control={form.control}
+              name="salle_id"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Salle *</FormLabel>
+                  <Select
+                    onValueChange={(value) => {
+                      const numericValue = parseInt(value);
+                      handleSalleChange(numericValue);
+                    }}
+                    value={field.value?.toString() || ""}
+                    disabled={isLoadingSalles}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Sélectionner la salle" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {salles
+                        ?.filter((salle) => !salle.deleted_at)
+                        .map((salle) => {
+                          const batiment = batimentMap.get(salle.batiment_id);
+                          const batimentNom = batiment?.nom || "";
+                          return (
                             <SelectItem key={salle.id} value={salle.id.toString()}>
-                              {salle.nom}
+                              {salle.nom} {batimentNom && `(${batimentNom})`}
                             </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+                          );
+                        })}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <FormField
               control={form.control}

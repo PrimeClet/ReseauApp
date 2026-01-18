@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useData } from "@/contexts/DataContext";
 import { Plus } from "lucide-react";
@@ -14,6 +15,7 @@ import { Plus } from "lucide-react";
 const batimentSchema = z.object({
   nom: z.string().min(1, "Le nom est requis"),
   description: z.string().optional(),
+  zone_id: z.number().optional(),
 });
 
 type BatimentFormData = z.infer<typeof batimentSchema>;
@@ -21,13 +23,16 @@ type BatimentFormData = z.infer<typeof batimentSchema>;
 export default function AddBatimentForm() {
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
-  const { addBatiment } = useData();
+  const { addBatiment, zones, refetchBatiments } = useData();
+
+  const zoneOptions = useMemo(() => zones.map(z => ({ id: z.id, label: z.libelle })), [zones]);
 
   const form = useForm<BatimentFormData>({
     resolver: zodResolver(batimentSchema),
     defaultValues: {
       nom: "",
       description: "",
+      zone_id: undefined,
     },
   });
 
@@ -40,6 +45,7 @@ export default function AddBatimentForm() {
       });
       form.reset();
       setOpen(false);
+      refetchBatiments();
     } catch (error) {
       toast({
         title: "Erreur",
@@ -72,6 +78,35 @@ export default function AddBatimentForm() {
                   <FormControl>
                     <Input placeholder="Ex: Bâtiment A" {...field} />
                   </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="zone_id"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Zone (optionnel)</FormLabel>
+                  <Select
+                    onValueChange={(value) => field.onChange(value && value !== "none" ? Number(value) : undefined)}
+                    value={field.value ? field.value.toString() : "none"}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Sélectionner une zone" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="none">Aucune zone</SelectItem>
+                      {zoneOptions.map((zone) => (
+                        <SelectItem key={zone.id} value={zone.id.toString()}>
+                          {zone.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}

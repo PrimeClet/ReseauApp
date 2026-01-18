@@ -300,7 +300,7 @@ export default function AddEquipmentForm({ defaultCoffretId, onSuccess, trigger 
                 name="modele"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Model</FormLabel>
+                    <FormLabel>Modèle</FormLabel>
                     <FormControl>
                       <Input placeholder="Ex: Catalyst 2960X" {...field} />
                     </FormControl>
@@ -313,7 +313,7 @@ export default function AddEquipmentForm({ defaultCoffretId, onSuccess, trigger 
                 name="fabricant"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Manufacturer</FormLabel>
+                    <FormLabel>Fabricant</FormLabel>
                     <FormControl>
                       <Input placeholder="Ex: Cisco, HP, Huawei..." {...field} />
                     </FormControl>
@@ -329,7 +329,7 @@ export default function AddEquipmentForm({ defaultCoffretId, onSuccess, trigger 
                 name="numero_serie"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Serial number</FormLabel>
+                    <FormLabel>Numéro de série</FormLabel>
                     <FormControl>
                       <Input placeholder="Ex: SN123456789" {...field} />
                     </FormControl>
@@ -342,11 +342,11 @@ export default function AddEquipmentForm({ defaultCoffretId, onSuccess, trigger 
                 name="type_reseau"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Network type</FormLabel>
+                    <FormLabel>Type de réseau</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select" />
+                          <SelectValue placeholder="Sélectionner" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
@@ -366,7 +366,7 @@ export default function AddEquipmentForm({ defaultCoffretId, onSuccess, trigger 
                 name="nb_ports_fibre"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Fibre ports</FormLabel>
+                    <FormLabel>Ports fibre</FormLabel>
                     <FormControl>
                       <Input type="number" min={0} {...field} onChange={(e) => field.onChange(parseInt(e.target.value || '0'))} />
                     </FormControl>
@@ -379,7 +379,7 @@ export default function AddEquipmentForm({ defaultCoffretId, onSuccess, trigger 
                 name="nb_ports_rj45"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>RJ45 ports</FormLabel>
+                    <FormLabel>Ports RJ45</FormLabel>
                     <FormControl>
                       <Input type="number" min={0} {...field} onChange={(e) => field.onChange(parseInt(e.target.value || '0'))} />
                     </FormControl>

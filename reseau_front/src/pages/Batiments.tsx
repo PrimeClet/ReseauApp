@@ -21,12 +21,13 @@ import {
 const Batiments = () => {
   const { isAuthenticated, isLoading: isLoadingAuth } = useAuth();
   const navigate = useNavigate();
-  const { batiments, salles, isLoadingBatiments, updateBatiment, deleteBatiment, restoreBatiment, refetchBatiments, importBatiments } = useData();
+  const { batiments, salles, zones, isLoadingBatiments, updateBatiment, deleteBatiment, restoreBatiment, refetchBatiments, importBatiments } = useData();
   const [selectedBatiment, setSelectedBatiment] = useState<any>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [sallesFilter, setSallesFilter] = useState<string>("all");
+  const [zoneFilter, setZoneFilter] = useState<string>("all");
 
   // Calculer le nombre de salles par bâtiment - DOIT être avant tout return conditionnel
   const sallesCountByBatiment = useMemo(() => {
@@ -39,19 +40,38 @@ const Batiments = () => {
     return counts;
   }, [salles]);
 
+  // Map zone_id -> libelle pour affichage
+  const zoneIdToLabel = useMemo(() => {
+    const m = new Map<number, string>();
+    zones.forEach(z => m.set(z.id, z.libelle));
+    return m;
+  }, [zones]);
+
   // Préparer les données pour le tableau - DOIT être avant tout return conditionnel
   const tableData = useMemo(() => {
     let data = batiments.map((batiment) => {
       const nombreSalles = (batiment as any).salles_count ?? sallesCountByBatiment[batiment.id] ?? 0;
       const isDeleted = (batiment as any).deleted_at !== null && (batiment as any).deleted_at !== undefined;
+      const zoneName = batiment.zone_id ? (zoneIdToLabel.get(batiment.zone_id) || (batiment as any).zone?.libelle || '-') : '-';
       return {
         id: batiment.id,
+        zone_id: batiment.zone_id,
+        Zone: zoneName,
         Nom: batiment.nom,
         Description: batiment.description || '-',
         "Nombre de Salles": nombreSalles,
         "Status": isDeleted ? "Supprimé" : "Actif",
       };
     });
+
+    // Appliquer le filtre de zone
+    if (zoneFilter !== "all") {
+      if (zoneFilter === "none") {
+        data = data.filter((item) => !item.zone_id);
+      } else {
+        data = data.filter((item) => item.zone_id === Number(zoneFilter));
+      }
+    }
 
     // Appliquer le filtre de status
     if (statusFilter !== "all") {
@@ -70,7 +90,7 @@ const Batiments = () => {
     }
 
     return data;
-  }, [batiments, sallesCountByBatiment, statusFilter, sallesFilter]);
+  }, [batiments, sallesCountByBatiment, zoneIdToLabel, zoneFilter, statusFilter, sallesFilter]);
 
   useEffect(() => {
     if (!isLoadingAuth && !isAuthenticated) {
@@ -90,9 +110,11 @@ const Batiments = () => {
 
   const handleSave = async (updatedBatiment: any) => {
     try {
+      const zoneId = updatedBatiment.zone_id === "" || updatedBatiment.zone_id === "none" ? null : updatedBatiment.zone_id;
       await updateBatiment(updatedBatiment.id, {
         nom: updatedBatiment.nom,
         description: updatedBatiment.description,
+        zone_id: zoneId,
       });
       toast({
         title: "Bâtiment mis à jour",
@@ -167,9 +189,14 @@ const Batiments = () => {
     // Trouver le bâtiment original
     const originalBatiment = batiments.find(b => b.id === batiment.id) || batiment;
     const nombreSalles = (originalBatiment as any).salles_count ?? sallesCountByBatiment[originalBatiment.id] ?? 0;
+    const zoneName = originalBatiment.zone_id
+      ? (zoneIdToLabel.get(originalBatiment.zone_id) || (originalBatiment as any).zone?.libelle || "Non défini")
+      : "Non défini";
     return {
       id: originalBatiment.id,
       nom: originalBatiment.nom,
+      zone: zoneName,
+      zone_id: originalBatiment.zone_id,
       description: originalBatiment.description || "",
       nombre_salles: nombreSalles,
     };
@@ -211,7 +238,7 @@ const Batiments = () => {
           <>
             <DataTableEnhanced
               title={`${tableData.length} bâtiment${tableData.length > 1 ? 's' : ''} configuré${tableData.length > 1 ? 's' : ''}`}
-              columns={["Nom", "Description", "Nombre de Salles", "Status"]}
+              columns={["Zone", "Nom", "Description", "Nombre de Salles", "Status"]}
               data={tableData}
               onRowClick={handleRowClick}
               onEdit={handleEdit}
@@ -228,6 +255,23 @@ const Batiments = () => {
               restoreConfirmDescription="Êtes-vous sûr de vouloir restaurer ce bâtiment ?"
               customFilters={
                 <>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground whitespace-nowrap">Zone:</span>
+                    <Select value={zoneFilter} onValueChange={setZoneFilter}>
+                      <SelectTrigger className="w-36">
+                        <SelectValue placeholder="Toutes" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Toutes</SelectItem>
+                        <SelectItem value="none">Sans zone</SelectItem>
+                        {zones.map((zone) => (
+                          <SelectItem key={zone.id} value={zone.id.toString()}>
+                            {zone.libelle}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-muted-foreground whitespace-nowrap">Status:</span>
                     <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -279,6 +323,7 @@ const Batiments = () => {
               onSave={handleSave}
               fields={[
                 { key: "nom", label: "Nom", type: "text" },
+                { key: "zone_id", label: "Zone", type: "select", options: [{ value: "", label: "Aucune zone" }, ...zones.map(z => ({ value: z.id, label: z.libelle }))] },
                 { key: "description", label: "Description", type: "text" },
               ]}
             />

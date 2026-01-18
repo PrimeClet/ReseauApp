@@ -109,10 +109,12 @@ Route::middleware('auth:sanctum')->group(function () {
 
             // Sites
             Route::get('/sites', [SiteController::class, 'index']);
+            Route::get('/sites/trashed', [SiteController::class, 'trashed']);
             Route::get('/sites/{site}', [SiteController::class, 'show']);
 
             // Zones
             Route::get('/zones', [ZoneController::class, 'index']);
+            Route::get('/zones/trashed', [ZoneController::class, 'trashed']);
             Route::get('/zones/{zone}', [ZoneController::class, 'show']);
 
             // Modifications
@@ -202,11 +204,15 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/sites', [SiteController::class, 'store']);
             Route::put('/sites/{site}', [SiteController::class, 'update']);
             Route::delete('/sites/{site}', [SiteController::class, 'destroy']);
+            Route::post('/sites/{id}/restore', [SiteController::class, 'restore']);
+            Route::delete('/sites/{id}/force', [SiteController::class, 'forceDelete']);
 
             // Zones
             Route::post('/zones', [ZoneController::class, 'store']);
             Route::put('/zones/{zone}', [ZoneController::class, 'update']);
             Route::delete('/zones/{zone}', [ZoneController::class, 'destroy']);
+            Route::post('/zones/{id}/restore', [ZoneController::class, 'restore']);
+            Route::delete('/zones/{id}/force', [ZoneController::class, 'forceDelete']);
 
             // Modifications
             Route::post('/modifications', [ModificationController::class, 'store']);

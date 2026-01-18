@@ -2,7 +2,6 @@ import { Server, Router, Cable, Activity, Loader2, Wrench } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import StatsCard from "./StatsCard";
 import { useData } from "@/contexts/DataContext";
-import { useNavigate } from "react-router-dom";
 
 export default function DashboardOverview() {
   const navigate = useNavigate();

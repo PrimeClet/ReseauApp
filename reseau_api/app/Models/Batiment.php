@@ -13,7 +13,16 @@ class Batiment extends Model
     protected $fillable = [
         'nom',
         'description',
+        'zone_id',
     ];
+
+    /**
+     * Relation avec la zone
+     */
+    public function zone()
+    {
+        return $this->belongsTo(Zone::class);
+    }
 
     /**
      * Relation avec les salles

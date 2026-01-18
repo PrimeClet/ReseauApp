@@ -23,7 +23,7 @@ type ZoneFormData = z.infer<typeof zoneSchema>;
 export default function AddZoneForm() {
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
-  const { addZone, sites } = useData();
+  const { addZone, sites, refetchZones } = useData();
 
   const siteOptions = useMemo(() => sites.map(s => ({ id: s.id, label: s.libelle })), [sites]);
 
@@ -45,6 +45,7 @@ export default function AddZoneForm() {
       });
       form.reset();
       setOpen(false);
+      refetchZones();
     } catch (error) {
       toast({
         title: "Erreur",

@@ -8,7 +8,9 @@
       "Bash(python3:*)",
       "Bash(php artisan migrate:fresh:*)",
       "Bash(npm run build:*)",
-      "Bash(php artisan db:seed:*)"
+      "Bash(php artisan db:seed:*)",
+      "Bash(php artisan migrate:*)",
+      "Bash(php artisan migrate:status:*)"
     ]
   }
 }

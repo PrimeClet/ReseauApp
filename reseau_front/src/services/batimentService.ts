@@ -4,10 +4,16 @@ export interface Batiment {
   id: number;
   nom: string;
   description?: string;
+  zone_id?: number;
   salles_count?: number;
   deleted_at?: string | null;
   created_at?: string;
   updated_at?: string;
+  // Optional expanded relation
+  zone?: {
+    id: number;
+    libelle: string;
+  };
 }
 
 export interface BatimentListResponse {
@@ -21,6 +27,7 @@ export interface BatimentListResponse {
 export interface BatimentCreateData {
   nom: string;
   description?: string;
+  zone_id?: number;
 }
 
 const batimentService = {

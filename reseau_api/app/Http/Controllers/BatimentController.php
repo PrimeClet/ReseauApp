@@ -32,7 +32,7 @@ class BatimentController extends Controller
         $perPage = (int) $request->get('per_page', 15);
         $perPage = $perPage > 0 && $perPage <= 100 ? $perPage : 15;
 
-        $batiments = $query->withCount('salles')->orderBy('nom')->paginate($perPage);
+        $batiments = $query->with('zone')->withCount('salles')->orderBy('nom')->paginate($perPage);
 
         return response()->json($batiments);
     }
@@ -49,9 +49,11 @@ class BatimentController extends Controller
         $request->validate([
             'nom' => 'required|string|max:255',
             'description' => 'nullable|string',
+            'zone_id' => 'nullable|exists:zones,id',
         ]);
 
-        $batiment = Batiment::create($request->only(['nom', 'description']));
+        $batiment = Batiment::create($request->only(['nom', 'description', 'zone_id']));
+        $batiment->load('zone');
 
         return response()->json([
             'message' => 'Bâtiment créé avec succès.',
@@ -64,6 +66,7 @@ class BatimentController extends Controller
      */
     public function show(Batiment $batiment)
     {
+        $batiment->load('zone');
         $batiment->loadCount('salles');
 
         return response()->json([
@@ -83,9 +86,11 @@ class BatimentController extends Controller
         $request->validate([
             'nom' => 'sometimes|string|max:255',
             'description' => 'nullable|string',
+            'zone_id' => 'nullable|exists:zones,id',
         ]);
 
-        $batiment->update($request->only(['nom', 'description']));
+        $batiment->update($request->only(['nom', 'description', 'zone_id']));
+        $batiment->load('zone');
 
         return response()->json([
             'message' => 'Bâtiment mis à jour avec succès.',
@@ -120,6 +125,7 @@ class BatimentController extends Controller
 
         $batiment = Batiment::withTrashed()->findOrFail($id);
         $batiment->restore();
+        $batiment->load('zone');
 
         return response()->json([
             'message' => 'Bâtiment restauré avec succès.',

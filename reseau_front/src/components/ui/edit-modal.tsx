@@ -126,8 +126,15 @@ export default function EditModal({
 
               {type === 'select' && options ? (
                 <Select
-                  value={formData[key] && formData[key] !== '' ? String(formData[key]) : undefined}
-                  onValueChange={(value) => handleChange(key, value)}
+                  value={formData[key] !== undefined && formData[key] !== null && formData[key] !== '' ? String(formData[key]) : undefined}
+                  onValueChange={(value) => {
+                    // Convertir en nombre si l'option originale était un nombre
+                    const firstOption = options[0];
+                    const isObjectOption = typeof firstOption === 'object' && firstOption !== null;
+                    const originalValue = isObjectOption ? (firstOption as any).value : firstOption;
+                    const shouldBeNumber = typeof originalValue === 'number';
+                    handleChange(key, shouldBeNumber ? Number(value) : value);
+                  }}
                   disabled={disabled}
                 >
                   <SelectTrigger>
@@ -136,10 +143,10 @@ export default function EditModal({
                   <SelectContent>
                     {options.map((option) => {
                       const isObjectOption = typeof option === 'object' && option !== null;
-                      const value = isObjectOption ? option.value : option;
-                      const optionLabel = isObjectOption ? option.label : option;
+                      const optionValue = isObjectOption ? (option as any).value : option;
+                      const optionLabel = isObjectOption ? (option as any).label : option;
                       return (
-                        <SelectItem key={value} value={value}>
+                        <SelectItem key={String(optionValue)} value={String(optionValue)}>
                           {optionLabel}
                         </SelectItem>
                       );

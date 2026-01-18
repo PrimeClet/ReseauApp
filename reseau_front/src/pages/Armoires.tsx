@@ -8,8 +8,9 @@ import DataTableEnhanced from "@/components/ui/data-table-enhanced";
 import DetailsModal from "@/components/ui/details-modal";
 import EditModal from "@/components/ui/edit-modal";
 import AddArmoireForm from "@/components/forms/AddArmoireForm";
+import QRCodeModal from "@/components/ui/qr-code-modal";
 import { toast } from "@/hooks/use-toast";
-import { Loader2, X, Server } from "lucide-react";
+import { Loader2, X, Server, QrCode } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -28,12 +29,14 @@ import {
 const Armoires = () => {
   const { isAuthenticated, isLoading: isLoadingAuth } = useAuth();
   const navigate = useNavigate();
-  const { coffrets, batiments, salles, isLoadingCoffrets, updateCoffret, deleteCoffret, restoreCoffret, importCoffrets, refetchCoffrets } = useData();
+  const { coffrets, sites, zones, batiments, salles, isLoadingCoffrets, updateCoffret, deleteCoffret, restoreCoffret, importCoffrets, refetchCoffrets } = useData();
   const [selectedCoffret, setSelectedCoffret] = useState<any>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [selectedSalle, setSelectedSalle] = useState<any>(null);
   const [isSalleDetailsOpen, setIsSalleDetailsOpen] = useState(false);
+  const [isQRCodeOpen, setIsQRCodeOpen] = useState(false);
+  const [qrCodeData, setQrCodeData] = useState<{ qrCode: string; title: string; subtitle: string; code: string } | null>(null);
 
   // Filtres par bâtiment, salle et status
   const [selectedBatimentId, setSelectedBatimentId] = useState<string>("");
@@ -299,6 +302,52 @@ const Armoires = () => {
     );
   };
 
+  // Fonction pour ouvrir le modal QR Code depuis les actions du tableau
+  const handleOpenQRCode = (row: any) => {
+    const originalCoffret = coffrets.find(c => c.id === row.id);
+    if (originalCoffret?.qr_code) {
+      const batiment = batiments.find(b => b.id === originalCoffret.batiment_id);
+      const salle = salles.find(s => s.id === originalCoffret.salle_id);
+      setQrCodeData({
+        qrCode: originalCoffret.qr_code,
+        title: originalCoffret.nom || originalCoffret.code,
+        subtitle: batiment?.nom || salle?.nom || originalCoffret.piece || '',
+        code: originalCoffret.code
+      });
+      setIsQRCodeOpen(true);
+    }
+  };
+
+  // Rendu des actions personnalisées (bouton QR Code)
+  const renderRowActions = (row: any) => {
+    const originalCoffret = coffrets.find(c => c.id === row.id);
+    const hasQRCode = originalCoffret?.qr_code;
+
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleOpenQRCode(row);
+              }}
+              disabled={!hasQRCode}
+              className={hasQRCode ? "text-primary hover:text-primary" : "text-muted-foreground"}
+            >
+              <QrCode className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>{hasQRCode ? "Télécharger le QR Code" : "QR Code non disponible"}</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  };
+
   // Préparer les données pour les modals (format attendu)
   const formatCoffretForModal = (coffret: any) => {
     if (!coffret) return null;
@@ -315,16 +364,18 @@ const Armoires = () => {
       modele: originalCoffret.modele || "",
       photo: originalCoffret.photo || "",
       photo_url: originalCoffret.photo_url || null,
+      emplacement: originalCoffret.emplacement || "",
       piece: originalCoffret.piece,
-      qr_code: originalCoffret.qr_code,
+      qr_code: originalCoffret.qr_code || null,
       long: originalCoffret.long || 0,
       lat: originalCoffret.lat || 0,
+      site: site ? { libelle: site.libelle } : null,
+      zone: zone ? { libelle: zone.libelle } : null,
       batiment: batiment ? { nom: batiment.nom } : null,
       salle: salle ? { nom: salle.nom } : null,
       batiment_id: originalCoffret.batiment_id,
       salle_id: originalCoffret.salle_id,
       status: originalCoffret.status,
-      qr_code: originalCoffret.qr_code || null,
     };
   };
 
@@ -370,6 +421,7 @@ const Armoires = () => {
                 "Salle": renderSalleCell,
                 "Équipements": renderEquipementsCell,
               }}
+              renderRowActions={renderRowActions}
               customFilters={
                 <>
                   <div className="flex items-center gap-2">
@@ -471,6 +523,19 @@ const Armoires = () => {
                 navigate('/salles');
               }}
             />
+
+            {/* Modal QR Code */}
+            {qrCodeData && (
+              <QRCodeModal
+                open={isQRCodeOpen}
+                onOpenChange={setIsQRCodeOpen}
+                qrCode={qrCodeData.qrCode}
+                title={qrCodeData.title}
+                subtitle={qrCodeData.subtitle}
+                type="coffret"
+                code={qrCodeData.code}
+              />
+            )}
           </>
         )}
       </div>

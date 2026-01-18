@@ -21,7 +21,7 @@ type SiteFormData = z.infer<typeof siteSchema>;
 export default function AddSiteForm() {
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
-  const { addSite } = useData();
+  const { addSite, refetchSites } = useData();
 
   const form = useForm<SiteFormData>({
     resolver: zodResolver(siteSchema),
@@ -40,6 +40,7 @@ export default function AddSiteForm() {
       });
       form.reset();
       setOpen(false);
+      refetchSites();
     } catch (error) {
       toast({
         title: "Erreur",

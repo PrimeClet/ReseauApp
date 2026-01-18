@@ -24,7 +24,11 @@ import {
   KeyRound,
   Network,
   Map,
-  Plug
+  Plug,
+  ClipboardList,
+  CheckCircle2,
+  History,
+  Bell
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
