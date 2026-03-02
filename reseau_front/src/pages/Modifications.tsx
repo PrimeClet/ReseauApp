@@ -1,6 +1,5 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
+import { useState } from "react";
+import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { useData } from "@/contexts/DataContext";
 import AppShell from "@/components/layout/AppShell";
 import DataTableEnhanced from "@/components/ui/data-table-enhanced";
@@ -20,24 +19,17 @@ const typeModificationLabels: Record<string, string> = {
 };
 
 const Modifications = () => {
-  const { isAuthenticated, isLoading: isLoadingAuth } = useAuth();
-  const navigate = useNavigate();
-  const { 
-    modifications, 
-    isLoadingModifications, 
-    addModification, 
-    updateModification, 
-    deleteModification 
+  const { isAuthenticated, isLoading: isLoadingAuth } = useRequireAuth();
+  const {
+    modifications,
+    isLoadingModifications,
+    addModification,
+    updateModification,
+    deleteModification
   } = useData();
   const [selectedModification, setSelectedModification] = useState<any>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
-
-  useEffect(() => {
-    if (!isLoadingAuth && !isAuthenticated) {
-      navigate("/login");
-    }
-  }, [isAuthenticated, isLoadingAuth, navigate]);
 
   if (isLoadingAuth) {
     return (
@@ -238,7 +230,7 @@ const Modifications = () => {
               onSave={handleSave}
               fields={[
                 { key: "description", label: "Description", type: "textarea" },
-                { key: "raison", label: "Raison / Justification", type: "textarea" },
+                { key: "raison", label: "Raison / justification", type: "textarea" },
                 { key: "date_intervention", label: "Date d'intervention", type: "date" },
                 { key: "heure_intervention", label: "Heure d'intervention", type: "time" },
                 { key: "photo_avant", label: "Photo avant (optionnel)", type: "file" },

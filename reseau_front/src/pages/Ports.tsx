@@ -1,6 +1,5 @@
-import { useEffect, useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
+import { useState, useMemo, useEffect } from "react";
+import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { useData } from "@/contexts/DataContext";
 import AppShell from "@/components/layout/AppShell";
 import PageHeader from "@/components/ui/page-header";
@@ -32,26 +31,27 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 // Schema de validation pour l'ajout de port
 const portSchema = z.object({
   port_label: z.string().min(1, "Le label du port est requis"),
-  device_name: z.string().min(1, "Le nom de l'appareil est requis"),
   equipement_id: z.number().min(1, "L'équipement est requis"),
   poe_enabled: z.boolean().optional(),
   vlan: z.string().optional(),
   speed: z.string().optional(),
-  connected_equipment_id: z.number().optional().nullable(),
+  port_genre: z.enum(["uplink", "downlink"]).default("downlink"),
+  type_reseau: z.enum(["IT", "OT"]).default("IT"),
+  statut: z.enum(["actif", "inactif", "reserve"]).default("actif"),
+  uplink: z.string().optional(),
+  downlink: z.string().optional(),
 });
 
 type PortFormData = z.infer<typeof portSchema>;
 
 const Ports = () => {
-  const { isAuthenticated, isLoading: isLoadingAuth } = useAuth();
-  const navigate = useNavigate();
+  const { isAuthenticated, isLoading: isLoadingAuth } = useRequireAuth();
   const { ports, equipements, isLoadingPorts, isLoadingEquipements, addPort, updatePort, deletePort, restorePort, refetchPorts, refetchEquipements } = useData();
   const [selectedPort, setSelectedPort] = useState<any>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [equipementComboboxOpen, setEquipementComboboxOpen] = useState(false);
-  const [connectedEquipementComboboxOpen, setConnectedEquipementComboboxOpen] = useState(false);
 
   // Filtres
   const [equipementFilter, setEquipementFilter] = useState<string>("all");
@@ -63,12 +63,15 @@ const Ports = () => {
     resolver: zodResolver(portSchema),
     defaultValues: {
       port_label: "",
-      device_name: "",
       equipement_id: undefined,
       poe_enabled: false,
       vlan: "",
       speed: "",
-      connected_equipment_id: null,
+      port_genre: "downlink",
+      type_reseau: "IT",
+      statut: "actif",
+      uplink: "",
+      downlink: "",
     },
   });
 
@@ -107,21 +110,17 @@ const Ports = () => {
   const tableData = useMemo(() => {
     let data = ports.map((port) => {
       const equipement = equipements.find(eq => eq.id === port.equipement_id);
-      const connectedEquipement = port.connected_equipment_id
-        ? equipements.find(eq => eq.id === port.connected_equipment_id)
-        : null;
       const isDeleted = (port as any).deleted_at !== null && (port as any).deleted_at !== undefined;
       return {
         id: port.id,
         Label: port.port_label,
-        Appareil: port.device_name,
         Équipement: equipement?.name || '-',
         equipement_id: port.equipement_id,
         PoE: port.poe_enabled ? 'Oui' : 'Non',
         VLAN: port.vlan || '-',
         Vitesse: port.speed || '-',
-        "Connecté à": connectedEquipement?.name || '-',
-        connected_equipment_id: port.connected_equipment_id,
+        Genre: (port as any).port_genre === 'uplink' ? 'Uplink' : 'Downlink',
+        port_genre: (port as any).port_genre || 'downlink',
         Status: isDeleted ? "Supprimé" : ((port as any).status === 'active' ? 'Actif' : (port as any).status),
       };
     });
@@ -144,19 +143,17 @@ const Ports = () => {
     return data;
   }, [ports, equipements, equipementFilter, poeFilter, statusFilter]);
 
-  useEffect(() => {
-    if (!isLoadingAuth && !isAuthenticated) {
-      navigate("/login");
-    }
-  }, [isAuthenticated, isLoadingAuth, navigate]);
-
   const handleRowClick = (port: any) => {
-    setSelectedPort(port);
+    // Trouver le port original dans la liste pour avoir toutes les données
+    const originalPort = ports.find(p => p.id === port.id) || port;
+    setSelectedPort(originalPort);
     setIsDetailsOpen(true);
   };
 
   const handleEdit = (port: any) => {
-    setSelectedPort(port);
+    // Trouver le port original dans la liste pour avoir toutes les données
+    const originalPort = ports.find(p => p.id === port.id) || port;
+    setSelectedPort(originalPort);
     setIsEditOpen(true);
   };
 
@@ -164,14 +161,18 @@ const Ports = () => {
     try {
       const dataToSave = {
         port_label: updatedPort.port_label,
-        device_name: updatedPort.device_name,
+        device_name: updatedPort.port_label, // Utiliser le label du port comme device_name
         equipement_id: typeof updatedPort.equipement_id === 'string'
           ? parseInt(updatedPort.equipement_id, 10)
           : updatedPort.equipement_id,
-        poe_enabled: updatedPort.poe_enabled,
+        poe_enabled: updatedPort.poe_enabled === 'true' || updatedPort.poe_enabled === true,
         vlan: updatedPort.vlan,
         speed: updatedPort.speed,
-        connected_equipment_id: updatedPort.connected_equipment_id || null,
+        port_genre: updatedPort.port_genre || 'downlink',
+        type_reseau: updatedPort.type_reseau || 'IT',
+        statut: updatedPort.statut || 'actif',
+        uplink: updatedPort.uplink || null,
+        downlink: updatedPort.downlink || null,
       };
 
       await updatePort(updatedPort.id, dataToSave);
@@ -247,12 +248,16 @@ const Ports = () => {
     try {
       await addPort({
         port_label: data.port_label,
-        device_name: data.device_name,
+        device_name: data.port_label, // Utiliser le label du port comme device_name
         equipement_id: data.equipement_id,
         poe_enabled: data.poe_enabled || false,
         vlan: data.vlan || undefined,
         speed: data.speed || undefined,
-        connected_equipment_id: data.connected_equipment_id || undefined,
+        port_genre: data.port_genre || 'downlink',
+        type_reseau: data.type_reseau || 'IT',
+        statut: data.statut || 'actif',
+        uplink: data.uplink || undefined,
+        downlink: data.downlink || undefined,
       });
 
       toast({
@@ -278,32 +283,79 @@ const Ports = () => {
     if (!port) return null;
     const originalPort = ports.find(p => p.id === port.id) || port;
     const equipement = equipements.find(eq => eq.id === originalPort.equipement_id);
-    const connectedEquipement = originalPort.connected_equipment_id
-      ? equipements.find(eq => eq.id === originalPort.connected_equipment_id)
-      : null;
     return {
       id: originalPort.id,
       port_label: originalPort.port_label,
-      device_name: originalPort.device_name,
       equipement: equipement?.name || null,
       equipement_id: originalPort.equipement_id,
       poe_enabled: originalPort.poe_enabled,
       vlan: originalPort.vlan,
       speed: originalPort.speed,
-      connected_equipment: connectedEquipement?.name || null,
-      connected_equipment_id: originalPort.connected_equipment_id,
+      port_genre: (originalPort as any).port_genre || 'downlink',
+      type_reseau: (originalPort as any).type_reseau || 'IT',
+      statut: (originalPort as any).statut || 'actif',
+      uplink: (originalPort as any).uplink || '',
+      downlink: (originalPort as any).downlink || '',
     };
+  };
+
+  // Rendu personnalisé pour la colonne Label (identifiant principal)
+  const renderLabelCell = (value: string) => {
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100">
+        {value}
+      </span>
+    );
   };
 
   // Rendu personnalisé pour la colonne PoE avec badge coloré
   const renderPoeCell = (value: string) => {
     const isEnabled = value === 'Oui';
     return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium ${
         isEnabled
-          ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-          : "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200"
+          ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400"
+          : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
       }`}>
+        <span className={`h-1.5 w-1.5 rounded-full ${isEnabled ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+        {value}
+      </span>
+    );
+  };
+
+  // Rendu personnalisé pour la colonne Genre de port
+  const renderGenreCell = (value: string) => {
+    const isUplink = value === 'Uplink';
+    return (
+      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium ${
+        isUplink
+          ? "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400"
+          : "bg-cyan-50 text-cyan-700 dark:bg-cyan-950/50 dark:text-cyan-400"
+      }`}>
+        {isUplink ? '↑' : '↓'} {value}
+      </span>
+    );
+  };
+
+  // Rendu personnalisé pour la colonne Status
+  const renderStatusCell = (value: string) => {
+    let bgClass = "bg-slate-100 dark:bg-slate-800";
+    let textClass = "text-slate-600 dark:text-slate-400";
+    let dotClass = "bg-slate-400";
+
+    if (value === 'Actif' || value === 'active') {
+      bgClass = "bg-emerald-50 dark:bg-emerald-950/50";
+      textClass = "text-emerald-700 dark:text-emerald-400";
+      dotClass = "bg-emerald-500";
+    } else if (value === 'Supprimé') {
+      bgClass = "bg-rose-50 dark:bg-rose-950/50";
+      textClass = "text-rose-700 dark:text-rose-400";
+      dotClass = "bg-rose-500";
+    }
+
+    return (
+      <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium ${bgClass} ${textClass}`}>
+        <span className={`h-1.5 w-1.5 rounded-full ${dotClass}`} />
         {value}
       </span>
     );
@@ -355,7 +407,7 @@ const Ports = () => {
     <AppShell>
       <div className="space-y-6">
         <PageHeader
-          title="Gestion des Ports"
+          title="Gestion des ports"
           description="Configuration et gestion des ports réseau"
           icon={<Plug className="h-6 w-6 text-primary" />}
           breadcrumbs={[
@@ -468,34 +520,19 @@ const Ports = () => {
                       </Alert>
                     )}
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="port_label"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Label du port *</FormLabel>
-                            <FormControl>
-                              <Input placeholder="Ex: Gi0/1" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="device_name"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Nom de l'appareil *</FormLabel>
-                            <FormControl>
-                              <Input placeholder="Ex: PC-Bureau-001" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
+                    <FormField
+                      control={form.control}
+                      name="port_label"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Label du port <span className="text-red-500">*</span></FormLabel>
+                          <FormControl>
+                            <Input placeholder="Ex: Gi0/1, P1, P2" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
 
                     <div className="grid grid-cols-2 gap-4">
                       <FormField
@@ -524,11 +561,16 @@ const Ports = () => {
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
-                                <SelectItem value="10Mbps">10 Mbps</SelectItem>
-                                <SelectItem value="100Mbps">100 Mbps</SelectItem>
-                                <SelectItem value="1Gbps">1 Gbps</SelectItem>
-                                <SelectItem value="10Gbps">10 Gbps</SelectItem>
-                                <SelectItem value="auto">Auto</SelectItem>
+                                <SelectItem value="Auto">Auto-négociation</SelectItem>
+                                <SelectItem value="10 Mbps">10 Mbps</SelectItem>
+                                <SelectItem value="100 Mbps">100 Mbps</SelectItem>
+                                <SelectItem value="1 Gbps">1 Gbps</SelectItem>
+                                <SelectItem value="2.5 Gbps">2.5 Gbps</SelectItem>
+                                <SelectItem value="5 Gbps">5 Gbps</SelectItem>
+                                <SelectItem value="10 Gbps">10 Gbps</SelectItem>
+                                <SelectItem value="25 Gbps">25 Gbps</SelectItem>
+                                <SelectItem value="40 Gbps">40 Gbps</SelectItem>
+                                <SelectItem value="100 Gbps">100 Gbps</SelectItem>
                               </SelectContent>
                             </Select>
                             <FormMessage />
@@ -536,6 +578,28 @@ const Ports = () => {
                         )}
                       />
                     </div>
+
+                    <FormField
+                      control={form.control}
+                      name="port_genre"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Genre de port</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value || "downlink"}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Sélectionner le genre" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="downlink">Downlink (par défaut)</SelectItem>
+                              <SelectItem value="uplink">Uplink</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
 
                     <FormField
                       control={form.control}
@@ -554,80 +618,6 @@ const Ports = () => {
                               onCheckedChange={field.onChange}
                             />
                           </FormControl>
-                        </FormItem>
-                      )}
-                    />
-
-                    {/* Équipement connecté (optionnel) */}
-                    <FormField
-                      control={form.control}
-                      name="connected_equipment_id"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Connecté à (optionnel)</FormLabel>
-                          <Popover open={connectedEquipementComboboxOpen} onOpenChange={setConnectedEquipementComboboxOpen}>
-                            <PopoverTrigger asChild>
-                              <FormControl>
-                                <Button
-                                  variant="outline"
-                                  role="combobox"
-                                  className={cn(
-                                    "w-full justify-between",
-                                    !field.value && "text-muted-foreground"
-                                  )}
-                                >
-                                  {field.value
-                                    ? equipements.find((eq) => eq.id === field.value)?.name || "Aucun"
-                                    : "Aucun équipement connecté"}
-                                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                </Button>
-                              </FormControl>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-full p-0" align="start">
-                              <Command>
-                                <CommandInput placeholder="Rechercher un équipement..." />
-                                <CommandList>
-                                  <CommandEmpty>Aucun équipement trouvé.</CommandEmpty>
-                                  <CommandGroup>
-                                    <CommandItem
-                                      value="none"
-                                      onSelect={() => {
-                                        field.onChange(null);
-                                        setConnectedEquipementComboboxOpen(false);
-                                      }}
-                                    >
-                                      <Check
-                                        className={cn(
-                                          "mr-2 h-4 w-4",
-                                          !field.value ? "opacity-100" : "opacity-0"
-                                        )}
-                                      />
-                                      Aucun
-                                    </CommandItem>
-                                    {equipements.filter(eq => !(eq as any).deleted_at && eq.id !== selectedEquipementId).map((eq) => (
-                                      <CommandItem
-                                        key={eq.id}
-                                        value={eq.name}
-                                        onSelect={() => {
-                                          field.onChange(eq.id);
-                                          setConnectedEquipementComboboxOpen(false);
-                                        }}
-                                      >
-                                        <Check
-                                          className={cn(
-                                            "mr-2 h-4 w-4",
-                                            eq.id === field.value ? "opacity-100" : "opacity-0"
-                                          )}
-                                        />
-                                        {eq.name}
-                                      </CommandItem>
-                                    ))}
-                                  </CommandGroup>
-                                </CommandList>
-                              </Command>
-                            </PopoverContent>
-                          </Popover>
-                          <FormMessage />
                         </FormItem>
                       )}
                     />
@@ -655,7 +645,7 @@ const Ports = () => {
           <>
             <DataTableEnhanced
               title={`${tableData.length} port${tableData.length > 1 ? 's' : ''} configuré${tableData.length > 1 ? 's' : ''}`}
-              columns={["Label", "Appareil", "Équipement", "PoE", "VLAN", "Vitesse", "Connecté à", "Status"]}
+              columns={["Label", "Équipement", "Genre", "PoE", "VLAN", "Vitesse", "Status"]}
               data={tableData}
               onRowClick={handleRowClick}
               onEdit={handleEdit}
@@ -668,8 +658,11 @@ const Ports = () => {
               statusColumn="Status"
               deletedStatus="Supprimé"
               customCellRenderers={{
+                "Label": renderLabelCell,
                 "PoE": renderPoeCell,
                 "Équipement": renderEquipementCell,
+                "Genre": renderGenreCell,
+                "Status": renderStatusCell,
               }}
               customFilters={
                 <>
@@ -738,28 +731,32 @@ const Ports = () => {
               data={formatPortForModal(selectedPort)}
               onSave={handleSave}
               fields={[
-                { key: "port_label", label: "Label du port", type: "text" },
-                { key: "device_name", label: "Nom de l'appareil", type: "text" },
+                { key: "port_label", label: "Label du port", type: "text", required: true },
                 {
                   key: "equipement_id",
                   label: "Équipement",
                   type: "select",
+                  required: true,
                   options: equipements.filter(eq => !(eq as any).deleted_at).map(eq => ({
                     value: eq.id.toString(),
                     label: eq.name
                   }))
                 },
-                { key: "vlan", label: "VLAN", type: "text" },
                 {
                   key: "speed",
                   label: "Vitesse",
                   type: "select",
                   options: [
-                    { value: "10Mbps", label: "10 Mbps" },
-                    { value: "100Mbps", label: "100 Mbps" },
-                    { value: "1Gbps", label: "1 Gbps" },
-                    { value: "10Gbps", label: "10 Gbps" },
-                    { value: "auto", label: "Auto" },
+                    { value: "Auto", label: "Auto-négociation" },
+                    { value: "10 Mbps", label: "10 Mbps" },
+                    { value: "100 Mbps", label: "100 Mbps" },
+                    { value: "1 Gbps", label: "1 Gbps" },
+                    { value: "2.5 Gbps", label: "2.5 Gbps" },
+                    { value: "5 Gbps", label: "5 Gbps" },
+                    { value: "10 Gbps", label: "10 Gbps" },
+                    { value: "25 Gbps", label: "25 Gbps" },
+                    { value: "40 Gbps", label: "40 Gbps" },
+                    { value: "100 Gbps", label: "100 Gbps" },
                   ]
                 },
                 {
@@ -771,6 +768,37 @@ const Ports = () => {
                     { value: "false", label: "Désactivé" },
                   ]
                 },
+                {
+                  key: "type_reseau",
+                  label: "Type réseau",
+                  type: "select",
+                  options: [
+                    { value: "IT", label: "IT" },
+                    { value: "OT", label: "OT" },
+                  ]
+                },
+                {
+                  key: "statut",
+                  label: "Statut",
+                  type: "select",
+                  options: [
+                    { value: "actif", label: "Actif" },
+                    { value: "inactif", label: "Inactif" },
+                    { value: "reserve", label: "Réservé" },
+                  ]
+                },
+                {
+                  key: "port_genre",
+                  label: "Genre de port",
+                  type: "select",
+                  options: [
+                    { value: "downlink", label: "Downlink" },
+                    { value: "uplink", label: "Uplink" },
+                  ]
+                },
+                { key: "uplink", label: "Uplink (source)", type: "text" },
+                { key: "downlink", label: "Downlink (destination)", type: "text" },
+                { key: "vlan", label: "VLAN", type: "text" },
               ]}
             />
           </>

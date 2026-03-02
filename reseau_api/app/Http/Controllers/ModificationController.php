@@ -2,40 +2,36 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Modification;
-use App\Models\Coffret;
 use App\Helpers\NotificationHelper;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\Response;
+use App\Http\Requests\Modification\StoreModificationRequest;
+use App\Models\Coffret;
+use App\Models\Modification;
 use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Response;
+use Illuminate\Support\Facades\Storage;
 
 class ModificationController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
-    public function index(Request $request)
+    public function index(Request $request): JsonResponse
     {
         $query = Modification::with(['user', 'coffret.site', 'coffret.zone', 'coffret.batiment', 'coffret.salle', 'port', 'equipement', 'validatedBy']);
 
         if ($request->has('type_modification')) {
             $query->where('type_modification', $request->type_modification);
         }
-
         if ($request->has('coffret_id')) {
             $query->where('coffret_id', $request->coffret_id);
         }
-
         if ($request->has('statut')) {
             $query->where('statut', $request->statut);
         }
-
         if ($request->has('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('description', 'like', "%{$search}%")
-                  ->orWhere('raison', 'like', "%{$search}%");
+                    ->orWhere('raison', 'like', "%{$search}%");
             });
         }
 
@@ -46,117 +42,58 @@ class ModificationController extends Controller
             ->orderBy('heure_intervention', 'desc')
             ->paginate($perPage);
 
-        // S'assurer que user_id est toujours inclus dans chaque modification
-        $modifications->getCollection()->transform(function ($modification) {
-            // S'assurer que user_id est présent dans les attributs
-            if (!isset($modification->attributes['user_id']) && $modification->user) {
-                $modification->setAttribute('user_id', $modification->user->id);
-            }
-            // Si user_id n'existe toujours pas, essayer de le récupérer depuis la relation
-            if (!isset($modification->attributes['user_id']) && $modification->relationLoaded('user') && $modification->user) {
-                $modification->setAttribute('user_id', $modification->user->id);
-            }
-            return $modification;
-        });
-
-        return response()->json($modifications);
+        return $this->paginatedResponse($modifications);
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(Request $request)
+    public function store(StoreModificationRequest $request): JsonResponse
     {
-        $request->validate([
-            'coffret_id' => 'required|exists:coffrets,id',
-            'port_id' => 'nullable|exists:ports,id',
-            'equipement_id' => 'nullable|exists:equipements,id',
-            'type_modification' => 'required|in:ajout_port,ajout_equipement,modification_connexion,suppression_port,suppression_equipement,changement_statut_port',
-            'description' => 'required|string',
-            'raison' => 'required|string',
-            'photo_avant' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:4096',
-            'photo_apres' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:4096',
-            'date_intervention' => 'required|date',
-            'heure_intervention' => 'required|date_format:H:i',
-        ]);
+        $data = $request->validated();
 
-        // Identifier automatiquement l'utilisateur connecté
-        $userId = auth()->id();
-        if (!$userId) {
-            return response()->json(['message' => 'Non authentifié'], 401);
-        }
-
-        $data = $request->only([
-            'coffret_id',
-            'port_id',
-            'equipement_id',
-            'type_modification',
-            'description',
-            'raison',
-            'date_intervention',
-            'heure_intervention',
-        ]);
-
-        // S'assurer que l'heure est au bon format (H:i)
         if (isset($data['heure_intervention']) && strlen($data['heure_intervention']) > 5) {
             $data['heure_intervention'] = substr($data['heure_intervention'], 0, 5);
         }
 
-        // Vérifier s'il existe déjà une modification en attente pour ce coffret
         $pendingModification = Modification::where('coffret_id', $data['coffret_id'])
             ->where('statut', 'en_attente')
             ->first();
 
         if ($pendingModification) {
-            return response()->json([
-                'message' => 'Une demande de modification est déjà en attente de validation pour ce coffret. Veuillez attendre la validation ou le rejet de la demande existante.',
-            ], 422);
+            return $this->errorResponse(
+                'Une demande de modification est déjà en attente de validation pour ce coffret.',
+                422
+            );
         }
 
-        // Ajouter l'ID de l'utilisateur et le statut par défaut
-        $data['user_id'] = $userId;
+        $data['user_id'] = auth()->id();
         $data['statut'] = 'en_attente';
 
-        // Créer la modification
         $modification = Modification::create($data);
 
-        // Gérer l'upload des photos
         if ($request->hasFile('photo_avant')) {
-            $path = $request->file('photo_avant')->store('modifications/' . $modification->id, 'public');
+            $path = $request->file('photo_avant')->store('modifications/'.$modification->id, 'public');
             $modification->update(['photo_avant' => $path]);
         }
-
         if ($request->hasFile('photo_apres')) {
-            $path = $request->file('photo_apres')->store('modifications/' . $modification->id, 'public');
+            $path = $request->file('photo_apres')->store('modifications/'.$modification->id, 'public');
             $modification->update(['photo_apres' => $path]);
         }
 
         $modification->refresh();
         $modification->load(['user', 'coffret.site', 'coffret.zone', 'coffret.batiment', 'coffret.salle', 'port', 'equipement', 'validatedBy']);
 
-        // Notifier les responsables réseau de la nouvelle demande
         NotificationHelper::notifyNewModificationRequest($modification);
 
-        return response()->json([
-            'message' => 'Modification créée avec succès.',
-            'data' => $modification,
-        ], 201);
+        return $this->successResponse($modification, 'Modification créée avec succès.', 201);
     }
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(Modification $modification)
+    public function show(Modification $modification): JsonResponse
     {
-        return response()->json([
-            'data' => $modification->load(['user', 'coffret.site', 'coffret.zone', 'coffret.batiment', 'coffret.salle', 'port', 'equipement', 'validatedBy'])
-        ]);
+        return $this->successResponse(
+            $modification->load(['user', 'coffret.site', 'coffret.zone', 'coffret.batiment', 'coffret.salle', 'port', 'equipement', 'validatedBy'])
+        );
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, Modification $modification)
+    public function update(Request $request, Modification $modification): JsonResponse
     {
         $request->validate([
             'coffret_id' => 'sometimes|exists:coffrets,id',
@@ -171,56 +108,40 @@ class ModificationController extends Controller
             'heure_intervention' => 'sometimes|date_format:H:i',
         ]);
 
-        // Mise à jour des champs fournis
         $modification->update($request->only([
-            'coffret_id',
-            'port_id',
-            'equipement_id',
-            'type_modification',
-            'description',
-            'raison',
-            'date_intervention',
-            'heure_intervention',
+            'coffret_id', 'port_id', 'equipement_id', 'type_modification',
+            'description', 'raison', 'date_intervention', 'heure_intervention',
         ]));
 
-        // S'assurer que l'heure est au bon format (H:i)
         if ($request->has('heure_intervention') && strlen($request->heure_intervention) > 5) {
             $modification->update(['heure_intervention' => substr($request->heure_intervention, 0, 5)]);
         }
 
-        // Gérer l'upload des nouvelles photos si fournies
         if ($request->hasFile('photo_avant')) {
-            // Supprimer l'ancienne photo si elle existe
             if ($modification->photo_avant) {
                 Storage::disk('public')->delete($modification->photo_avant);
             }
-            $path = $request->file('photo_avant')->store('modifications/' . $modification->id, 'public');
+            $path = $request->file('photo_avant')->store('modifications/'.$modification->id, 'public');
             $modification->update(['photo_avant' => $path]);
         }
-
         if ($request->hasFile('photo_apres')) {
-            // Supprimer l'ancienne photo si elle existe
             if ($modification->photo_apres) {
                 Storage::disk('public')->delete($modification->photo_apres);
             }
-            $path = $request->file('photo_apres')->store('modifications/' . $modification->id, 'public');
+            $path = $request->file('photo_apres')->store('modifications/'.$modification->id, 'public');
             $modification->update(['photo_apres' => $path]);
         }
 
         $modification->refresh();
 
-        return response()->json([
-            'message' => 'Modification mise à jour avec succès.',
-            'data' => $modification->load(['user', 'coffret.site', 'coffret.zone', 'coffret.batiment', 'coffret.salle', 'port', 'equipement', 'validatedBy']),
-        ], 200);
+        return $this->successResponse(
+            $modification->load(['user', 'coffret.site', 'coffret.zone', 'coffret.batiment', 'coffret.salle', 'port', 'equipement', 'validatedBy']),
+            'Modification mise à jour avec succès.'
+        );
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(Modification $modification)
+    public function destroy(Modification $modification): JsonResponse
     {
-        // Supprimer les photos associées
         if ($modification->photo_avant) {
             Storage::disk('public')->delete($modification->photo_avant);
         }
@@ -228,84 +149,53 @@ class ModificationController extends Controller
             Storage::disk('public')->delete($modification->photo_apres);
         }
 
-        // Supprimer le dossier de la modification si vide
-        $directory = 'modifications/' . $modification->id;
+        $directory = 'modifications/'.$modification->id;
         if (Storage::disk('public')->exists($directory)) {
             Storage::disk('public')->deleteDirectory($directory);
         }
 
         $modification->delete();
 
-        return response()->json([
-            'message' => 'Modification supprimée avec succès.',
-        ], 200);
+        return $this->successResponse(message: 'Modification supprimée avec succès.');
     }
 
-    /**
-     * Retourne l'image avant d'une modification
-     */
     public function photoAvant(Modification $modification)
     {
-        if (!$modification->photo_avant) {
-            return response()->json(['message' => 'Photo avant non trouvée'], 404);
+        if (! $modification->photo_avant) {
+            return $this->errorResponse('Photo avant non trouvée', 404);
         }
 
-        $path = storage_path('app/public/' . $modification->photo_avant);
-        
-        if (!file_exists($path)) {
-            return response()->json(['message' => 'Fichier image non trouvé'], 404);
-        }
-
-        $mimeType = mime_content_type($path);
-        if (!$mimeType) {
-            $mimeType = 'image/jpeg';
+        $path = storage_path('app/public/'.$modification->photo_avant);
+        if (! file_exists($path)) {
+            return $this->errorResponse('Fichier image non trouvé', 404);
         }
 
         return response()->file($path, [
-            'Content-Type' => $mimeType,
+            'Content-Type' => mime_content_type($path) ?: 'image/jpeg',
             'Cache-Control' => 'public, max-age=31536000',
         ]);
     }
 
-    /**
-     * Retourne l'image après d'une modification
-     */
     public function photoApres(Modification $modification)
     {
-        if (!$modification->photo_apres) {
-            return response()->json(['message' => 'Photo après non trouvée'], 404);
+        if (! $modification->photo_apres) {
+            return $this->errorResponse('Photo après non trouvée', 404);
         }
 
-        $path = storage_path('app/public/' . $modification->photo_apres);
-        
-        if (!file_exists($path)) {
-            return response()->json(['message' => 'Fichier image non trouvé'], 404);
-        }
-
-        $mimeType = mime_content_type($path);
-        if (!$mimeType) {
-            $mimeType = 'image/jpeg';
+        $path = storage_path('app/public/'.$modification->photo_apres);
+        if (! file_exists($path)) {
+            return $this->errorResponse('Fichier image non trouvé', 404);
         }
 
         return response()->file($path, [
-            'Content-Type' => $mimeType,
+            'Content-Type' => mime_content_type($path) ?: 'image/jpeg',
             'Cache-Control' => 'public, max-age=31536000',
         ]);
     }
 
-    /**
-     * Approuver une demande de modification
-     */
-    public function approve(Request $request, Modification $modification)
+    public function approve(Request $request, Modification $modification): JsonResponse
     {
-        // Vérifier que l'utilisateur est administrateur
-        if (!auth()->user()->isAdministrator()) {
-            return response()->json(['message' => 'Seuls les administrateurs peuvent approuver des demandes'], 403);
-        }
-
-        $request->validate([
-            'commentaire_validation' => 'nullable|string',
-        ]);
+        $request->validate(['commentaire_validation' => 'nullable|string']);
 
         $modification->update([
             'statut' => 'approuvee',
@@ -315,26 +205,13 @@ class ModificationController extends Controller
         ]);
 
         $modification->load(['user', 'coffret.site', 'coffret.zone', 'coffret.batiment', 'coffret.salle', 'port', 'equipement', 'validatedBy']);
-
-        // Notifier le demandeur que sa demande a été approuvée
         NotificationHelper::notifyModificationApproved($modification);
 
-        return response()->json([
-            'message' => 'Demande de modification approuvée avec succès.',
-            'data' => $modification,
-        ], 200);
+        return $this->successResponse($modification, 'Demande de modification approuvée avec succès.');
     }
 
-    /**
-     * Rejeter une demande de modification
-     */
-    public function reject(Request $request, Modification $modification)
+    public function reject(Request $request, Modification $modification): JsonResponse
     {
-        // Vérifier que l'utilisateur est administrateur
-        if (!auth()->user()->isAdministrator()) {
-            return response()->json(['message' => 'Seuls les administrateurs peuvent rejeter des demandes'], 403);
-        }
-
         $request->validate([
             'commentaire_validation' => 'required|string|min:10',
         ], [
@@ -350,30 +227,17 @@ class ModificationController extends Controller
         ]);
 
         $modification->load(['user', 'coffret.site', 'coffret.zone', 'coffret.batiment', 'coffret.salle', 'port', 'equipement', 'validatedBy']);
-
-        // Notifier le demandeur que sa demande a été rejetée
         NotificationHelper::notifyModificationRejected($modification);
 
-        return response()->json([
-            'message' => 'Demande de modification rejetée.',
-            'data' => $modification->load(['user', 'coffret.site', 'coffret.zone', 'coffret.batiment', 'coffret.salle', 'port', 'equipement', 'validatedBy']),
-        ], 200);
+        return $this->successResponse($modification, 'Demande de modification rejetée.');
     }
 
-    /**
-     * Demander plus d'informations (passer en révision)
-     */
-    public function requestMoreInfo(Request $request, Modification $modification)
+    public function requestMoreInfo(Request $request, Modification $modification): JsonResponse
     {
-        // Vérifier que l'utilisateur est administrateur
-        if (!auth()->user()->isAdministrator()) {
-            return response()->json(['message' => 'Seuls les administrateurs peuvent demander plus d\'informations'], 403);
-        }
-
         $request->validate([
             'commentaire_validation' => 'required|string|min:10',
         ], [
-            'commentaire_validation.required' => 'Un commentaire est requis pour demander plus d\'informations.',
+            'commentaire_validation.required' => 'Un commentaire est requis.',
             'commentaire_validation.min' => 'Le commentaire doit contenir au moins 10 caractères.',
         ]);
 
@@ -385,55 +249,34 @@ class ModificationController extends Controller
         ]);
 
         $modification->load(['user', 'coffret.site', 'coffret.zone', 'coffret.batiment', 'coffret.salle', 'port', 'equipement', 'validatedBy']);
-
-        // Notifier le demandeur que sa demande nécessite plus d'informations
         NotificationHelper::notifyModificationReviewRequest($modification);
 
-        return response()->json([
-            'message' => 'Demande de modification mise en révision. Des informations complémentaires sont requises.',
-            'data' => $modification,
-        ], 200);
+        return $this->successResponse($modification, 'Demande mise en révision.');
     }
 
-    /**
-     * Obtenir les modifications en attente de validation
-     */
-    public function pending()
+    public function pending(): JsonResponse
     {
-        // Vérifier que l'utilisateur est administrateur
-        if (!auth()->user()->isAdministrator()) {
-            return response()->json(['message' => 'Seuls les administrateurs peuvent accéder aux demandes en attente'], 403);
-        }
-
         $modifications = Modification::with(['user', 'coffret.site', 'coffret.zone', 'coffret.batiment', 'coffret.salle', 'port', 'equipement', 'validatedBy'])
             ->where('statut', 'en_attente')
             ->orderBy('created_at', 'desc')
             ->get();
 
-        return response()->json([
-            'data' => $modifications,
-        ]);
+        return $this->successResponse($modifications);
     }
 
-    /**
-     * Obtenir l'historique complet des modifications pour un coffret
-     */
-    public function history($coffretId, Request $request)
+    public function history($coffretId, Request $request): JsonResponse
     {
         $coffret = Coffret::findOrFail($coffretId);
 
         $query = Modification::with(['user', 'validatedBy', 'coffret.site', 'coffret.zone', 'coffret.batiment', 'coffret.salle', 'port', 'equipement'])
             ->where('coffret_id', $coffretId)
-            ->where('statut', 'approuvee') // Seulement les modifications approuvées dans l'historique
+            ->where('statut', 'approuvee')
             ->orderBy('validated_at', 'desc')
             ->orderBy('created_at', 'desc');
 
-        // Filtrer par type de modification
         if ($request->has('type_modification')) {
             $query->where('type_modification', $request->type_modification);
         }
-
-        // Filtrer par date
         if ($request->has('date_from')) {
             $query->whereDate('validated_at', '>=', $request->date_from);
         }
@@ -442,21 +285,13 @@ class ModificationController extends Controller
         }
 
         $perPage = $request->get('per_page', 50);
-        $modifications = $query->paginate($perPage);
 
-        return response()->json([
-            'coffret' => [
-                'id' => $coffret->id,
-                'code' => $coffret->code,
-                'nom' => $coffret->nom,
-            ],
-            'data' => $modifications,
+        return $this->successResponse([
+            'coffret' => ['id' => $coffret->id, 'code' => $coffret->code, 'nom' => $coffret->nom],
+            'modifications' => $query->paginate($perPage),
         ]);
     }
 
-    /**
-     * Exporter l'historique d'un coffret en CSV
-     */
     public function exportHistoryCsv($coffretId, Request $request)
     {
         $coffret = Coffret::with(['site', 'zone', 'batiment', 'salle'])->findOrFail($coffretId);
@@ -487,90 +322,47 @@ class ModificationController extends Controller
             'changement_statut_port' => "Changement de statut d'un port",
         ];
 
-        $csvLines = [];
-        
-        // En-tête avec informations du coffret
-        $csvLines[] = "HISTORIQUE DES MODIFICATIONS - COFFRET";
-        $csvLines[] = "Code: {$coffret->code}";
-        $csvLines[] = "Nom: {$coffret->nom}";
+        $csvLines = ['HISTORIQUE DES MODIFICATIONS - COFFRET', "Code: {$coffret->code}", "Nom: {$coffret->nom}"];
         if ($coffret->site) {
             $csvLines[] = "Site: {$coffret->site->libelle}";
         }
-        if ($coffret->zone) {
-            $csvLines[] = "Zone: {$coffret->zone->libelle}";
-        }
         if ($coffret->batiment) {
             $csvLines[] = "Bâtiment: {$coffret->batiment->nom}";
-            if ($coffret->batiment->ville) {
-                $csvLines[] = "Ville: {$coffret->batiment->ville}";
-            }
         }
         if ($coffret->salle) {
             $csvLines[] = "Salle: {$coffret->salle->nom}";
         }
-        $csvLines[] = "Date d'export: " . now()->format('d/m/Y H:i:s');
-        $csvLines[] = "";
-        
-        // En-têtes du tableau
-        $csvLines[] = implode(';', [
-            'ID',
-            'Date/Heure Validation',
-            'Type de modification',
-            'Description',
-            'Raison',
-            'Utilisateur demandeur',
-            'Validateur',
-            'Date intervention',
-            'Heure intervention',
-            'Port concerné',
-            'Équipement concerné',
-            'Commentaire validation'
-        ]);
+        $csvLines[] = "Date d'export: ".now()->format('d/m/Y H:i:s');
+        $csvLines[] = '';
+        $csvLines[] = implode(';', ['ID', 'Date Validation', 'Type', 'Description', 'Raison', 'Demandeur', 'Validateur', 'Date intervention', 'Heure', 'Port', 'Équipement', 'Commentaire']);
 
-        // Données
         foreach ($modifications as $mod) {
-            $userName = $mod->user 
-                ? ($mod->user->name . ($mod->user->surname ? ' ' . $mod->user->surname : ''))
-                : "Utilisateur #{$mod->user_id}";
-            
-            $validatorName = $mod->validatedBy 
-                ? ($mod->validatedBy->name . ($mod->validatedBy->surname ? ' ' . $mod->validatedBy->surname : ''))
-                : ($mod->validated_by ? "Utilisateur #{$mod->validated_by}" : "Non défini");
-
-            $portLabel = $mod->port ? $mod->port->port_label : ($mod->port_id ? "Port #{$mod->port_id}" : "");
-            $equipementName = $mod->equipement ? $mod->equipement->name : ($mod->equipement_id ? "Équipement #{$mod->equipement_id}" : "");
+            $userName = $mod->user ? ($mod->user->name.' '.($mod->user->surname ?? '')) : "#{$mod->user_id}";
+            $validatorName = $mod->validatedBy ? ($mod->validatedBy->name.' '.($mod->validatedBy->surname ?? '')) : 'N/A';
+            $clean = fn ($s) => str_replace(["\r", "\n", ';'], ' ', $s ?? '');
 
             $csvLines[] = implode(';', [
                 $mod->id,
                 $mod->validated_at ? Carbon::parse($mod->validated_at)->format('d/m/Y H:i:s') : '',
                 $typeLabels[$mod->type_modification] ?? $mod->type_modification,
-                str_replace(["\r", "\n", ";"], [' ', ' ', ' '], $mod->description),
-                str_replace(["\r", "\n", ";"], [' ', ' ', ' '], $mod->raison),
-                $userName,
-                $validatorName,
+                $clean($mod->description), $clean($mod->raison),
+                $userName, $validatorName,
                 $mod->date_intervention ? Carbon::parse($mod->date_intervention)->format('d/m/Y') : '',
                 $mod->heure_intervention ?? '',
-                $portLabel,
-                $equipementName,
-                $mod->commentaire_validation ? str_replace(["\r", "\n", ";"], [' ', ' ', ' '], $mod->commentaire_validation) : ''
+                $mod->port?->port_label ?? '', $mod->equipement?->name ?? '',
+                $clean($mod->commentaire_validation),
             ]);
         }
 
-        $filename = "historique_coffret_{$coffret->code}_" . date('Y-m-d_His') . ".csv";
-        
-        // Ajouter BOM UTF-8 pour Excel
-        $bom = "\xEF\xBB\xBF";
-        
-        return Response::make($bom . implode("\n", $csvLines), 200, [
+        $filename = "historique_coffret_{$coffret->code}_".date('Y-m-d_His').'.csv';
+
+        return Response::make("\xEF\xBB\xBF".implode("\n", $csvLines), 200, [
             'Content-Type' => 'text/csv; charset=UTF-8',
             'Content-Disposition' => "attachment; filename=\"{$filename}\"",
         ]);
     }
 
-    /**
-     * Exporter l'historique d'un coffret en PDF (retourne les données formatées)
-     */
-    public function exportHistoryPdf($coffretId, Request $request)
+    public function exportHistoryPdf($coffretId, Request $request): JsonResponse
     {
         $coffret = Coffret::with(['site', 'zone', 'batiment', 'salle'])->findOrFail($coffretId);
 
@@ -589,8 +381,6 @@ class ModificationController extends Controller
             $query->whereDate('validated_at', '<=', $request->date_to);
         }
 
-        $modifications = $query->get();
-
         $typeLabels = [
             'ajout_port' => "Ajout d'un port",
             'ajout_equipement' => "Ajout d'un équipement",
@@ -600,107 +390,66 @@ class ModificationController extends Controller
             'changement_statut_port' => "Changement de statut d'un port",
         ];
 
-        return response()->json([
+        return $this->successResponse([
             'coffret' => [
-                'id' => $coffret->id,
-                'code' => $coffret->code,
-                'nom' => $coffret->nom,
-                'site' => $coffret->site?->libelle,
-                'zone' => $coffret->zone?->libelle,
-                'batiment' => $coffret->batiment?->nom,
-                'ville' => $coffret->batiment?->ville,
-                'salle' => $coffret->salle?->nom,
+                'id' => $coffret->id, 'code' => $coffret->code, 'nom' => $coffret->nom,
+                'site' => $coffret->site?->libelle, 'zone' => $coffret->zone?->libelle,
+                'batiment' => $coffret->batiment?->nom, 'salle' => $coffret->salle?->nom,
             ],
-            'modifications' => $modifications->map(function ($mod) use ($typeLabels) {
-                return [
-                    'id' => $mod->id,
-                    'date_validation' => $mod->validated_at,
-                    'type_modification' => $mod->type_modification,
-                    'type_modification_label' => $typeLabels[$mod->type_modification] ?? $mod->type_modification,
-                    'description' => $mod->description,
-                    'raison' => $mod->raison,
-                    'user' => $mod->user ? ($mod->user->name . ($mod->user->surname ? ' ' . $mod->user->surname : '')) : "Utilisateur #{$mod->user_id}",
-                    'validator' => $mod->validatedBy ? ($mod->validatedBy->name . ($mod->validatedBy->surname ? ' ' . $mod->validatedBy->surname : '')) : ($mod->validated_by ? "Utilisateur #{$mod->validated_by}" : "Non défini"),
-                    'date_intervention' => $mod->date_intervention,
-                    'heure_intervention' => $mod->heure_intervention,
-                    'port' => $mod->port ? $mod->port->port_label : ($mod->port_id ? "Port #{$mod->port_id}" : null),
-                    'equipement' => $mod->equipement ? $mod->equipement->name : ($mod->equipement_id ? "Équipement #{$mod->equipement_id}" : null),
-                    'commentaire_validation' => $mod->commentaire_validation,
-                ];
-            })->toArray(),
+            'modifications' => $query->get()->map(fn ($mod) => [
+                'id' => $mod->id,
+                'date_validation' => $mod->validated_at,
+                'type_label' => $typeLabels[$mod->type_modification] ?? $mod->type_modification,
+                'description' => $mod->description,
+                'raison' => $mod->raison,
+                'user' => $mod->user ? trim($mod->user->name.' '.($mod->user->surname ?? '')) : 'N/A',
+                'validator' => $mod->validatedBy ? trim($mod->validatedBy->name.' '.($mod->validatedBy->surname ?? '')) : 'N/A',
+                'date_intervention' => $mod->date_intervention,
+                'port' => $mod->port?->port_label,
+                'equipement' => $mod->equipement?->name,
+            ])->toArray(),
             'export_date' => now()->toISOString(),
         ]);
     }
 
-    /**
-     * Rollback - Restaurer un état précédent en créant une modification inverse
-     */
-    public function rollback(Request $request, Modification $modification)
+    public function rollback(Request $request, Modification $modification): JsonResponse
     {
-        // Vérifier que la modification est approuvée
         if ($modification->statut !== 'approuvee') {
-            return response()->json([
-                'message' => 'Seules les modifications approuvées peuvent être annulées (rollback).',
-            ], 422);
+            return $this->errorResponse('Seules les modifications approuvées peuvent être annulées.', 422);
         }
 
-        // Vérifier que l'utilisateur a les droits (administrateur ou directeur)
-        if (!auth()->user()->isAdministrator() && auth()->user()->role !== 'directeur') {
-            return response()->json([
-                'message' => 'Vous n\'avez pas les droits pour effectuer un rollback.',
-            ], 403);
-        }
+        $request->validate(['raison' => 'required|string|min:10']);
 
-        $request->validate([
-            'raison' => 'required|string|min:10',
-        ], [
-            'raison.required' => 'Une raison est requise pour effectuer un rollback.',
-            'raison.min' => 'La raison doit contenir au moins 10 caractères.',
-        ]);
-
-        // Déterminer le type de modification inverse
         $inverseTypes = [
-            'ajout_port' => 'suppression_port',
-            'ajout_equipement' => 'suppression_equipement',
-            'suppression_port' => 'ajout_port',
-            'suppression_equipement' => 'ajout_equipement',
-            'modification_connexion' => 'modification_connexion',
-            'changement_statut_port' => 'changement_statut_port',
+            'ajout_port' => 'suppression_port', 'ajout_equipement' => 'suppression_equipement',
+            'suppression_port' => 'ajout_port', 'suppression_equipement' => 'ajout_equipement',
+            'modification_connexion' => 'modification_connexion', 'changement_statut_port' => 'changement_statut_port',
         ];
 
-        $inverseType = $inverseTypes[$modification->type_modification] ?? $modification->type_modification;
-
-        // Créer une nouvelle modification pour annuler la précédente
-        $rollbackModification = Modification::create([
+        $rollback = Modification::create([
             'user_id' => auth()->id(),
             'coffret_id' => $modification->coffret_id,
             'port_id' => $modification->port_id,
             'equipement_id' => $modification->equipement_id,
-            'type_modification' => $inverseType,
-            'description' => "Annulation (rollback) de la modification #{$modification->id}: " . $modification->description,
-            'raison' => $request->raison . " (Rollback de la modification #{$modification->id})",
+            'type_modification' => $inverseTypes[$modification->type_modification] ?? $modification->type_modification,
+            'description' => "Rollback de la modification #{$modification->id}: ".$modification->description,
+            'raison' => $request->raison." (Rollback #{$modification->id})",
             'date_intervention' => now()->format('Y-m-d'),
             'heure_intervention' => now()->format('H:i'),
-            'statut' => 'approuvee', // Approuver automatiquement le rollback
-            'commentaire_validation' => "Rollback automatique de la modification #{$modification->id}",
+            'statut' => 'approuvee',
+            'commentaire_validation' => "Rollback automatique #{$modification->id}",
             'validated_by' => auth()->id(),
             'validated_at' => now(),
         ]);
 
-        // Marquer la modification originale comme "annulée" en ajoutant un commentaire
         $modification->update([
-            'commentaire_validation' => ($modification->commentaire_validation ?? '') . "\n\n[ANNULÉ PAR ROLLBACK] Rollback effectué le " . now()->format('d/m/Y H:i') . " par " . auth()->user()->name . ". Nouvelle modification: #{$rollbackModification->id}",
+            'commentaire_validation' => ($modification->commentaire_validation ?? '').
+                "\n\n[ROLLBACK] ".now()->format('d/m/Y H:i').' par '.auth()->user()->name." -> #{$rollback->id}",
         ]);
 
-        $rollbackModification->load(['user', 'coffret.site', 'coffret.zone', 'coffret.batiment', 'coffret.salle', 'port', 'equipement', 'validatedBy']);
+        $rollback->load(['user', 'coffret.site', 'coffret.zone', 'coffret.batiment', 'coffret.salle', 'port', 'equipement', 'validatedBy']);
+        NotificationHelper::notifyNewModificationRequest($rollback);
 
-        // Notifier les responsables
-        NotificationHelper::notifyNewModificationRequest($rollbackModification);
-
-        return response()->json([
-            'message' => 'Rollback effectué avec succès. Une nouvelle modification a été créée pour annuler la modification précédente.',
-            'data' => $rollbackModification,
-            'original_modification_id' => $modification->id,
-        ], 201);
+        return $this->successResponse($rollback, 'Rollback effectué avec succès.', 201);
     }
 }

@@ -68,7 +68,7 @@ export default function PortsSection() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Gestion des Ports"
+        title="Gestion des ports"
         description="Configuration et surveillance des ports réseau"
         icon={<Cable className="h-6 w-6 text-primary" />}
         breadcrumbs={[
@@ -87,7 +87,7 @@ export default function PortsSection() {
           Appareil: port.device_name,
           Type: port.type_reseau || '-',
           Statut: port.statut ? (port.statut === 'actif' ? 'Actif' : port.statut === 'inactif' ? 'Inactif' : 'Réservé') : '-',
-          Connexion: port.connexion_type ? (port.connexion_type === 'fibre' ? 'Fibre optique' : 'Cuivre (RJ45)') : '-',
+          Connexion: port.connexion_type ? (port.connexion_type === 'fibre' ? 'Fibre optique' : port.connexion_type === 'rj45' ? 'RJ45' : 'Cuivre') : '-',
           Uplink: port.uplink || '-',
           Downlink: port.downlink || '-',
           Vitesse: port.speed || '-',
@@ -121,7 +121,7 @@ export default function PortsSection() {
           { key: 'device_name', label: 'Appareil', type: 'text' },
           { key: 'type_reseau', label: 'Type', type: 'select', options: ['IT', 'OT'] },
           { key: 'statut', label: 'Statut', type: 'select', options: ['actif', 'inactif', 'reserve'] },
-          { key: 'connexion_type', label: 'Connexion', type: 'select', options: ['fibre', 'cuivre'] },
+          { key: 'connexion_type', label: 'Connexion', type: 'select', options: ['fibre', 'rj45', 'cuivre'] },
           { key: 'uplink', label: 'Uplink', type: 'text' },
           { key: 'downlink', label: 'Downlink', type: 'text' },
           { key: 'speed', label: 'Vitesse', type: 'text' },

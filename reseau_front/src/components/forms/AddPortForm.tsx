@@ -1,46 +1,44 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useData } from "@/contexts/DataContext";
 import { useToast } from "@/hooks/use-toast";
-import { Plus } from "lucide-react";
+import { Plus, Tag, Monitor, Loader2 } from "lucide-react";
 import type { PortCreateData } from "@/services/portService";
 
 const portSchema = z.object({
   port_label: z.string().min(1, "Le label du port est requis"),
-  device_name: z.string().min(1, "Le nom de l'appareil est requis"),
   poe_enabled: z.boolean(),
   vlan: z.string().optional(),
   speed: z.string().optional(),
   type_reseau: z.enum(["IT", "OT"]).default("IT"),
   statut: z.enum(["actif", "inactif", "reserve"]).default("actif"),
-  connexion_type: z.enum(["fibre", "cuivre"]).optional(),
+  port_genre: z.enum(["uplink", "downlink"]).default("downlink"),
   uplink: z.string().optional(),
   downlink: z.string().optional(),
   equipement_id: z.number().min(1, "L'équipement est requis"),
-  connected_equipment_id: z.number().optional().nullable(),
 });
 
 type PortFormData = z.infer<typeof portSchema>;
 
 interface AddPortFormProps {
   defaultCoffretId?: number;
+  defaultEquipementId?: number;
   onSuccess?: () => void;
   trigger?: React.ReactNode;
 }
 
-const AddPortForm = ({ defaultCoffretId, onSuccess, trigger }: AddPortFormProps) => {
+const AddPortForm = ({ defaultCoffretId, defaultEquipementId, onSuccess, trigger }: AddPortFormProps) => {
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
-  const { addPort, refetchPorts, equipements, isLoadingEquipements } = useData();
+  const { addPort, refetchPorts, equipements, lans, ports, isLoadingEquipements } = useData();
 
   // Filtrer les équipements par coffret si defaultCoffretId est fourni
   const filteredEquipements = defaultCoffretId
@@ -51,37 +49,77 @@ const AddPortForm = ({ defaultCoffretId, onSuccess, trigger }: AddPortFormProps)
     resolver: zodResolver(portSchema),
     defaultValues: {
       port_label: "",
-      device_name: "",
       poe_enabled: false,
       vlan: "",
       speed: "",
       type_reseau: "IT",
       statut: "actif",
-      connexion_type: undefined,
+      port_genre: "downlink",
       uplink: "",
       downlink: "",
       equipement_id: undefined,
-      connected_equipment_id: undefined,
     },
   });
+
+  const { isSubmitting } = form.formState;
+
+  // Handler pour la sélection d'équipement - génère automatiquement le label
+  const handleEquipementChange = (value: string, fieldOnChange: (value: number) => void) => {
+    const equipementId = parseInt(value);
+    fieldOnChange(equipementId);
+
+    // Trouver l'équipement sélectionné
+    const equipement = equipements.find(e => e.id === equipementId);
+    if (equipement) {
+      // Compter les ports existants pour cet équipement
+      const existingPorts = ports?.filter(p => p.equipement_id === equipementId).length || 0;
+      const nextPortNumber = existingPorts + 1;
+
+      // Format: Gi0/{numero} pour switch, P{numero} pour autres équipements
+      const isSwitch = equipement.type?.toLowerCase() === 'switch';
+      const generatedLabel = isSwitch
+        ? `Gi0/${nextPortNumber}`
+        : `P${String(nextPortNumber).padStart(2, '0')}`;
+
+      form.setValue("port_label", generatedLabel);
+    }
+  };
+
+  // Réinitialiser le formulaire avec les valeurs par défaut quand le modal s'ouvre
+  useEffect(() => {
+    if (open) {
+      form.reset({
+        port_label: "",
+        poe_enabled: false,
+        vlan: "",
+        speed: "",
+        type_reseau: "IT",
+        statut: "actif",
+        port_genre: "downlink",
+        uplink: "",
+        downlink: "",
+        equipement_id: defaultEquipementId || undefined,
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, defaultEquipementId]);
 
   const onSubmit = async (data: PortFormData) => {
     try {
       const portData: PortCreateData = {
         port_label: data.port_label,
-        device_name: data.device_name,
+        device_name: data.port_label, // Utiliser le label du port comme device_name
         poe_enabled: data.poe_enabled,
         vlan: data.vlan || undefined,
         speed: data.speed || undefined,
         type_reseau: data.type_reseau,
         statut: data.statut,
-        connexion_type: data.connexion_type,
+        port_genre: data.port_genre,
         uplink: data.uplink || undefined,
         downlink: data.downlink || undefined,
         equipement_id: data.equipement_id,
-        connected_equipment_id: data.connected_equipment_id || undefined,
       };
-      
+
       await addPort(portData);
       toast({
         title: "Port ajouté",
@@ -101,7 +139,7 @@ const AddPortForm = ({ defaultCoffretId, onSuccess, trigger }: AddPortFormProps)
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(value) => { if (!isSubmitting) setOpen(value); }}>
       <DialogTrigger asChild>
         {trigger || (
           <Button>
@@ -110,7 +148,7 @@ const AddPortForm = ({ defaultCoffretId, onSuccess, trigger }: AddPortFormProps)
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-[95vw] sm:max-w-[700px] max-h-[90vh] overflow-y-auto p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle>Ajouter un nouveau port</DialogTitle>
           <DialogDescription>
@@ -119,64 +157,64 @@ const AddPortForm = ({ defaultCoffretId, onSuccess, trigger }: AddPortFormProps)
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="equipement_id"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Équipement *</FormLabel>
-                  <Select
-                    onValueChange={(value) => field.onChange(parseInt(value))}
-                    value={field.value?.toString()}
-                    disabled={isLoadingEquipements}
-                  >
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+              <FormField
+                control={form.control}
+                name="equipement_id"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel className="flex items-center gap-1.5">
+                      <Monitor className="h-3.5 w-3.5 text-muted-foreground" />
+                      Équipement <span className="text-red-500">*</span>
+                    </FormLabel>
+                    <Select
+                      onValueChange={(value) => handleEquipementChange(value, field.onChange)}
+                      value={field.value?.toString()}
+                      disabled={isLoadingEquipements}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Sélectionner l'équipement" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {filteredEquipements?.map((equipement) => (
+                          <SelectItem key={equipement.id} value={equipement.id.toString()}>
+                            {equipement.name} ({equipement.equipement_code})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormDescription className="text-xs min-h-[1.25rem]">
+                      Équipement parent du port
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="port_label"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel className="flex items-center gap-1.5">
+                      <Tag className="h-3.5 w-3.5 text-muted-foreground" />
+                      Label du port <span className="text-red-500">*</span>
+                    </FormLabel>
                     <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Sélectionner l'équipement" />
-                      </SelectTrigger>
+                      <Input placeholder="Ex: P01, Gi0/1, Fa0/24" {...field} />
                     </FormControl>
-                    <SelectContent>
-                      {filteredEquipements?.map((equipement) => (
-                        <SelectItem key={equipement.id} value={equipement.id.toString()}>
-                          {equipement.name} ({equipement.equipement_code})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                    <FormDescription className="text-xs min-h-[1.25rem]">
+                      Généré automatiquement, modifiable si nécessaire
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
-            <FormField
-              control={form.control}
-              name="port_label"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Label du port *</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Ex: P1, P2, Gi0/1" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            
-            <FormField
-              control={form.control}
-              name="device_name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Nom de l'appareil *</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Ex: Switch-001" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <FormField
                 control={form.control}
                 name="speed"
@@ -190,8 +228,12 @@ const AddPortForm = ({ defaultCoffretId, onSuccess, trigger }: AddPortFormProps)
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
+                        <SelectItem value="Auto">Auto-négociation</SelectItem>
+                        <SelectItem value="10 Mbps">10 Mbps</SelectItem>
                         <SelectItem value="100 Mbps">100 Mbps</SelectItem>
                         <SelectItem value="1 Gbps">1 Gbps</SelectItem>
+                        <SelectItem value="2.5 Gbps">2.5 Gbps</SelectItem>
+                        <SelectItem value="5 Gbps">5 Gbps</SelectItem>
                         <SelectItem value="10 Gbps">10 Gbps</SelectItem>
                         <SelectItem value="25 Gbps">25 Gbps</SelectItem>
                         <SelectItem value="40 Gbps">40 Gbps</SelectItem>
@@ -229,7 +271,7 @@ const AddPortForm = ({ defaultCoffretId, onSuccess, trigger }: AddPortFormProps)
               />
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
               <FormField
                 control={form.control}
                 name="type_reseau"
@@ -275,19 +317,19 @@ const AddPortForm = ({ defaultCoffretId, onSuccess, trigger }: AddPortFormProps)
               />
               <FormField
                 control={form.control}
-                name="connexion_type"
+                name="port_genre"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Connexion</FormLabel>
+                    <FormLabel>Genre de port</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Type connexion" />
+                          <SelectValue placeholder="Genre" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="fibre">Fibre optique</SelectItem>
-                        <SelectItem value="cuivre">Cuivre (RJ45)</SelectItem>
+                        <SelectItem value="downlink">Downlink (par défaut)</SelectItem>
+                        <SelectItem value="uplink">Uplink</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -296,7 +338,7 @@ const AddPortForm = ({ defaultCoffretId, onSuccess, trigger }: AddPortFormProps)
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <FormField
                 control={form.control}
                 name="uplink"
@@ -330,38 +372,16 @@ const AddPortForm = ({ defaultCoffretId, onSuccess, trigger }: AddPortFormProps)
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>VLAN</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Ex: VLAN-300" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="connected_equipment_id"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Équipement connecté (optionnel)</FormLabel>
-                  <Select
-                    onValueChange={(value) => {
-                      const numericValue = value === "none" ? undefined : parseInt(value);
-                      field.onChange(numericValue);
-                    }}
-                    value={field.value?.toString() || "none"}
-                    disabled={isLoadingEquipements}
-                  >
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Sélectionner l'équipement connecté" />
+                        <SelectValue placeholder="Sélectionner un VLAN" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="none">Aucun</SelectItem>
-                      {filteredEquipements?.map((equipement) => (
-                        <SelectItem key={equipement.id} value={equipement.id.toString()}>
-                          {equipement.name} ({equipement.equipement_code})
+                      {lans?.map((lan) => (
+                        <SelectItem key={lan.id} value={lan.name}>
+                          {lan.name} (VLAN {lan.vlan_id})
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -371,11 +391,14 @@ const AddPortForm = ({ defaultCoffretId, onSuccess, trigger }: AddPortFormProps)
               )}
             />
 
-            <div className="flex justify-end space-x-2">
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-2">
+              <Button type="button" variant="outline" onClick={() => { if (!isSubmitting) setOpen(false); }} className="w-full sm:w-auto" disabled={isSubmitting}>
                 Annuler
               </Button>
-              <Button type="submit">Ajouter</Button>
+              <Button type="submit" className="w-full sm:w-auto" disabled={isSubmitting}>
+                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
+                {isSubmitting ? "Ajout en cours..." : "Ajouter"}
+              </Button>
             </div>
           </form>
         </Form>

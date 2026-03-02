@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
+import { useRequireAuth } from "@/hooks/useRequireAuth";
 import AppShell from "@/components/layout/AppShell";
 import DetailsModal from "@/components/ui/details-modal";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, CheckCircle2, XCircle, Clock, MessageSquare } from "lucide-react";
+import { Loader2, CheckCircle2, XCircle, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import modificationService, { type Modification } from "@/services/modificationService";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import StatusBadge from "@/components/dashboard/StatusBadge";
@@ -36,7 +36,7 @@ const typeModificationLabels: Record<string, string> = {
 };
 
 const ValidationModifications = () => {
-  const { isAuthenticated, isLoading: isLoadingAuth, user } = useAuth();
+  const { isAuthenticated, isLoading: isLoadingAuth, user, hasPermission } = useRequireAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -47,23 +47,22 @@ const ValidationModifications = () => {
   const [isRequestInfoOpen, setIsRequestInfoOpen] = useState(false);
   const [commentaire, setCommentaire] = useState("");
 
+  // Vérifier si l'utilisateur est administrateur (via Spatie roles)
+  const isAdmin = user?.roles?.some((role: string) =>
+    role === 'Super Admin' || role === 'Administrateur'
+  ) || false;
+
+  // Rediriger vers /unauthorized si l'utilisateur n'est pas admin
   useEffect(() => {
-    if (!isLoadingAuth && !isAuthenticated) {
-      navigate("/login");
-    } else if (!isLoadingAuth && isAuthenticated && user?.role !== 'administrator') {
-      navigate("/");
-      toast({
-        title: "Accès refusé",
-        description: "Seuls les administrateurs peuvent accéder au dashboard de validation.",
-        variant: "destructive",
-      });
+    if (!isLoadingAuth && isAuthenticated && !isAdmin) {
+      navigate("/unauthorized");
     }
-  }, [isAuthenticated, isLoadingAuth, navigate, user, toast]);
+  }, [isAuthenticated, isLoadingAuth, navigate, isAdmin]);
 
   const { data: pendingModifications = [], isLoading, refetch } = useQuery({
     queryKey: ['modifications', 'pending'],
     queryFn: () => modificationService.getPending(),
-    enabled: isAuthenticated && user?.role === 'administrator',
+    enabled: isAuthenticated && isAdmin,
     refetchInterval: 30000, // Rafraîchir toutes les 30 secondes
   });
 
@@ -152,7 +151,7 @@ const ValidationModifications = () => {
     );
   }
 
-  if (!isAuthenticated || user?.role !== 'administrator') {
+  if (!isAuthenticated || !isAdmin) {
     return null;
   }
 

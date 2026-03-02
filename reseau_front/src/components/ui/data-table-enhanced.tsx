@@ -1,7 +1,8 @@
 import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Download, Upload, Eye, Edit, Search, X, Trash2, RotateCcw } from "lucide-react";
+import { Download, Upload, Eye, Edit, Search, X, Trash2, RotateCcw, Inbox } from "lucide-react";
+import { getLabelIcon } from "@/lib/label-icons";
 import StatusBadge from "../dashboard/StatusBadge";
 import { PaginationEnhanced } from "./pagination-enhanced";
 import ImportModal from "./import-modal";
@@ -58,6 +59,101 @@ interface DataTableEnhancedProps {
   statusColumn?: string;
   deletedStatus?: string;
 }
+
+// Fonction pour formater les labels des colonnes
+const formatColumnLabel = (column: string): string => {
+  // Mapping personnalisé pour certains termes courants
+  const labelMapping: Record<string, string> = {
+    'id': 'ID',
+    'nom': 'Nom',
+    'name': 'Nom',
+    'type': 'Type',
+    'status': 'Statut',
+    'statut': 'Statut',
+    'etat': 'État',
+    'état': 'État',
+    'date_debut': 'Date de début',
+    'date_fin': 'Date de fin',
+    'date_creation': 'Date de création',
+    'date_intervention': 'Date d\'intervention',
+    'heure_debut': 'Heure de début',
+    'heure_intervention': 'Heure d\'intervention',
+    'created_at': 'Créé le',
+    'updated_at': 'Modifié le',
+    'deleted_at': 'Supprimé le',
+    'equipement': 'Équipement',
+    'equipement_id': 'Équipement',
+    'equipement_code': 'Code équipement',
+    'coffret': 'Coffret',
+    'coffret_id': 'Coffret',
+    'batiment': 'Bâtiment',
+    'batiment_id': 'Bâtiment',
+    'salle': 'Salle',
+    'salle_id': 'Salle',
+    'site': 'Site',
+    'site_id': 'Site',
+    'zone': 'Zone',
+    'zone_id': 'Zone',
+    'technicien': 'Technicien',
+    'priorite': 'Priorité',
+    'description': 'Description',
+    'duree': 'Durée',
+    'ip_address': 'Adresse IP',
+    'port_genre': 'Genre de port',
+    'port_label': 'Port',
+    'vlan': 'VLAN',
+    'type_modification': 'Type de modification',
+    'type_reseau': 'Type réseau',
+    'numero_serie': 'N° de série',
+    'fabricant': 'Fabricant',
+    'modele': 'Modèle',
+    'nombre_ports': 'Nombre de ports',
+    'direction_in_out': 'Direction',
+    'user': 'Utilisateur',
+    'user_id': 'Utilisateur',
+    'validated_by': 'Validé par',
+    'validated_at': 'Validé le',
+    'commentaire': 'Commentaire',
+    'commentaire_validation': 'Commentaire de validation',
+    'raison': 'Raison',
+    'photo_avant': 'Photo avant',
+    'photo_apres': 'Photo après',
+    'poe_enabled': 'PoE activé',
+    'device_name': 'Appareil',
+    'speed': 'Vitesse',
+    'full_name': 'Nom complet',
+    'email': 'Email',
+    'username': 'Nom d\'utilisateur',
+    'phone': 'Téléphone',
+    'is_active': 'Actif',
+    'roles': 'Rôles',
+    'permissions': 'Permissions',
+    'libelle': 'Libellé',
+    'code': 'Code',
+    'capacite': 'Capacité',
+    'temperature': 'Température',
+    'direction': 'Direction',
+    'dateCreation': 'Date de création',
+    'batiments': 'Bâtiments',
+    'zones': 'Zones',
+  };
+
+  // Vérifier si le label existe dans le mapping
+  const lowerColumn = column.toLowerCase();
+  if (labelMapping[lowerColumn]) {
+    return labelMapping[lowerColumn];
+  }
+
+  // Si la colonne commence par une majuscule (y compris accentuée),
+  // c'est déjà un label formaté - le retourner tel quel
+  if (/^[A-ZÀ-ÖØ-Ý]/.test(column)) {
+    return column;
+  }
+
+  // Sinon, formater automatiquement : remplacer les underscores et mettre en majuscule uniquement la première lettre
+  const formatted = column.replace(/_/g, ' ');
+  return formatted.charAt(0).toUpperCase() + formatted.slice(1);
+};
 
 const usePagination = (data: any[], initialItemsPerPage = 5) => {
   const [currentPage, setCurrentPage] = useState(1);
@@ -121,7 +217,8 @@ export default function DataTableEnhanced({
 
   // Filter and search data
   const filteredData = useMemo(() => {
-    let filtered = data;
+    // Les données sont déjà triées par le backend (id DESC = plus récent en premier)
+    let filtered = [...data];
 
     // Colonnes à exclure du filtrage
     const excludedColumns = ['equipement_code', 'ip_address'];
@@ -229,9 +326,10 @@ export default function DataTableEnhanced({
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-foreground">{title}</h3>
+    <div className="space-y-3 sm:space-y-4">
+      {/* Header - titre et boutons */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <h3 className="text-base sm:text-lg font-semibold text-foreground">{title}</h3>
         <div className="flex items-center gap-2">
           {enableImport && onImport && (
             <Button
@@ -240,8 +338,8 @@ export default function DataTableEnhanced({
               onClick={() => setIsImportModalOpen(true)}
               className="bg-accent text-accent-foreground"
             >
-              <Upload className="h-4 w-4 mr-2" />
-              Importer
+              <Upload className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Importer</span>
             </Button>
           )}
           {enableExport && (
@@ -251,8 +349,8 @@ export default function DataTableEnhanced({
               onClick={handleExport}
               className="bg-accent text-accent-foreground"
             >
-              <Download className="h-4 w-4 mr-2" />
-              Exporter
+              <Download className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Exporter</span>
             </Button>
           )}
         </div>
@@ -260,23 +358,26 @@ export default function DataTableEnhanced({
 
       {/* Search and Filters */}
       {(enableSearch || showFilters || customFilters) && (
-        <div className="space-y-4">
-          <div className="flex items-center gap-4">
-            {enableSearch && (
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Rechercher..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            )}
+        <div className="space-y-3 sm:space-y-4">
+          {/* Search bar - toujours pleine largeur */}
+          {enableSearch && (
+            <div className="relative w-full">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Rechercher..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+          )}
 
-            {/* Custom Filters (sur la même ligne que la recherche) */}
-            {customFilters}
-          </div>
+          {/* Custom Filters - responsive grid */}
+          {customFilters && (
+            <div className="flex flex-wrap items-center gap-2 sm:gap-4">
+              {customFilters}
+            </div>
+          )}
 
           {showFilters && (
             <div className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg">
@@ -289,7 +390,7 @@ export default function DataTableEnhanced({
                     .filter((column) => !['equipement_code', 'ip_address'].includes(column))
                     .map((column) => (
                     <SelectItem key={column} value={column}>
-                      {column}
+                      {formatColumnLabel(column)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -311,37 +412,71 @@ export default function DataTableEnhanced({
         </div>
       )}
 
-      <div className="rounded-lg border border-border bg-card">
-        <Table>
+      {/* Table avec scroll horizontal sur mobile et design amélioré */}
+      <div className="rounded-xl border border-border bg-card overflow-hidden shadow-sm">
+        <div className="overflow-x-auto">
+          <Table className="min-w-[500px]">
           <TableHeader>
-            <TableRow className="bg-table-header hover:bg-table-header">
-              {columns.map((column) => (
-                <TableHead key={column} className="text-primary-foreground font-medium">
-                  {column}
-                </TableHead>
-              ))}
+            <TableRow className="bg-gradient-to-r from-primary/95 to-primary hover:from-primary hover:to-primary border-b-2 border-primary/20">
+              {columns.map((column) => {
+                const label = formatColumnLabel(column);
+                const icon = getLabelIcon(label);
+                return (
+                  <TableHead key={column} className="text-primary-foreground font-semibold text-xs uppercase tracking-wider h-12">
+                    <span className="flex items-center gap-2">
+                      {icon && <span className="opacity-80">{icon}</span>}
+                      {label}
+                    </span>
+                  </TableHead>
+                );
+              })}
               {(onRowClick || onEdit || onDelete || onRestore || renderRowActions) && (
-                <TableHead className="text-primary-foreground font-medium">Actions</TableHead>
+                <TableHead className="text-primary-foreground font-semibold text-xs uppercase tracking-wider text-center h-12">
+                  Actions
+                </TableHead>
               )}
             </TableRow>
           </TableHeader>
           <TableBody>
-            {paginatedData.map((row, index) => (
-              <TableRow 
-                key={index} 
-                className="hover:bg-table-row-hover border-border cursor-pointer"
+            {paginatedData.length === 0 ? (
+              <TableRow>
+                <TableCell
+                  colSpan={columns.length + ((onRowClick || onEdit || onDelete || onRestore || renderRowActions) ? 1 : 0)}
+                  className="h-32 text-center"
+                >
+                  <div className="flex flex-col items-center justify-center text-muted-foreground">
+                    <Inbox className="h-10 w-10 mb-3 opacity-50" />
+                    <p className="text-sm font-medium">Aucune donnée disponible</p>
+                    <p className="text-xs mt-1">
+                      {searchTerm || filterValue
+                        ? "Aucun résultat ne correspond à votre recherche"
+                        : "Cette liste est vide pour le moment"}
+                    </p>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ) : paginatedData.map((row, index) => {
+              const isDeleted = row[statusColumn] === deletedStatus;
+              return (
+              <TableRow
+                key={index}
+                className={`group transition-all duration-200 border-b border-border/50 last:border-0 ${
+                  isDeleted
+                    ? 'bg-destructive/5 hover:bg-destructive/10 opacity-75'
+                    : 'hover:bg-muted/50 hover:shadow-sm'
+                } ${onRowClick ? 'cursor-pointer' : ''}`}
                 onClick={() => onRowClick?.(row)}
               >
                 {columns.map((column, colIndex) => (
-                  <TableCell key={colIndex} className="text-card-foreground">
+                  <TableCell key={colIndex} className="text-card-foreground py-4 text-sm">
                     {customCellRenderers?.[column]
                       ? customCellRenderers[column](row[column], row)
                       : renderCellContent(row[column], column)}
                   </TableCell>
                 ))}
                 {(onRowClick || onEdit || onDelete || onRestore || renderRowActions) && (
-                  <TableCell className="text-card-foreground">
-                    <div className="flex items-center gap-2">
+                  <TableCell className="text-card-foreground py-4">
+                    <div className="flex items-center justify-center gap-1.5 opacity-60 group-hover:opacity-100 transition-opacity">
                       {onRowClick && (
                         <Button
                           variant="ghost"
@@ -441,9 +576,11 @@ export default function DataTableEnhanced({
                   </TableCell>
                 )}
               </TableRow>
-            ))}
+              );
+            })}
           </TableBody>
         </Table>
+        </div>
       </div>
 
       <PaginationEnhanced

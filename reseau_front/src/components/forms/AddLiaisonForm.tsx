@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import type React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -11,11 +11,13 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDes
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useData } from "@/contexts/DataContext";
 import { toast } from "@/hooks/use-toast";
-import { Plus } from "lucide-react";
+import { Plus, Loader2 } from "lucide-react";
 
 const liaisonSchema = z.object({
   label: z.string().min(1, "Le label est requis"),
+  direction: z.enum(['up', 'down']).default('down'),
   media: z.string().min(1, "Le média est requis"),
+  cable_type: z.string().optional(),
   from_equipement_id: z.number().min(1, "L'équipement d'origine est requis"),
   to_equipement_id: z.number().min(1, "L'équipement de destination est requis"),
   from: z.number().min(1, "Le port d'origine est requis"),
@@ -28,31 +30,45 @@ type LiaisonFormData = z.infer<typeof liaisonSchema>;
 
 interface AddLiaisonFormProps {
   defaultCoffretId?: number;
+  defaultEquipementId?: number;
   onSuccess?: () => void;
   trigger?: React.ReactNode;
 }
 
-const AddLiaisonForm = ({ defaultCoffretId, onSuccess, trigger }: AddLiaisonFormProps) => {
+const AddLiaisonForm = ({ defaultCoffretId, defaultEquipementId, onSuccess, trigger }: AddLiaisonFormProps) => {
   const [open, setOpen] = useState(false);
-  const { addLiaison, refetchLiaisons, ports, equipements, isLoadingPorts, liaisons } = useData();
+  const { addLiaison, refetchLiaisons, ports, equipements, isLoadingPorts, isLoadingLiaisons, liaisons } = useData();
 
   // Filtrer les équipements par coffret si defaultCoffretId est fourni
   const filteredEquipements = defaultCoffretId
     ? equipements.filter(e => e.coffret_id === defaultCoffretId)
     : equipements;
 
-  // Récupérer tous les IDs de ports déjà utilisés dans les liaisons existantes
-  const usedPortIds = new Set<number>();
-  liaisons.forEach(liaison => {
-    if (liaison.from) usedPortIds.add(liaison.from);
-    if (liaison.to) usedPortIds.add(liaison.to);
-  });
+  // Récupérer tous les IDs de ports déjà utilisés dans les liaisons existantes (non supprimées)
+  // Utilisation de useMemo pour optimiser et garantir la réactivité
+  const usedPortIds = useMemo(() => {
+    const ids = new Set<number>();
+    liaisons.forEach(liaison => {
+      // Ignorer les liaisons soft-deleted
+      if (liaison.deleted_at) return;
+      // Vérifier que from et to sont des nombres valides
+      if (typeof liaison.from === 'number' && liaison.from > 0) {
+        ids.add(liaison.from);
+      }
+      if (typeof liaison.to === 'number' && liaison.to > 0) {
+        ids.add(liaison.to);
+      }
+    });
+    return ids;
+  }, [liaisons]);
 
   const form = useForm<LiaisonFormData>({
     resolver: zodResolver(liaisonSchema),
     defaultValues: {
       label: "",
+      direction: "down",
       media: "",
+      cable_type: "",
       from_equipement_id: undefined,
       to_equipement_id: undefined,
       from: undefined,
@@ -62,6 +78,27 @@ const AddLiaisonForm = ({ defaultCoffretId, onSuccess, trigger }: AddLiaisonForm
     }
   });
 
+  const { isSubmitting } = form.formState;
+
+  // Réinitialiser le formulaire avec les valeurs par défaut quand le modal s'ouvre
+  useEffect(() => {
+    if (open) {
+      form.reset({
+        label: "",
+        direction: "down",
+        media: "",
+        cable_type: "",
+        from_equipement_id: defaultEquipementId || undefined,
+        to_equipement_id: undefined,
+        from: undefined,
+        to: undefined,
+        length: undefined,
+        status: true,
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, defaultEquipementId]);
+
   // Observer les valeurs des équipements et ports pour réinitialiser les ports
   const fromEquipementId = form.watch("from_equipement_id");
   const toEquipementId = form.watch("to_equipement_id");
@@ -70,21 +107,38 @@ const AddLiaisonForm = ({ defaultCoffretId, onSuccess, trigger }: AddLiaisonForm
 
   // Filtrer les ports selon les équipements sélectionnés et exclure les ports déjà utilisés
   // Aussi exclure le port de destination sélectionné pour éviter qu'un même port soit origine et destination
-  const filteredFromPorts = fromEquipementId
-    ? ports.filter(p => 
-        p.equipement_id === fromEquipementId && 
-        !usedPortIds.has(p.id) &&
-        p.id !== selectedToPort
-      )
-    : [];
+  // Exclure aussi les ports soft-deleted
+  const filteredFromPorts = useMemo(() => {
+    if (!fromEquipementId) return [];
+    return ports.filter(p =>
+      p.equipement_id === fromEquipementId &&
+      !p.deleted_at &&
+      !usedPortIds.has(p.id) &&
+      p.id !== selectedToPort
+    );
+  }, [ports, fromEquipementId, usedPortIds, selectedToPort]);
 
-  const filteredToPorts = toEquipementId
-    ? ports.filter(p => 
-        p.equipement_id === toEquipementId && 
-        !usedPortIds.has(p.id) &&
-        p.id !== selectedFromPort
-      )
-    : [];
+  const filteredToPorts = useMemo(() => {
+    if (!toEquipementId) return [];
+    return ports.filter(p =>
+      p.equipement_id === toEquipementId &&
+      !p.deleted_at &&
+      !usedPortIds.has(p.id) &&
+      p.id !== selectedFromPort
+    );
+  }, [ports, toEquipementId, usedPortIds, selectedFromPort]);
+
+  // Compter le total des ports pour chaque équipement (pour afficher X disponibles sur Y)
+  // Exclure les ports soft-deleted du total
+  const totalFromPorts = useMemo(() => {
+    if (!fromEquipementId) return 0;
+    return ports.filter(p => p.equipement_id === fromEquipementId && !p.deleted_at).length;
+  }, [ports, fromEquipementId]);
+
+  const totalToPorts = useMemo(() => {
+    if (!toEquipementId) return 0;
+    return ports.filter(p => p.equipement_id === toEquipementId && !p.deleted_at).length;
+  }, [ports, toEquipementId]);
 
   // Réinitialiser les ports quand on change d'équipement
   const handleFromEquipementChange = (equipementId: number) => {
@@ -101,7 +155,9 @@ const AddLiaisonForm = ({ defaultCoffretId, onSuccess, trigger }: AddLiaisonForm
     try {
       await addLiaison({
         label: data.label,
+        direction: data.direction,
         media: data.media,
+        cable_type: data.cable_type || undefined,
         from: data.from,
         to: data.to,
         length: data.length || undefined,
@@ -125,7 +181,7 @@ const AddLiaisonForm = ({ defaultCoffretId, onSuccess, trigger }: AddLiaisonForm
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(value) => { if (!isSubmitting) setOpen(value); }}>
       <DialogTrigger asChild>
         {trigger || (
           <Button>
@@ -134,7 +190,7 @@ const AddLiaisonForm = ({ defaultCoffretId, onSuccess, trigger }: AddLiaisonForm
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-[95vw] sm:max-w-[600px] max-h-[90vh] overflow-y-auto p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle>Ajouter une nouvelle liaison</DialogTitle>
           <DialogDescription>
@@ -148,7 +204,7 @@ const AddLiaisonForm = ({ defaultCoffretId, onSuccess, trigger }: AddLiaisonForm
               name="label"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Label *</FormLabel>
+                  <FormLabel>Label <span className="text-red-500">*</span></FormLabel>
                   <FormControl>
                     <Input placeholder="Ex: LIA-001" {...field} />
                   </FormControl>
@@ -159,10 +215,35 @@ const AddLiaisonForm = ({ defaultCoffretId, onSuccess, trigger }: AddLiaisonForm
             
             <FormField
               control={form.control}
+              name="direction"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Direction du flux <span className="text-red-500">*</span></FormLabel>
+                  <FormControl>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Sélectionner la direction" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="down">Downstream (vers distribution)</SelectItem>
+                        <SelectItem value="up">Upstream (vers source)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </FormControl>
+                  <FormDescription>
+                    Downstream = équipement source DONNE le réseau à la destination
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
               name="media"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Type de liaison *</FormLabel>
+                  <FormLabel>Type de liaison <span className="text-red-500">*</span></FormLabel>
                   <FormControl>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <SelectTrigger>
@@ -185,10 +266,37 @@ const AddLiaisonForm = ({ defaultCoffretId, onSuccess, trigger }: AddLiaisonForm
 
             <FormField
               control={form.control}
+              name="cable_type"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Type de câble</FormLabel>
+                  <FormControl>
+                    <Select onValueChange={field.onChange} value={field.value || ""}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Sélectionner le type de câble (optionnel)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Cat5e">Cat5e</SelectItem>
+                        <SelectItem value="Cat6">Cat6</SelectItem>
+                        <SelectItem value="Cat6a">Cat6a</SelectItem>
+                        <SelectItem value="Cat7">Cat7</SelectItem>
+                        <SelectItem value="Fibre monomode">Fibre monomode</SelectItem>
+                        <SelectItem value="Fibre multimode">Fibre multimode</SelectItem>
+                        <SelectItem value="Coaxial">Coaxial</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
               name="from_equipement_id"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Équipement d'origine *</FormLabel>
+                  <FormLabel>Équipement d'origine <span className="text-red-500">*</span></FormLabel>
                   <FormControl>
                     <Select
                       onValueChange={(value) => handleFromEquipementChange(parseInt(value))}
@@ -216,18 +324,27 @@ const AddLiaisonForm = ({ defaultCoffretId, onSuccess, trigger }: AddLiaisonForm
               name="from"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Port d'origine *</FormLabel>
+                  <FormLabel>
+                    Port d'origine <span className="text-red-500">*</span>
+                    {fromEquipementId && (
+                      <span className={`ml-2 text-xs ${filteredFromPorts.length === 0 ? 'text-red-500' : 'text-muted-foreground'}`}>
+                        ({filteredFromPorts.length}/{totalFromPorts} disponible{filteredFromPorts.length > 1 ? 's' : ''})
+                      </span>
+                    )}
+                  </FormLabel>
                   <FormControl>
                     <Select
                       onValueChange={(value) => field.onChange(parseInt(value))}
                       value={field.value?.toString()}
-                      disabled={isLoadingPorts || !fromEquipementId}
+                      disabled={isLoadingPorts || isLoadingLiaisons || !fromEquipementId || filteredFromPorts.length === 0}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder={
-                          !fromEquipementId 
-                            ? "Sélectionnez d'abord l'équipement d'origine" 
-                            : "Sélectionner le port d'origine"
+                          !fromEquipementId
+                            ? "Sélectionnez d'abord l'équipement d'origine"
+                            : filteredFromPorts.length === 0
+                              ? "Aucun port disponible"
+                              : "Sélectionner le port d'origine"
                         } />
                       </SelectTrigger>
                       <SelectContent>
@@ -239,6 +356,9 @@ const AddLiaisonForm = ({ defaultCoffretId, onSuccess, trigger }: AddLiaisonForm
                       </SelectContent>
                     </Select>
                   </FormControl>
+                  {fromEquipementId && filteredFromPorts.length === 0 && (
+                    <p className="text-xs text-red-500">Tous les ports de cet équipement sont déjà utilisés</p>
+                  )}
                   <FormMessage />
                 </FormItem>
               )}
@@ -249,7 +369,7 @@ const AddLiaisonForm = ({ defaultCoffretId, onSuccess, trigger }: AddLiaisonForm
               name="to_equipement_id"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Équipement de destination *</FormLabel>
+                  <FormLabel>Équipement de destination <span className="text-red-500">*</span></FormLabel>
                   <FormControl>
                     <Select
                       onValueChange={(value) => handleToEquipementChange(parseInt(value))}
@@ -277,18 +397,27 @@ const AddLiaisonForm = ({ defaultCoffretId, onSuccess, trigger }: AddLiaisonForm
               name="to"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Port de destination *</FormLabel>
+                  <FormLabel>
+                    Port de destination <span className="text-red-500">*</span>
+                    {toEquipementId && (
+                      <span className={`ml-2 text-xs ${filteredToPorts.length === 0 ? 'text-red-500' : 'text-muted-foreground'}`}>
+                        ({filteredToPorts.length}/{totalToPorts} disponible{filteredToPorts.length > 1 ? 's' : ''})
+                      </span>
+                    )}
+                  </FormLabel>
                   <FormControl>
                     <Select
                       onValueChange={(value) => field.onChange(parseInt(value))}
                       value={field.value?.toString()}
-                      disabled={isLoadingPorts || !toEquipementId}
+                      disabled={isLoadingPorts || isLoadingLiaisons || !toEquipementId || filteredToPorts.length === 0}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder={
-                          !toEquipementId 
-                            ? "Sélectionnez d'abord l'équipement de destination" 
-                            : "Sélectionner le port de destination"
+                          !toEquipementId
+                            ? "Sélectionnez d'abord l'équipement de destination"
+                            : filteredToPorts.length === 0
+                              ? "Aucun port disponible"
+                              : "Sélectionner le port de destination"
                         } />
                       </SelectTrigger>
                       <SelectContent>
@@ -300,6 +429,9 @@ const AddLiaisonForm = ({ defaultCoffretId, onSuccess, trigger }: AddLiaisonForm
                       </SelectContent>
                     </Select>
                   </FormControl>
+                  {toEquipementId && filteredToPorts.length === 0 && (
+                    <p className="text-xs text-red-500">Tous les ports de cet équipement sont déjà utilisés</p>
+                  )}
                   <FormMessage />
                 </FormItem>
               )}
@@ -348,11 +480,14 @@ const AddLiaisonForm = ({ defaultCoffretId, onSuccess, trigger }: AddLiaisonForm
               )}
             />
 
-            <div className="flex justify-end space-x-2">
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-2">
+              <Button type="button" variant="outline" onClick={() => { if (!isSubmitting) setOpen(false); }} className="w-full sm:w-auto" disabled={isSubmitting}>
                 Annuler
               </Button>
-              <Button type="submit">Ajouter</Button>
+              <Button type="submit" className="w-full sm:w-auto" disabled={isSubmitting}>
+                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
+                {isSubmitting ? "Ajout en cours..." : "Ajouter"}
+              </Button>
             </div>
           </form>
         </Form>

@@ -2,13 +2,18 @@
 
 namespace App\Models;
 
+use App\Traits\LogsActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Salle extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, LogsActivity, SoftDeletes;
+
+    protected $logLabel = 'Salle';
+
+    protected $logIdentifier = 'nom';
 
     protected $fillable = [
         'nom',
@@ -52,4 +57,3 @@ class Salle extends Model
         return $this->hasMany(Lan::class);
     }
 }
-

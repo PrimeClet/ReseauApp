@@ -2,21 +2,19 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Spatie\Permission\Models\Permission;
 
 class PermissionController extends Controller
 {
-    /**
-     * Liste toutes les permissions groupées par module
-     */
-    public function index(Request $request)
+    public function index(Request $request): JsonResponse
     {
         $permissions = Permission::orderBy('name')->get();
 
-        // Grouper par module
         $grouped = $permissions->groupBy(function ($permission) {
             $parts = explode('.', $permission->name);
+
             return $parts[0] ?? 'other';
         });
 
@@ -27,6 +25,7 @@ class PermissionController extends Controller
                 'module_label' => $this->getModuleLabel($module),
                 'permissions' => $perms->map(function ($perm) {
                     $parts = explode('.', $perm->name);
+
                     return [
                         'id' => $perm->id,
                         'name' => $perm->name,
@@ -37,34 +36,26 @@ class PermissionController extends Controller
             ];
         }
 
-        return response()->json([
-            'data' => $data,
+        return $this->successResponse([
+            'grouped' => $data,
             'all_permissions' => $permissions->pluck('name'),
         ]);
     }
 
-    /**
-     * Affiche une permission spécifique
-     */
-    public function show($id)
+    public function show($id): JsonResponse
     {
         $permission = Permission::findOrFail($id);
 
-        return response()->json([
-            'data' => [
-                'id' => $permission->id,
-                'name' => $permission->name,
-                'guard_name' => $permission->guard_name,
-                'roles' => $permission->roles->pluck('name'),
-                'created_at' => $permission->created_at,
-            ]
+        return $this->successResponse([
+            'id' => $permission->id,
+            'name' => $permission->name,
+            'guard_name' => $permission->guard_name,
+            'roles' => $permission->roles->pluck('name'),
+            'created_at' => $permission->created_at,
         ]);
     }
 
-    /**
-     * Liste des modules disponibles
-     */
-    public function modules()
+    public function modules(): JsonResponse
     {
         $modules = [
             ['id' => 'utilisateurs', 'label' => 'Utilisateurs', 'icon' => 'users'],
@@ -82,14 +73,9 @@ class PermissionController extends Controller
             ['id' => 'dashboard', 'label' => 'Tableau de bord', 'icon' => 'layout-dashboard'],
         ];
 
-        return response()->json([
-            'data' => $modules
-        ]);
+        return $this->successResponse($modules);
     }
 
-    /**
-     * Récupère le libellé français d'un module
-     */
     private function getModuleLabel(string $module): string
     {
         $labels = [
@@ -111,9 +97,6 @@ class PermissionController extends Controller
         return $labels[$module] ?? ucfirst($module);
     }
 
-    /**
-     * Récupère le libellé français d'une action
-     */
     private function getActionLabel(string $action): string
     {
         $labels = [

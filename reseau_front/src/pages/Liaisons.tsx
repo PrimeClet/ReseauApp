@@ -1,6 +1,5 @@
-import { useEffect, useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
+import { useState, useMemo, useEffect } from "react";
+import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { useData } from "@/contexts/DataContext";
 import AppShell from "@/components/layout/AppShell";
 import PageHeader from "@/components/ui/page-header";
@@ -17,7 +16,7 @@ import { toast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Loader2, Plus, Cable, Check, ChevronsUpDown, ArrowRight, Info } from "lucide-react";
+import { Loader2, Plus, Cable, Check, ChevronsUpDown, ArrowRight, Info, Plug, ArrowRightLeft, Zap } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -28,6 +27,7 @@ import { Label } from "@/components/ui/label";
 const liaisonSchema = z.object({
   from: z.number().min(1, "Le port source est requis"),
   to: z.number().min(1, "Le port destination est requis"),
+  direction: z.enum(['up', 'down']).default('down'),
   label: z.string().min(1, "Le label est requis"),
   media: z.string().min(1, "Le type de média est requis"),
   length: z.number().optional().nullable(),
@@ -69,8 +69,7 @@ const getMediaColor = (media: string) => {
 };
 
 const Liaisons = () => {
-  const { isAuthenticated, isLoading: isLoadingAuth } = useAuth();
-  const navigate = useNavigate();
+  const { isAuthenticated, isLoading: isLoadingAuth } = useRequireAuth();
   const { liaisons, ports, equipements, isLoadingLiaisons, isLoadingPorts, isLoadingEquipements, addLiaison, updateLiaison, deleteLiaison, restoreLiaison, refetchLiaisons } = useData();
   const [selectedLiaison, setSelectedLiaison] = useState<any>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
@@ -95,6 +94,7 @@ const Liaisons = () => {
     defaultValues: {
       from: undefined,
       to: undefined,
+      direction: "down",
       label: "",
       media: "",
       length: null,
@@ -107,34 +107,55 @@ const Liaisons = () => {
     return equipements.filter(eq => !(eq as any).deleted_at);
   }, [equipements]);
 
-  // Ports par équipement
+  // Récupérer tous les IDs de ports déjà utilisés dans les liaisons existantes (non supprimées)
+  const usedPortIds = useMemo(() => {
+    const ids = new Set<number>();
+    liaisons.forEach(liaison => {
+      // Ignorer les liaisons soft-deleted
+      if ((liaison as any).deleted_at) return;
+      // Vérifier que from et to sont des nombres valides
+      if (typeof liaison.from === 'number' && liaison.from > 0) {
+        ids.add(liaison.from);
+      }
+      if (typeof liaison.to === 'number' && liaison.to > 0) {
+        ids.add(liaison.to);
+      }
+    });
+    return ids;
+  }, [liaisons]);
+
+  // Ports par équipement (exclure les ports soft-deleted et les ports déjà utilisés)
   const portsByEquipement = useMemo(() => {
     const map: Record<number, typeof ports> = {};
-    ports.filter(p => !(p as any).deleted_at).forEach(port => {
-      if (!map[port.equipement_id]) {
-        map[port.equipement_id] = [];
-      }
-      map[port.equipement_id].push(port);
-    });
+    ports
+      .filter(p => !(p as any).deleted_at && !usedPortIds.has(p.id))
+      .forEach(port => {
+        if (!map[port.equipement_id]) {
+          map[port.equipement_id] = [];
+        }
+        map[port.equipement_id].push(port);
+      });
     return map;
-  }, [ports]);
-
-  // Ports disponibles pour l'équipement source sélectionné
-  const fromEquipementPorts = useMemo(() => {
-    if (!selectedFromEquipement) return [];
-    return portsByEquipement[selectedFromEquipement] || [];
-  }, [selectedFromEquipement, portsByEquipement]);
-
-  // Ports disponibles pour l'équipement destination sélectionné
-  const toEquipementPorts = useMemo(() => {
-    if (!selectedToEquipement) return [];
-    return portsByEquipement[selectedToEquipement] || [];
-  }, [selectedToEquipement, portsByEquipement]);
+  }, [ports, usedPortIds]);
 
   // Générer le label automatiquement quand les ports sont sélectionnés
   const selectedFromPort = form.watch("from");
   const selectedToPort = form.watch("to");
   const selectedMedia = form.watch("media");
+
+  // Ports disponibles pour l'équipement source sélectionné (exclure le port destination sélectionné)
+  const fromEquipementPorts = useMemo(() => {
+    if (!selectedFromEquipement) return [];
+    const portsForEquipement = portsByEquipement[selectedFromEquipement] || [];
+    return portsForEquipement.filter(p => p.id !== selectedToPort);
+  }, [selectedFromEquipement, portsByEquipement, selectedToPort]);
+
+  // Ports disponibles pour l'équipement destination sélectionné (exclure le port source sélectionné)
+  const toEquipementPorts = useMemo(() => {
+    if (!selectedToEquipement) return [];
+    const portsForEquipement = portsByEquipement[selectedToEquipement] || [];
+    return portsForEquipement.filter(p => p.id !== selectedFromPort);
+  }, [selectedToEquipement, portsByEquipement, selectedFromPort]);
 
   useEffect(() => {
     if (selectedFromPort && selectedToPort && selectedMedia) {
@@ -179,17 +200,29 @@ const Liaisons = () => {
       return {
         id: liaison.id,
         Nom: liaison.label || '-',
-        "Port Source": fromPort ? `${fromPort.port_label} (${fromPort.device_name})` : '-',
-        "Port Destination": toPort ? `${toPort.port_label} (${toPort.device_name})` : '-',
+        Connexion: {
+          from: fromPort ? {
+            label: fromPort.port_label,
+            device: fromPort.device_name,
+            equipement: fromEquipement?.name || '-',
+          } : null,
+          to: toPort ? {
+            label: toPort.port_label,
+            device: toPort.device_name,
+            equipement: toEquipement?.name || '-',
+          } : null,
+          direction: liaison.direction,
+        },
         Média: liaison.media || '-',
-        "Longueur (m)": liaison.length ? `${liaison.length}` : '-',
-        Actif: liaison.status ? 'Oui' : 'Non',
-        Status: isDeleted ? "Supprimé" : "Actif",
+        "Longueur": liaison.length ? `${liaison.length}m` : '-',
+        Status: isDeleted ? "Supprimé" : (liaison.status ? "Actif" : "Inactif"),
         from: liaison.from,
         to: liaison.to,
+        direction: liaison.direction,
         media: liaison.media,
         length: liaison.length,
         status: liaison.status,
+        isActive: liaison.status,
         // Données supplémentaires pour les tooltips
         fromPortDetails: fromPort ? {
           label: fromPort.port_label,
@@ -229,21 +262,19 @@ const Liaisons = () => {
     }
 
     return data;
-  }, [liaisons, ports, mediaFilter, statusFilter]);
-
-  useEffect(() => {
-    if (!isLoadingAuth && !isAuthenticated) {
-      navigate("/login");
-    }
-  }, [isAuthenticated, isLoadingAuth, navigate]);
+  }, [liaisons, ports, equipements, mediaFilter, statusFilter]);
 
   const handleRowClick = (liaison: any) => {
-    setSelectedLiaison(liaison);
+    // Trouver la liaison originale dans la liste pour avoir toutes les données
+    const originalLiaison = liaisons.find(l => l.id === liaison.id) || liaison;
+    setSelectedLiaison(originalLiaison);
     setIsDetailsOpen(true);
   };
 
   const handleEdit = (liaison: any) => {
-    setSelectedLiaison(liaison);
+    // Trouver la liaison originale dans la liste pour avoir toutes les données
+    const originalLiaison = liaisons.find(l => l.id === liaison.id) || liaison;
+    setSelectedLiaison(originalLiaison);
     setIsEditOpen(true);
   };
 
@@ -252,6 +283,7 @@ const Liaisons = () => {
       const dataToSave = {
         from: typeof updatedLiaison.from === 'string' ? parseInt(updatedLiaison.from, 10) : updatedLiaison.from,
         to: typeof updatedLiaison.to === 'string' ? parseInt(updatedLiaison.to, 10) : updatedLiaison.to,
+        direction: updatedLiaison.direction,
         label: updatedLiaison.label,
         media: updatedLiaison.media,
         length: updatedLiaison.length ? parseInt(updatedLiaison.length, 10) : null,
@@ -318,6 +350,7 @@ const Liaisons = () => {
       await addLiaison({
         from: data.from,
         to: data.to,
+        direction: data.direction,
         label: data.label,
         media: data.media,
         length: data.length || undefined,
@@ -359,101 +392,160 @@ const Liaisons = () => {
     const originalLiaison = liaisons.find(l => l.id === liaison.id) || liaison;
     const fromPort = ports.find(p => p.id === originalLiaison.from);
     const toPort = ports.find(p => p.id === originalLiaison.to);
+    const fromEquipement = fromPort ? equipements.find(eq => eq.id === fromPort.equipement_id) : null;
+    const toEquipement = toPort ? equipements.find(eq => eq.id === toPort.equipement_id) : null;
+
     return {
       id: originalLiaison.id,
+      nom: originalLiaison.label, // Utilisé pour l'affichage du nom
       label: originalLiaison.label,
+      direction: originalLiaison.direction || 'down',
       from: originalLiaison.from,
       to: originalLiaison.to,
+      // Objets structurés pour le rendu visuel
+      port_source: fromPort ? {
+        id: fromPort.id,
+        port_label: fromPort.port_label,
+        device_name: fromPort.device_name,
+        equipement: fromEquipement ? {
+          id: fromEquipement.id,
+          name: fromEquipement.name,
+          equipement_code: fromEquipement.equipement_code,
+        } : null,
+      } : null,
+      port_destination: toPort ? {
+        id: toPort.id,
+        port_label: toPort.port_label,
+        device_name: toPort.device_name,
+        equipement: toEquipement ? {
+          id: toEquipement.id,
+          name: toEquipement.name,
+          equipement_code: toEquipement.equipement_code,
+        } : null,
+      } : null,
+      // Chaînes formatées pour l'édition
       from_port: fromPort ? `${fromPort.port_label} (${fromPort.device_name})` : null,
       to_port: toPort ? `${toPort.port_label} (${toPort.device_name})` : null,
       media: originalLiaison.media,
-      length: originalLiaison.length,
+      longueur: originalLiaison.length, // Utilisé par le modal pour l'affichage
+      length: originalLiaison.length, // Conservé pour l'édition
       status: originalLiaison.status,
+      actif: originalLiaison.status, // Pour le badge actif/inactif
     };
+  };
+
+  // Rendu personnalisé pour la colonne Nom (identifiant principal)
+  const renderNomCell = (value: string) => {
+    if (value === '-') {
+      return <span className="text-muted-foreground text-xs">-</span>;
+    }
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100">
+        {value}
+      </span>
+    );
+  };
+
+  // Rendu personnalisé pour la colonne Connexion (source -> destination)
+  const renderConnexionCell = (value: any, row: any) => {
+    if (!value || (!value.from && !value.to)) {
+      return <span className="text-muted-foreground">-</span>;
+    }
+
+    const isUpstream = value.direction === 'up';
+    const mediaColor = getMediaColor(row.media || '');
+
+    return (
+      <div className="flex items-center gap-2 min-w-[280px]">
+        {/* Port source */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-muted/50 border cursor-help hover:bg-muted transition-colors">
+              <Plug className="h-3.5 w-3.5 text-blue-500" />
+              <div className="flex flex-col">
+                <span className="text-xs font-medium leading-tight">{value.from?.label || '-'}</span>
+                <span className="text-[10px] text-muted-foreground leading-tight">{value.from?.equipement || ''}</span>
+              </div>
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="top">
+            <div className="text-xs">
+              <div className="font-semibold">Port source</div>
+              <div>{value.from?.device || '-'}</div>
+            </div>
+          </TooltipContent>
+        </Tooltip>
+
+        {/* Flèche de direction */}
+        <div className={cn(
+          "flex items-center gap-1 px-1.5 py-0.5 rounded",
+          isUpstream ? "bg-orange-100 dark:bg-orange-900/30" : "bg-cyan-100 dark:bg-cyan-900/30"
+        )}>
+          {isUpstream ? (
+            <span className="text-orange-600 dark:text-orange-400 text-xs">←</span>
+          ) : (
+            <span className="text-cyan-600 dark:text-cyan-400 text-xs">→</span>
+          )}
+        </div>
+
+        {/* Port destination */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-muted/50 border cursor-help hover:bg-muted transition-colors">
+              <Plug className="h-3.5 w-3.5 text-green-500" />
+              <div className="flex flex-col">
+                <span className="text-xs font-medium leading-tight">{value.to?.label || '-'}</span>
+                <span className="text-[10px] text-muted-foreground leading-tight">{value.to?.equipement || ''}</span>
+              </div>
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="top">
+            <div className="text-xs">
+              <div className="font-semibold">Port destination</div>
+              <div>{value.to?.device || '-'}</div>
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      </div>
+    );
   };
 
   // Rendu personnalisé pour la colonne Média avec badge coloré
   const renderMediaCell = (value: string) => {
     const colors = getMediaColor(value);
     return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium border ${colors.bg} ${colors.text} ${colors.border}`}>
+      <span className={`px-2 py-1 rounded-md text-xs font-medium border ${colors.bg} ${colors.text} ${colors.border}`}>
         {value}
       </span>
     );
   };
 
-  // Rendu personnalisé pour la colonne Actif
-  const renderActifCell = (value: string) => {
-    const isActif = value === 'Oui';
+  // Rendu personnalisé pour la colonne Status
+  const renderStatusCell = (value: string, row: any) => {
+    if (value === "Supprimé") {
+      return (
+        <span className="px-2 py-1 rounded-md text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-200">
+          Supprimé
+        </span>
+      );
+    }
+    const isActive = row.isActive;
     return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-        isActif
-          ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-          : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+      <span className={`px-2 py-1 rounded-md text-xs font-medium ${
+        isActive
+          ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200"
+          : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
       }`}>
-        {value}
+        {isActive ? "Actif" : "Inactif"}
       </span>
     );
   };
 
-  // Rendu personnalisé pour les ports avec tooltip au survol
-  const renderPortSourceCell = (value: string, row: any) => {
-    const details = row.fromPortDetails;
-    if (!details) return <span className="text-muted-foreground">-</span>;
-
+  // Rendu pour la longueur avec icône
+  const renderLongueurCell = (value: string) => {
+    if (value === '-') return <span className="text-muted-foreground">-</span>;
     return (
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span className="cursor-help border-b border-dotted border-muted-foreground hover:border-primary transition-colors">
-            {value}
-          </span>
-        </TooltipTrigger>
-        <TooltipContent side="top" className="max-w-xs">
-          <div className="space-y-1 text-sm">
-            <div className="font-semibold text-primary">Port Source</div>
-            <div className="grid grid-cols-2 gap-x-3 gap-y-1">
-              <span className="text-muted-foreground">Label:</span>
-              <span>{details.label}</span>
-              <span className="text-muted-foreground">Device:</span>
-              <span>{details.device}</span>
-              <span className="text-muted-foreground">Type:</span>
-              <span>{details.type || '-'}</span>
-              <span className="text-muted-foreground">Équipement:</span>
-              <span>{details.equipement}</span>
-            </div>
-          </div>
-        </TooltipContent>
-      </Tooltip>
-    );
-  };
-
-  const renderPortDestinationCell = (value: string, row: any) => {
-    const details = row.toPortDetails;
-    if (!details) return <span className="text-muted-foreground">-</span>;
-
-    return (
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span className="cursor-help border-b border-dotted border-muted-foreground hover:border-primary transition-colors">
-            {value}
-          </span>
-        </TooltipTrigger>
-        <TooltipContent side="top" className="max-w-xs">
-          <div className="space-y-1 text-sm">
-            <div className="font-semibold text-primary">Port Destination</div>
-            <div className="grid grid-cols-2 gap-x-3 gap-y-1">
-              <span className="text-muted-foreground">Label:</span>
-              <span>{details.label}</span>
-              <span className="text-muted-foreground">Device:</span>
-              <span>{details.device}</span>
-              <span className="text-muted-foreground">Type:</span>
-              <span>{details.type || '-'}</span>
-              <span className="text-muted-foreground">Équipement:</span>
-              <span>{details.equipement}</span>
-            </div>
-          </div>
-        </TooltipContent>
-      </Tooltip>
+      <span className="text-sm font-medium">{value}</span>
     );
   };
 
@@ -480,7 +572,7 @@ const Liaisons = () => {
     <AppShell>
       <div className="space-y-6">
         <PageHeader
-          title="Gestion des Liaisons"
+          title="Gestion des liaisons"
           description="Configuration et gestion des liaisons réseau"
           icon={<Cable className="h-6 w-6 text-primary" />}
           breadcrumbs={[
@@ -504,75 +596,114 @@ const Liaisons = () => {
                 </DialogHeader>
                 <Form {...form}>
                   <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                    {/* Étape 1: Type de média */}
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium">1. Type de liaison *</Label>
-                      <FormField
-                        control={form.control}
-                        name="media"
-                        render={({ field }) => (
-                          <FormItem>
-                            <Select onValueChange={field.onChange} value={field.value || ""}>
-                              <FormControl>
-                                <SelectTrigger className="w-full">
-                                  <SelectValue placeholder="Sélectionner le type de liaison" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="Cuivre Cat5e">
-                                  <span className="flex items-center gap-2">
-                                    <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                                    Cuivre Cat5e
-                                  </span>
-                                </SelectItem>
-                                <SelectItem value="Cuivre Cat6">
-                                  <span className="flex items-center gap-2">
-                                    <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                                    Cuivre Cat6
-                                  </span>
-                                </SelectItem>
-                                <SelectItem value="Cuivre Cat6a">
-                                  <span className="flex items-center gap-2">
-                                    <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                                    Cuivre Cat6a
-                                  </span>
-                                </SelectItem>
-                                <SelectItem value="Fibre Monomode">
-                                  <span className="flex items-center gap-2">
-                                    <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-                                    Fibre Monomode
-                                  </span>
-                                </SelectItem>
-                                <SelectItem value="Fibre Multimode">
-                                  <span className="flex items-center gap-2">
-                                    <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-                                    Fibre Multimode
-                                  </span>
-                                </SelectItem>
-                                <SelectItem value="WiFi 2.4GHz">
-                                  <span className="flex items-center gap-2">
-                                    <span className="w-2 h-2 rounded-full bg-purple-500"></span>
-                                    WiFi 2.4GHz
-                                  </span>
-                                </SelectItem>
-                                <SelectItem value="WiFi 5GHz">
-                                  <span className="flex items-center gap-2">
-                                    <span className="w-2 h-2 rounded-full bg-purple-500"></span>
-                                    WiFi 5GHz
-                                  </span>
-                                </SelectItem>
-                                <SelectItem value="WiFi 6">
-                                  <span className="flex items-center gap-2">
-                                    <span className="w-2 h-2 rounded-full bg-purple-500"></span>
-                                    WiFi 6
-                                  </span>
-                                </SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                    {/* Étape 1: Type de média et Direction */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium">1. Type de liaison *</Label>
+                        <FormField
+                          control={form.control}
+                          name="media"
+                          render={({ field }) => (
+                            <FormItem>
+                              <Select onValueChange={field.onChange} value={field.value || ""}>
+                                <FormControl>
+                                  <SelectTrigger className="w-full">
+                                    <SelectValue placeholder="Sélectionner le type" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="Cuivre Cat5e">
+                                    <span className="flex items-center gap-2">
+                                      <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                                      Cuivre Cat5e
+                                    </span>
+                                  </SelectItem>
+                                  <SelectItem value="Cuivre Cat6">
+                                    <span className="flex items-center gap-2">
+                                      <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                                      Cuivre Cat6
+                                    </span>
+                                  </SelectItem>
+                                  <SelectItem value="Cuivre Cat6a">
+                                    <span className="flex items-center gap-2">
+                                      <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                                      Cuivre Cat6a
+                                    </span>
+                                  </SelectItem>
+                                  <SelectItem value="Fibre Monomode">
+                                    <span className="flex items-center gap-2">
+                                      <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                                      Fibre Monomode
+                                    </span>
+                                  </SelectItem>
+                                  <SelectItem value="Fibre Multimode">
+                                    <span className="flex items-center gap-2">
+                                      <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                                      Fibre Multimode
+                                    </span>
+                                  </SelectItem>
+                                  <SelectItem value="WiFi 2.4GHz">
+                                    <span className="flex items-center gap-2">
+                                      <span className="w-2 h-2 rounded-full bg-purple-500"></span>
+                                      WiFi 2.4GHz
+                                    </span>
+                                  </SelectItem>
+                                  <SelectItem value="WiFi 5GHz">
+                                    <span className="flex items-center gap-2">
+                                      <span className="w-2 h-2 rounded-full bg-purple-500"></span>
+                                      WiFi 5GHz
+                                    </span>
+                                  </SelectItem>
+                                  <SelectItem value="WiFi 6">
+                                    <span className="flex items-center gap-2">
+                                      <span className="w-2 h-2 rounded-full bg-purple-500"></span>
+                                      WiFi 6
+                                    </span>
+                                  </SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium">Direction du flux *</Label>
+                        <FormField
+                          control={form.control}
+                          name="direction"
+                          render={({ field }) => (
+                            <FormItem>
+                              <Select onValueChange={field.onChange} value={field.value || "down"}>
+                                <FormControl>
+                                  <SelectTrigger className="w-full">
+                                    <SelectValue placeholder="Direction" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="down">
+                                    <span className="flex items-center gap-2">
+                                      <span className="text-cyan-600">↓</span>
+                                      Downstream
+                                    </span>
+                                  </SelectItem>
+                                  <SelectItem value="up">
+                                    <span className="flex items-center gap-2">
+                                      <span className="text-orange-600">↑</span>
+                                      Upstream
+                                    </span>
+                                  </SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Downstream = vers distribution, Upstream = vers source
+                              </p>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
                     </div>
 
                     {/* Étape 2: Sélection Source et Destination côte à côte */}
@@ -927,7 +1058,7 @@ const Liaisons = () => {
           <>
             <DataTableEnhanced
               title={`${tableData.length} liaison${tableData.length > 1 ? 's' : ''} configurée${tableData.length > 1 ? 's' : ''}`}
-              columns={["Nom", "Port Source", "Port Destination", "Média", "Longueur (m)", "Actif", "Status"]}
+              columns={["Nom", "Connexion", "Média", "Longueur", "Status"]}
               data={tableData}
               onRowClick={handleRowClick}
               onEdit={handleEdit}
@@ -940,10 +1071,11 @@ const Liaisons = () => {
               statusColumn="Status"
               deletedStatus="Supprimé"
               customCellRenderers={{
+                "Nom": renderNomCell,
+                "Connexion": renderConnexionCell,
                 "Média": renderMediaCell,
-                "Actif": renderActifCell,
-                "Port Source": renderPortSourceCell,
-                "Port Destination": renderPortDestinationCell,
+                "Status": renderStatusCell,
+                "Longueur": renderLongueurCell,
               }}
               customFilters={
                 <>
@@ -1013,6 +1145,15 @@ const Liaisons = () => {
               onSave={handleSave}
               fields={[
                 { key: "label", label: "Nom", type: "text" },
+                {
+                  key: "direction",
+                  label: "Direction",
+                  type: "select",
+                  options: [
+                    { value: "down", label: "Downstream (vers distribution)" },
+                    { value: "up", label: "Upstream (vers source)" },
+                  ]
+                },
                 {
                   key: "media",
                   label: "Type de média",

@@ -2,114 +2,47 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\System\StoreSystemRequest;
+use App\Http\Requests\System\UpdateSystemRequest;
 use App\Models\System;
+use App\Services\SystemService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class SystemController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
-    public function index(Request $request)
+    public function __construct(
+        private readonly SystemService $systemService,
+    ) {}
+
+    public function index(Request $request): JsonResponse
     {
-        $query = System::query();
-
-        if ($request->has('status')) {
-            $query->where('status', $request->status);
-        }
-
-        if ($request->has('search')) {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%");
-            });
-        }
-
-        $perPage = (int) $request->get('per_page', $request->get('count', 15));
-        $perPage = $perPage > 0 && $perPage <= 100 ? $perPage : 15;
-
-        $systems = $query->orderBy('name')->paginate($perPage);
-
-        return response()->json($systems);
+        return $this->paginatedResponse($this->systemService->list($request));
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(Request $request)
+    public function store(StoreSystemRequest $request): JsonResponse
     {
-        if (!auth()->user()->isAdministrator()) {
-            return response()->json(['message' => 'Non autorisé'], 403);
-        }
+        $system = $this->systemService->create($request->validated());
 
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'type' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'vendor' => 'nullable|string',
-            'endpoint' => 'nullable|string',
-            'monitored_scope' => 'nullable|string',
-            'coffret_id' => 'required|exists:coffrets,id',
-            'status' => 'required|boolean',
-        ]);
-
-        $system = System::create($request->all());
-
-        return response()->json([
-            'message' => 'Système créé avec succès.',
-            'system' => $system,
-        ], 201);
+        return $this->successResponse($system, 'Système créé avec succès.', 201);
     }
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(System $system)
+    public function show(System $system): JsonResponse
     {
-        return response()->json($system);
+        return $this->successResponse($system);
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, System $system)
+    public function update(UpdateSystemRequest $request, System $system): JsonResponse
     {
-        if (!auth()->user()->isAdministrator()) {
-            return response()->json(['message' => 'Non autorisé'], 403);
-        }
+        $system = $this->systemService->update($system, $request->validated());
 
-        $request->validate([
-            'name' => 'sometimes|string|max:255',
-            'type' => 'sometimes|string|max:255',
-            'description' => 'nullable|string',
-            'vendor' => 'nullable|string',
-            'endpoint' => 'nullable|string',
-            'monitored_scope' => 'nullable|string',
-            'coffret_id' => 'sometimes|exists:coffrets,id',
-            'status' => 'sometimes|boolean',
-        ]);
-
-        $system->update($request->all());
-
-        return response()->json([
-            'message' => 'Système mis à jour avec succès.',
-            'system' => $system,
-        ], 200);
+        return $this->successResponse($system, 'Système mis à jour avec succès.');
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(System $system)
+    public function destroy(System $system): JsonResponse
     {
-        if (!auth()->user()->isAdministrator()) {
-            return response()->json(['message' => 'Non autorisé'], 403);
-        }
+        $this->systemService->delete($system);
 
-        $system->delete();
-
-        return response()->json([
-            'message' => 'Système supprimé avec succès.',
-        ], 200);
+        return $this->successResponse(message: 'Système supprimé avec succès.');
     }
 }

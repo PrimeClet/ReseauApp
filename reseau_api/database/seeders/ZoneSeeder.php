@@ -4,7 +4,6 @@ namespace Database\Seeders;
 
 use App\Models\Site;
 use App\Models\Zone;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
 class ZoneSeeder extends Seeder
@@ -15,7 +14,7 @@ class ZoneSeeder extends Seeder
     public function run(): void
     {
         $firstSite = Site::first();
-        if (!$firstSite) {
+        if (! $firstSite) {
             return;
         }
 

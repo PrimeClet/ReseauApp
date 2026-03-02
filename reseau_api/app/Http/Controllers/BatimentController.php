@@ -2,235 +2,69 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\Batiment\ImportBatimentRequest;
+use App\Http\Requests\Batiment\StoreBatimentRequest;
+use App\Http\Requests\Batiment\UpdateBatimentRequest;
 use App\Models\Batiment;
+use App\Services\BatimentService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class BatimentController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
-    public function index(Request $request)
+    public function __construct(
+        private readonly BatimentService $batimentService,
+    ) {}
+
+    public function index(Request $request): JsonResponse
     {
-        $query = Batiment::query();
-
-        // Filtrer les supprimés ou non
-        if ($request->has('with_trashed') && $request->with_trashed === 'true') {
-            $query->withTrashed();
-        } elseif ($request->has('only_trashed') && $request->only_trashed === 'true') {
-            $query->onlyTrashed();
-        }
-
-        if ($request->has('search')) {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('nom', 'like', "%{$search}%")
-                  ->orWhere('description', 'like', "%{$search}%");
-            });
-        }
-
-        $perPage = (int) $request->get('per_page', 15);
-        $perPage = $perPage > 0 && $perPage <= 100 ? $perPage : 15;
-
-        $batiments = $query->with('zone')->withCount('salles')->orderBy('nom')->paginate($perPage);
-
-        return response()->json($batiments);
+        return $this->successResponse($this->batimentService->list($request));
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(Request $request)
+    public function store(StoreBatimentRequest $request): JsonResponse
     {
-        if (!auth()->user()->isAdministrator()) {
-            return response()->json(['message' => 'Non autorisé'], 403);
-        }
+        $batiment = $this->batimentService->create($request->validated());
 
-        $request->validate([
-            'nom' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'zone_id' => 'nullable|exists:zones,id',
-        ]);
-
-        $batiment = Batiment::create($request->only(['nom', 'description', 'zone_id']));
-        $batiment->load('zone');
-
-        return response()->json([
-            'message' => 'Bâtiment créé avec succès.',
-            'data' => $batiment,
-        ], 201);
+        return $this->successResponse($batiment, 'Bâtiment créé avec succès.', 201);
     }
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(Batiment $batiment)
+    public function show(Batiment $batiment): JsonResponse
     {
-        $batiment->load('zone');
-        $batiment->loadCount('salles');
-
-        return response()->json([
-            'data' => $batiment,
-        ]);
+        return $this->successResponse($this->batimentService->find($batiment));
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, Batiment $batiment)
+    public function update(UpdateBatimentRequest $request, Batiment $batiment): JsonResponse
     {
-        if (!auth()->user()->isAdministrator()) {
-            return response()->json(['message' => 'Non autorisé'], 403);
-        }
+        $batiment = $this->batimentService->update($batiment, $request->validated());
 
-        $request->validate([
-            'nom' => 'sometimes|string|max:255',
-            'description' => 'nullable|string',
-            'zone_id' => 'nullable|exists:zones,id',
-        ]);
-
-        $batiment->update($request->only(['nom', 'description', 'zone_id']));
-        $batiment->load('zone');
-
-        return response()->json([
-            'message' => 'Bâtiment mis à jour avec succès.',
-            'data' => $batiment,
-        ], 200);
+        return $this->successResponse($batiment, 'Bâtiment mis à jour avec succès.');
     }
 
-    /**
-     * Remove the specified resource from storage (soft delete).
-     */
-    public function destroy(Batiment $batiment)
+    public function destroy(Batiment $batiment): JsonResponse
     {
-        if (!auth()->user()->isAdministrator()) {
-            return response()->json(['message' => 'Non autorisé'], 403);
-        }
+        $this->batimentService->delete($batiment);
 
-        $batiment->delete();
-
-        return response()->json([
-            'message' => 'Bâtiment supprimé avec succès.',
-        ], 200);
+        return $this->successResponse(message: 'Bâtiment supprimé avec succès.');
     }
 
-    /**
-     * Restore a soft deleted batiment.
-     */
-    public function restore($id)
+    public function restore($id): JsonResponse
     {
-        if (!auth()->user()->isAdministrator()) {
-            return response()->json(['message' => 'Non autorisé'], 403);
-        }
+        $batiment = $this->batimentService->restore($id);
 
-        $batiment = Batiment::withTrashed()->findOrFail($id);
-        $batiment->restore();
-        $batiment->load('zone');
-
-        return response()->json([
-            'message' => 'Bâtiment restauré avec succès.',
-            'data' => $batiment,
-        ], 200);
+        return $this->successResponse($batiment, 'Bâtiment restauré avec succès.');
     }
 
-    /**
-     * Force delete a batiment permanently.
-     */
-    public function forceDelete($id)
+    public function forceDelete($id): JsonResponse
     {
-        if (!auth()->user()->isAdministrator()) {
-            return response()->json(['message' => 'Non autorisé'], 403);
-        }
+        $this->batimentService->forceDelete($id);
 
-        $batiment = Batiment::withTrashed()->findOrFail($id);
-        $batiment->forceDelete();
-
-        return response()->json([
-            'message' => 'Bâtiment supprimé définitivement.',
-        ], 200);
+        return $this->successResponse(message: 'Bâtiment supprimé définitivement.');
     }
 
-    /**
-     * Import batiments from CSV file.
-     */
-    public function import(Request $request)
+    public function import(ImportBatimentRequest $request): JsonResponse
     {
-        if (!auth()->user()->isAdministrator()) {
-            return response()->json(['message' => 'Non autorisé'], 403);
-        }
+        $result = $this->batimentService->importFromCsv($request->file('file'));
 
-        $request->validate([
-            'file' => 'required|file|mimes:csv,txt|max:2048',
-        ]);
-
-        $file = $request->file('file');
-        $handle = fopen($file->getPathname(), 'r');
-
-        if (!$handle) {
-            return response()->json(['message' => 'Impossible de lire le fichier.'], 400);
-        }
-
-        $header = fgetcsv($handle, 0, ',');
-        if (!$header) {
-            fclose($handle);
-            return response()->json(['message' => 'Fichier CSV vide ou invalide.'], 400);
-        }
-
-        // Normaliser les headers (enlever BOM, trim, lowercase)
-        $header = array_map(function ($h) {
-            return strtolower(trim(preg_replace('/[\x00-\x1F\x80-\xFF]/', '', $h)));
-        }, $header);
-
-        $created = 0;
-        $updated = 0;
-        $errors = [];
-        $lineNumber = 1;
-
-        while (($row = fgetcsv($handle, 0, ',')) !== false) {
-            $lineNumber++;
-
-            if (count($row) !== count($header)) {
-                $errors[] = "Ligne {$lineNumber}: nombre de colonnes incorrect";
-                continue;
-            }
-
-            $data = array_combine($header, $row);
-
-            // Vérifier que le nom existe
-            $nom = $data['nom'] ?? null;
-            if (empty($nom)) {
-                $errors[] = "Ligne {$lineNumber}: le nom est requis";
-                continue;
-            }
-
-            // Chercher si le bâtiment existe déjà
-            $batiment = Batiment::withTrashed()->where('nom', $nom)->first();
-
-            if ($batiment) {
-                // Mise à jour
-                $batiment->description = $data['description'] ?? $batiment->description;
-                if ($batiment->trashed()) {
-                    $batiment->restore();
-                }
-                $batiment->save();
-                $updated++;
-            } else {
-                // Création
-                Batiment::create([
-                    'nom' => $nom,
-                    'description' => $data['description'] ?? null,
-                ]);
-                $created++;
-            }
-        }
-
-        fclose($handle);
-
-        return response()->json([
-            'message' => 'Import terminé.',
-            'created' => $created,
-            'updated' => $updated,
-            'errors' => $errors,
-        ], 200);
+        return $this->successResponse($result, 'Import terminé.');
     }
 }

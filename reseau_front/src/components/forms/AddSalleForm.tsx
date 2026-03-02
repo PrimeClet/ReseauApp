@@ -10,13 +10,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useData } from "@/contexts/DataContext";
-import { Plus } from "lucide-react";
+import { Plus, Loader2 } from "lucide-react";
 
 const salleSchema = z.object({
   nom: z.string().min(1, "Le nom est requis"),
   batiment_id: z.string().min(1, "Le bâtiment est requis"),
   etage: z.string().optional().transform((val) => val ? parseInt(val, 10) : 0),
-  capacite: z.string().min(1, "La capacité est requise").transform((val) => parseInt(val, 10)),
+  capacite: z.string().optional().transform((val) => val ? parseInt(val, 10) : undefined),
   type: z.string().min(1, "Le type est requis"),
   description: z.string().optional(),
 });
@@ -39,6 +39,16 @@ export default function AddSalleForm() {
       description: "",
     },
   });
+
+  const { isSubmitting } = form.formState;
+
+  const handleOpenChange = (isOpen: boolean) => {
+    if (isSubmitting) return;
+    setOpen(isOpen);
+    if (!isOpen) {
+      form.reset();
+    }
+  };
 
   const onSubmit = async (data: SalleFormData) => {
     try {
@@ -63,7 +73,7 @@ export default function AddSalleForm() {
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button className="bg-primary text-primary-foreground hover:bg-primary/90">
           <Plus className="h-4 w-4 mr-2" />
@@ -96,7 +106,7 @@ export default function AddSalleForm() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Bâtiment</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Sélectionner un bâtiment" />
@@ -115,13 +125,13 @@ export default function AddSalleForm() {
               )}
             />
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <FormField
                 control={form.control}
                 name="etage"
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Étage (optionnel)</FormLabel>
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Étage</FormLabel>
                     <FormControl>
                       <Input type="number" placeholder="0" {...field} />
                     </FormControl>
@@ -133,7 +143,7 @@ export default function AddSalleForm() {
                 control={form.control}
                 name="capacite"
                 render={({ field }) => (
-                  <FormItem>
+                  <FormItem className="flex flex-col">
                     <FormLabel>Capacité</FormLabel>
                     <FormControl>
                       <Input type="number" placeholder="Ex: 30" {...field} />
@@ -146,12 +156,12 @@ export default function AddSalleForm() {
                 control={form.control}
                 name="type"
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Type</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Type <span className="text-red-500">*</span></FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Sélectionner le type" />
+                          <SelectValue placeholder="Sélectionner" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
@@ -187,10 +197,13 @@ export default function AddSalleForm() {
             />
 
             <div className="flex justify-end space-x-2">
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              <Button type="button" variant="outline" onClick={() => handleOpenChange(false)} disabled={isSubmitting}>
                 Annuler
               </Button>
-              <Button type="submit">Créer</Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                {isSubmitting ? "Création..." : "Créer"}
+              </Button>
             </div>
           </form>
         </Form>

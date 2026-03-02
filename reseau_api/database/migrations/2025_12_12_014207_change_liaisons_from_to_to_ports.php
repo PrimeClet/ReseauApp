@@ -15,13 +15,13 @@ return new class extends Migration
             // Supprimer les anciennes clés étrangères
             $table->dropForeign(['from']);
             $table->dropForeign(['to']);
-            
+
             // Renommer les colonnes pour plus de clarté (optionnel, on peut garder from/to)
             // Modifier les colonnes pour pointer vers ports
             $table->dropColumn('from');
             $table->dropColumn('to');
         });
-        
+
         Schema::table('liaisons', function (Blueprint $table) {
             // Ajouter les nouvelles colonnes pointant vers ports
             $table->foreignId('from')->after('id')->constrained('ports')->onDelete('cascade');
@@ -38,12 +38,12 @@ return new class extends Migration
             // Supprimer les clés étrangères vers ports
             $table->dropForeign(['from']);
             $table->dropForeign(['to']);
-            
+
             // Supprimer les colonnes
             $table->dropColumn('from');
             $table->dropColumn('to');
         });
-        
+
         Schema::table('liaisons', function (Blueprint $table) {
             // Restaurer les colonnes pointant vers equipements
             $table->foreignId('from')->after('id')->constrained('equipements')->onDelete('cascade');

@@ -2,17 +2,21 @@
 
 namespace App\Models;
 
+use App\Traits\LogsActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Coffret extends Model
 {
-    use HasFactory, SoftDeletes;
-    
+    use HasFactory, LogsActivity, SoftDeletes;
+
+    protected $logLabel = 'Armoire';
+
+    protected $logIdentifier = 'nom';
+
     protected $fillable = [
-        'code', 'nom', 'modele', 'photo', 'piece', 'emplacement', 'long', 'lat', 'status', 'batiment_id', 'salle_id', 'site_id', 'zone_id', 'qr_code'
+        'code', 'nom', 'modele', 'photo', 'emplacement', 'long', 'lat', 'status', 'batiment_id', 'salle_id', 'site_id', 'zone_id', 'qr_code',
     ];
 
     protected $appends = ['photo_url'];
@@ -49,7 +53,7 @@ class Coffret extends Model
 
     public function getPhotoUrlAttribute(): ?string
     {
-        if (!$this->photo) {
+        if (! $this->photo) {
             return null;
         }
         // If already an absolute URL, return as-is
@@ -59,6 +63,7 @@ class Coffret extends Model
         // Return the API endpoint URL for the photo
         $baseUrl = config('app.url', 'http://127.0.0.1:8000');
         $baseUrl = rtrim($baseUrl, '/');
-        return $baseUrl . '/api/coffrets/' . $this->id . '/photo';
+
+        return $baseUrl.'/api/coffrets/'.$this->id.'/photo';
     }
 }

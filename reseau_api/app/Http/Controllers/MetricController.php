@@ -3,14 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\Metric;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class MetricController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
-    public function index(Request $request)
+    public function index(Request $request): JsonResponse
     {
         $query = Metric::query();
 
@@ -30,13 +28,10 @@ class MetricController extends Controller
 
         $metrics = $query->orderBy('name')->paginate($perPage);
 
-        return response()->json($metrics);
+        return $this->paginatedResponse($metrics);
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(Request $request)
+    public function store(Request $request): JsonResponse
     {
         $request->validate([
             'name' => 'required|string|max:255',
@@ -49,24 +44,15 @@ class MetricController extends Controller
 
         $metric = Metric::create($request->all());
 
-        return response()->json([
-            'message' => 'Metric créée avec succès.',
-            'metric' => $metric,
-        ], 201);
+        return $this->successResponse($metric, 'Metric créée avec succès.', 201);
     }
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(Metric $metric)
+    public function show(Metric $metric): JsonResponse
     {
-        return response()->json($metric);
+        return $this->successResponse($metric);
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, Metric $metric)
+    public function update(Request $request, Metric $metric): JsonResponse
     {
         $request->validate([
             'name' => 'sometimes|string|max:255',
@@ -79,21 +65,13 @@ class MetricController extends Controller
 
         $metric->update($request->all());
 
-        return response()->json([
-            'message' => 'Metric mise à jour avec succès.',
-            'metric' => $metric,
-        ], 200);
+        return $this->successResponse($metric, 'Metric mise à jour avec succès.');
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(Metric $metric)
+    public function destroy(Metric $metric): JsonResponse
     {
         $metric->delete();
 
-        return response()->json([
-            'message' => 'Metric supprimée avec succès.',
-        ], 200);
+        return $this->successResponse(message: 'Metric supprimée avec succès.');
     }
 }

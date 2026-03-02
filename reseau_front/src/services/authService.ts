@@ -13,6 +13,8 @@ export interface User {
   email: string;
   phone: string;
   role: string;
+  roles: string[];
+  permissions: string[];
   is_active: boolean;
 }
 
@@ -33,6 +35,8 @@ export interface AuthMeResponse {
   email: string;
   phone: string;
   role: string;
+  roles: string[];
+  permissions: string[];
   is_active: boolean;
 }
 

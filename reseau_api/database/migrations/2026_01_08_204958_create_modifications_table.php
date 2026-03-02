@@ -23,7 +23,7 @@ return new class extends Migration
                 'modification_connexion',
                 'suppression_port',
                 'suppression_equipement',
-                'changement_statut_port'
+                'changement_statut_port',
             ]);
             $table->text('description');
             $table->text('raison');

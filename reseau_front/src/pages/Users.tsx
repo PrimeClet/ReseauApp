@@ -1,6 +1,5 @@
-import { useEffect, useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
+import { useState, useMemo, useEffect } from "react";
+import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import userService, { User, UserCreateData } from "@/services/userService";
 import roleService, { Role } from "@/services/roleService";
@@ -67,8 +66,7 @@ const userUpdateSchema = z.object({
 type UserFormData = z.infer<typeof userSchema>;
 
 const UsersPage = () => {
-  const { isAuthenticated, isLoading: isLoadingAuth, user: currentUser } = useAuth();
-  const navigate = useNavigate();
+  const { isAuthenticated, isLoading: isLoadingAuth, user: currentUser } = useRequireAuth();
   const queryClient = useQueryClient();
 
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -222,12 +220,6 @@ const UsersPage = () => {
     return data;
   }, [users, roleFilter, statusFilter]);
 
-  useEffect(() => {
-    if (!isLoadingAuth && !isAuthenticated) {
-      navigate("/login");
-    }
-  }, [isAuthenticated, isLoadingAuth, navigate]);
-
   // Remplir le formulaire d'édition
   useEffect(() => {
     if (selectedUser && isEditOpen) {
@@ -344,7 +336,7 @@ const UsersPage = () => {
     <AppShell>
       <div className="space-y-6">
         <PageHeader
-          title="Gestion des Utilisateurs"
+          title="Gestion des utilisateurs"
           description="Gérer les comptes utilisateurs et leurs accès"
           icon={<Users className="h-6 w-6 text-primary" />}
           breadcrumbs={[

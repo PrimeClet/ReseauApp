@@ -10,32 +10,29 @@ class PermissionMiddleware
 {
     /**
      * Gère une requête entrante en vérifiant qu'un utilisateur
-     * authentifié dispose de la permission demandée.
+     * authentifié dispose de l'une des permissions demandées (Spatie).
      *
      * Utilisation dans les routes :
-     *  Route::middleware(['auth:sanctum', 'permission:view_inventory'])->get(...);
+     *  Route::middleware('permission:armoires.voir')->get(...);
+     *  Route::middleware('permission:armoires.voir|equipements.voir')->get(...);
      */
-    public function handle(Request $request, Closure $next, string $permission): Response
+    public function handle(Request $request, Closure $next, string $permissions): Response
     {
-        if (!auth()->check()) {
+        if (! auth()->check()) {
             return response()->json(['message' => 'Non authentifié'], 401);
         }
 
         $user = auth()->user();
-        $role = $user->role ?? null;
 
-        if (!$role) {
-            return response()->json(['message' => 'Rôle non défini pour cet utilisateur'], 403);
-        }
+        // Parser les permissions (séparées par | ou ,)
+        $permissionsArray = preg_split('/[|,]/', $permissions);
+        $permissionsArray = array_map('trim', $permissionsArray);
 
-        $permissionsForRole = config('permissions.roles.' . $role, []);
-
-        if (!in_array($permission, $permissionsForRole, true)) {
+        // Vérifier avec Spatie hasAnyPermission
+        if (! $user->hasAnyPermission($permissionsArray)) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
         return $next($request);
     }
 }
-
-

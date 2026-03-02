@@ -34,7 +34,7 @@ export default function LiaisonsSection() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Gestion des Liaisons"
+        title="Gestion des liaisons"
         description="Configuration et monitoring des connexions réseau"
         icon={<Link2 className="h-6 w-6 text-primary" />}
         breadcrumbs={[

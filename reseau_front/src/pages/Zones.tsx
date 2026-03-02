@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
+import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { useData } from "@/contexts/DataContext";
 import AppShell from "@/components/layout/AppShell";
 import DataTableEnhanced from "@/components/ui/data-table-enhanced";
@@ -8,7 +8,7 @@ import DetailsModal from "@/components/ui/details-modal";
 import EditModal from "@/components/ui/edit-modal";
 import AddZoneForm from "@/components/forms/AddZoneForm";
 import { toast } from "@/hooks/use-toast";
-import { Loader2, Trash2, RotateCcw, AlertTriangle, Layers } from "lucide-react";
+import { Loader2, Trash2, RotateCcw, AlertTriangle, Layers, Building2, MapPin, Calendar, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -32,7 +32,7 @@ interface ZoneDeleteError {
 }
 
 const Zones = () => {
-  const { isAuthenticated, isLoading: isLoadingAuth } = useAuth();
+  const { isAuthenticated, isLoading: isLoadingAuth } = useRequireAuth();
   const navigate = useNavigate();
   const {
     zones,
@@ -53,12 +53,6 @@ const Zones = () => {
   const [zoneToDelete, setZoneToDelete] = useState<any>(null);
   const [deleteError, setDeleteError] = useState<ZoneDeleteError | null>(null);
   const [activeTab, setActiveTab] = useState("active");
-
-  useEffect(() => {
-    if (!isLoadingAuth && !isAuthenticated) {
-      navigate("/login");
-    }
-  }, [isAuthenticated, isLoadingAuth, navigate]);
 
   const siteIdToLabel = useMemo(() => {
     const m = new Map<number, string>();
@@ -206,12 +200,12 @@ const Zones = () => {
   // Préparer les données pour le tableau des zones actives
   const tableData = zones.map((zone) => ({
     id: zone.id,
-    site: siteIdToLabel.get(zone.site_id) || zone.site?.libelle || `#${zone.site_id}`,
-    libelle: zone.libelle,
-    description: zone.description || "Aucune description",
-    batiments: zone.batiments_count || 0,
-    Status: "Actif",
-    dateCreation: zone.created_at ? new Date(zone.created_at).toLocaleDateString('fr-FR') : "N/A",
+    "Site": siteIdToLabel.get(zone.site_id) || zone.site?.libelle || `#${zone.site_id}`,
+    "Libellé": zone.libelle,
+    "Description": zone.description || "Aucune description",
+    "Bâtiments": zone.batiments_count || 0,
+    "Status": "Actif",
+    "Date de création": zone.created_at ? new Date(zone.created_at).toLocaleDateString('fr-FR') : "N/A",
   }));
 
   // Préparer les données pour le tableau des zones supprimées
@@ -225,11 +219,77 @@ const Zones = () => {
     dateSuppression: zone.deleted_at ? new Date(zone.deleted_at).toLocaleDateString('fr-FR') : "N/A",
   }));
 
+  // Rendu personnalisé pour la colonne Libellé (identifiant principal)
+  const renderLibelleCell = (value: string) => {
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100">
+        {value}
+      </span>
+    );
+  };
+
+  // Rendu personnalisé pour la colonne Site
+  const renderSiteCell = (value: string) => {
+    return (
+      <div className="flex items-center gap-1.5">
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-violet-50 text-violet-700 dark:bg-violet-950/50 dark:text-violet-400">
+          <MapPin className="h-3 w-3" />
+          {value}
+        </span>
+      </div>
+    );
+  };
+
+  // Rendu personnalisé pour la colonne Status
+  const renderStatusCell = (value: string) => {
+    const isActive = value === "Actif";
+    return (
+      <div className="flex items-center gap-1.5">
+        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium ${
+          isActive
+            ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400"
+            : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
+        }`}>
+          <CheckCircle2 className="h-3 w-3" />
+          {value}
+        </span>
+      </div>
+    );
+  };
+
+  // Rendu personnalisé pour la colonne Bâtiments
+  const renderBatimentsCell = (value: number) => {
+    return (
+      <div className="flex items-center gap-1.5">
+        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium ${
+          value > 0
+            ? "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400"
+            : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+        }`}>
+          <Building2 className="h-3 w-3" />
+          {value} bâtiment{value !== 1 ? 's' : ''}
+        </span>
+      </div>
+    );
+  };
+
+  // Rendu personnalisé pour la colonne Date
+  const renderDateCell = (value: string) => {
+    return (
+      <div className="flex items-center gap-1.5 text-muted-foreground">
+        <Calendar className="h-3.5 w-3.5" />
+        <span className="text-xs">{value}</span>
+      </div>
+    );
+  };
+
   // Préparer les données pour les modals (format attendu)
   const formatZoneForModal = (zone: any) => {
     if (!zone) return null;
     const siteName = siteIdToLabel.get(zone.site_id) || zone.site?.libelle || "Non défini";
     return {
+      id: zone.id,
+      site_id: zone.site_id,
       libelle: zone.libelle,
       site: siteName,
       description: zone.description || "",
@@ -241,7 +301,7 @@ const Zones = () => {
     <AppShell>
       <div className="space-y-6">
         <PageHeader
-          title="Gestion des Zones"
+          title="Gestion des zones"
           description="Configuration et gestion des zones par site"
           icon={<Layers className="h-6 w-6 text-primary" />}
           breadcrumbs={[
@@ -286,11 +346,18 @@ const Zones = () => {
             ) : (
               <DataTableEnhanced
                 title={`${zones.length} zone${zones.length > 1 ? 's' : ''} configurée${zones.length > 1 ? 's' : ''}`}
-                columns={["site", "libelle", "description", "batiments", "Status", "dateCreation"]}
+                columns={["Site", "Libellé", "Description", "Bâtiments", "Status", "Date de création"]}
                 data={tableData}
                 onRowClick={handleRowClick}
                 onEdit={handleEdit}
                 onDelete={handleDeleteClick}
+                customCellRenderers={{
+                  "Libellé": renderLibelleCell,
+                  "Site": renderSiteCell,
+                  "Status": renderStatusCell,
+                  "Bâtiments": renderBatimentsCell,
+                  "Date de création": renderDateCell,
+                }}
               />
             )}
           </TabsContent>

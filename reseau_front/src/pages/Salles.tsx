@@ -1,6 +1,6 @@
-import { useEffect, useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
+import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { useData } from "@/contexts/DataContext";
 import AppShell from "@/components/layout/AppShell";
 import PageHeader from "@/components/ui/page-header";
@@ -9,7 +9,7 @@ import DetailsModal from "@/components/ui/details-modal";
 import EditModal from "@/components/ui/edit-modal";
 import AddSalleForm from "@/components/forms/AddSalleForm";
 import { toast } from "@/hooks/use-toast";
-import { Loader2, LayoutGrid } from "lucide-react";
+import { Loader2, LayoutGrid, Building2, Layers, Users, Tag, CheckCircle2 } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/tooltip";
 
 const Salles = () => {
-  const { isAuthenticated, isLoading: isLoadingAuth } = useAuth();
+  const { isAuthenticated, isLoading: isLoadingAuth } = useRequireAuth();
   const navigate = useNavigate();
   const { salles, batiments, isLoadingSalles, updateSalle, deleteSalle, restoreSalle, refetchSalles, importSalles } = useData();
   const [selectedSalle, setSelectedSalle] = useState<any>(null);
@@ -106,12 +106,6 @@ const Salles = () => {
 
     return data;
   }, [salles, batiments, statusFilter, batimentFilter, etageFilter, typeFilter, capaciteFilter]);
-
-  useEffect(() => {
-    if (!isLoadingAuth && !isAuthenticated) {
-      navigate("/login");
-    }
-  }, [isAuthenticated, isLoadingAuth, navigate]);
 
   const handleRowClick = (salle: any) => {
     setSelectedSalle(salle);
@@ -256,21 +250,33 @@ const Salles = () => {
     };
   };
 
+  // Rendu personnalisé pour la colonne Nom (identifiant principal)
+  const renderNomCell = (value: string) => {
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100">
+        {value}
+      </span>
+    );
+  };
+
   // Rendu personnalisé pour la colonne Bâtiment avec lien vers le modal
   const renderBatimentCell = (value: string, row: any) => {
-    if (value === 'N/A') return value;
+    if (value === 'N/A') {
+      return <span className="text-muted-foreground text-xs">Non assigné</span>;
+    }
     return (
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
             <span
-              className="cursor-pointer text-primary hover:underline"
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400 cursor-pointer hover:bg-amber-100 dark:hover:bg-amber-950 transition-colors"
               onClick={(e) => {
                 e.stopPropagation();
                 setSelectedBatiment(formatBatimentForModal(row.batiment_id));
                 setIsBatimentDetailsOpen(true);
               }}
             >
+              <Building2 className="h-3 w-3" />
               {value}
             </span>
           </TooltipTrigger>
@@ -279,6 +285,75 @@ const Salles = () => {
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
+    );
+  };
+
+  // Rendu personnalisé pour la colonne Status
+  const renderStatusCell = (value: string) => {
+    const isActive = value === "Actif";
+    return (
+      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium ${
+        isActive
+          ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400"
+          : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
+      }`}>
+        <CheckCircle2 className="h-3 w-3" />
+        {value}
+      </span>
+    );
+  };
+
+  // Rendu personnalisé pour la colonne Étage
+  const renderEtageCell = (value: string | number) => {
+    if (!value && value !== 0) {
+      return <span className="text-muted-foreground text-xs">-</span>;
+    }
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-400">
+        <Layers className="h-3 w-3" />
+        Étage {value}
+      </span>
+    );
+  };
+
+  // Rendu personnalisé pour la colonne Capacité
+  const renderCapaciteCell = (value: number) => {
+    if (!value && value !== 0) {
+      return <span className="text-muted-foreground text-xs">-</span>;
+    }
+    let colorClasses = "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400";
+    if (value >= 31) {
+      colorClasses = "bg-violet-50 text-violet-700 dark:bg-violet-950/50 dark:text-violet-400";
+    } else if (value >= 11) {
+      colorClasses = "bg-cyan-50 text-cyan-700 dark:bg-cyan-950/50 dark:text-cyan-400";
+    }
+    return (
+      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium ${colorClasses}`}>
+        <Users className="h-3 w-3" />
+        {value} pers.
+      </span>
+    );
+  };
+
+  // Rendu personnalisé pour la colonne Type
+  const renderTypeCell = (value: string) => {
+    if (!value) {
+      return <span className="text-muted-foreground text-xs">-</span>;
+    }
+    const typeColors: Record<string, string> = {
+      "Bureau": "bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-400",
+      "Réunion": "bg-violet-50 text-violet-700 dark:bg-violet-950/50 dark:text-violet-400",
+      "Formation": "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400",
+      "Stockage": "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400",
+      "Technique": "bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-400",
+      "Autre": "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400",
+    };
+    const colorClass = typeColors[value] || typeColors["Autre"];
+    return (
+      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium ${colorClass}`}>
+        <Tag className="h-3 w-3" />
+        {value}
+      </span>
     );
   };
 
@@ -300,7 +375,7 @@ const Salles = () => {
     <AppShell>
       <div className="space-y-6">
         <PageHeader
-          title="Gestion des Salles"
+          title="Gestion des salles"
           description="Configuration et gestion des salles de vos bâtiments"
           icon={<LayoutGrid className="h-6 w-6 text-primary" />}
           breadcrumbs={[
@@ -334,7 +409,12 @@ const Salles = () => {
               restoreConfirmTitle="Restaurer la salle"
               restoreConfirmDescription="Êtes-vous sûr de vouloir restaurer cette salle ?"
               customCellRenderers={{
+                "Nom": renderNomCell,
                 "Bâtiment": renderBatimentCell,
+                "Status": renderStatusCell,
+                "Étage": renderEtageCell,
+                "Capacité": renderCapaciteCell,
+                "Type": renderTypeCell,
               }}
               customFilters={
                 <>

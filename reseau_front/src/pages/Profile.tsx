@@ -382,12 +382,12 @@ const Profile = () => {
                 <CardContent>
                   <div className="grid gap-4 md:grid-cols-2">
                     <div>
-                      <Label className="text-muted-foreground">ID utilisateur</Label>
-                      <p className="text-sm font-medium">{user.id}</p>
+                      <Label className="text-muted-foreground">Nom d'utilisateur</Label>
+                      <p className="text-sm font-medium">{user.username}</p>
                     </div>
                     <div>
                       <Label className="text-muted-foreground">Statut du compte</Label>
-                      <p className="text-sm font-medium">Actif</p>
+                      <p className="text-sm font-medium">{user.is_active ? "Actif" : "Inactif"}</p>
                     </div>
                   </div>
                 </CardContent>

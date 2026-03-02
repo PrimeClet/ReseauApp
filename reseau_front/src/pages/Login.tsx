@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,10 @@ const Login = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Récupérer l'URL de redirection depuis le state (si l'utilisateur était redirigé depuis une page protégée)
+  const from = (location.state as { from?: string })?.from || "/";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,9 +29,10 @@ const Login = () => {
       if (success) {
         toast({
           title: "Connexion réussie",
-          description: "Bienvenue dans le système de gestion réseau",
+          description: "Bienvenue sur NetInfra Manager",
         });
-        navigate("/");
+        // Rediriger vers la page demandée initialement ou vers l'accueil
+        navigate(from, { replace: true });
       } else {
         toast({
           title: "Erreur de connexion",
@@ -63,12 +68,12 @@ const Login = () => {
       )}
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-4 w-12 h-12 bg-primary rounded-full flex items-center justify-center">
-            <Network className="w-6 h-6 text-primary-foreground" />
+          <div className="mx-auto mb-4 w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center">
+            <Network className="w-6 h-6 text-primary" />
           </div>
-          <CardTitle className="text-2xl">Connexion</CardTitle>
+          <CardTitle className="text-2xl text-primary">NetInfra Manager</CardTitle>
           <CardDescription>
-            Accédez au système de gestion réseau
+            Gestion d'infrastructure réseau
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -118,10 +123,26 @@ const Login = () => {
             </Button>
           </form>
           
-          <div className="mt-6 p-4 bg-muted rounded-lg">
-            <p className="text-sm text-muted-foreground text-center">
-              Utilisez vos identifiants fournis par l'administrateur
-            </p>
+          <div className="mt-6 p-4 bg-muted rounded-lg space-y-3">
+            <p className="text-sm font-medium text-center">Comptes de test</p>
+            <div className="space-y-2 text-xs">
+              <div className="flex justify-between items-center p-2 bg-background rounded border">
+                <span className="font-medium text-rose-500">Super Admin</span>
+                <span className="font-mono">superadmin / SuperAdmin@2024</span>
+              </div>
+              <div className="flex justify-between items-center p-2 bg-background rounded border">
+                <span className="font-medium text-sky-500">Administrateur</span>
+                <span className="font-mono">jean.directeur / Admin@2024</span>
+              </div>
+              <div className="flex justify-between items-center p-2 bg-background rounded border">
+                <span className="font-medium text-emerald-500">Technicien</span>
+                <span className="font-mono">paul.technicien / Tech@2024</span>
+              </div>
+              <div className="flex justify-between items-center p-2 bg-background rounded border">
+                <span className="font-medium text-amber-500">Observateur</span>
+                <span className="font-mono">alice.observatrice / Obs@2024</span>
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>

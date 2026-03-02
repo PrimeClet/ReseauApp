@@ -10,7 +10,7 @@ use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable
 {
-    use HasFactory, Notifiable, HasApiTokens, HasRoles;
+    use HasApiTokens, HasFactory, HasRoles, Notifiable;
 
     /**
      * The attributes that are mass assignable.
@@ -54,11 +54,11 @@ class User extends Authenticatable
     }
 
     /**
-     * Vérifie si l'utilisateur est administrateur (a le rôle Super Admin)
+     * Vérifie si l'utilisateur est administrateur (a le rôle Super Admin ou Administrateur)
      */
     public function isAdministrator(): bool
     {
-        return $this->hasRole('Super Admin');
+        return $this->hasAnyRole(['Super Admin', 'Administrateur']);
     }
 
     /**
@@ -76,19 +76,19 @@ class User extends Authenticatable
     {
         $name = trim($this->name ?? '');
         $surname = trim($this->surname ?? '');
-        
+
         if ($name && $surname) {
-            return $name . ' ' . $surname;
+            return $name.' '.$surname;
         }
-        
+
         if ($name) {
             return $name;
         }
-        
+
         if ($surname) {
             return $surname;
         }
-        
+
         return $this->username ?? 'Utilisateur';
     }
 }

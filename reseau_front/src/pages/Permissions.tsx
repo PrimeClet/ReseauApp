@@ -1,6 +1,5 @@
-import { useEffect, useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
+import { useState, useMemo } from "react";
+import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { useQuery } from "@tanstack/react-query";
 import permissionService, { PermissionModule } from "@/services/permissionService";
 import AppShell from "@/components/layout/AppShell";
@@ -51,8 +50,7 @@ const moduleColors: Record<string, string> = {
 };
 
 const PermissionsPage = () => {
-  const { isAuthenticated, isLoading: isLoadingAuth } = useAuth();
-  const navigate = useNavigate();
+  const { isAuthenticated, isLoading: isLoadingAuth } = useRequireAuth();
   const [searchTerm, setSearchTerm] = useState("");
 
   // Query
@@ -83,12 +81,6 @@ const PermissionsPage = () => {
       .filter((module) => module.permissions.length > 0);
   }, [permissionModules, searchTerm]);
 
-  useEffect(() => {
-    if (!isLoadingAuth && !isAuthenticated) {
-      navigate("/login");
-    }
-  }, [isAuthenticated, isLoadingAuth, navigate]);
-
   if (isLoadingAuth) {
     return (
       <AppShell>
@@ -107,7 +99,7 @@ const PermissionsPage = () => {
     <AppShell>
       <div className="space-y-6">
         <PageHeader
-          title="Gestion des Permissions"
+          title="Gestion des permissions"
           description="Consultez les permissions disponibles pour les rôles utilisateur"
           icon={<Key className="h-6 w-6 text-primary" />}
           breadcrumbs={[

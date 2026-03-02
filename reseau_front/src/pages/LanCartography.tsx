@@ -1,6 +1,5 @@
 import { useEffect, useState, useMemo, useRef, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
+import { useRequireAuth } from "@/hooks/useRequireAuth";
 import AppShell from "@/components/layout/AppShell";
 import {
   Card,
@@ -367,12 +366,12 @@ const LanCartographyContent = () => {
     const graph = new dia.Graph();
     graphRef.current = graph;
 
-    // Créer le papier
+    // Créer le papier avec les dimensions du container
     const paper = new dia.Paper({
       el: container,
       model: graph,
-      width: 1400,
-      height: 900,
+      width: container.clientWidth || 1400,
+      height: container.clientHeight || 800,
       gridSize: 10,
       drawGrid: true,
       background: {
@@ -620,8 +619,36 @@ const LanCartographyContent = () => {
       }
     });
 
-    // Ajuster la vue
-    paper.scaleContentToFit({ padding: 40, minScale: 0.4, maxScale: 1.2 });
+    // Ajuster la vue et centrer le contenu
+    const centerContent = () => {
+      // Obtenir la bounding box du contenu
+      const contentBBox = graph.getBBox();
+      if (!contentBBox) return;
+
+      // Obtenir les dimensions du container
+      const containerWidth = container.clientWidth;
+      const containerHeight = container.clientHeight;
+
+      // Calculer l'échelle optimale
+      const scaleX = (containerWidth - 80) / contentBBox.width;
+      const scaleY = (containerHeight - 80) / contentBBox.height;
+      const scale = Math.max(0.4, Math.min(1.2, Math.min(scaleX, scaleY)));
+
+      // Appliquer l'échelle
+      paper.scale(scale, scale);
+
+      // Calculer la translation pour centrer
+      const scaledContentWidth = contentBBox.width * scale;
+      const scaledContentHeight = contentBBox.height * scale;
+
+      const tx = (containerWidth - scaledContentWidth) / 2 - contentBBox.x * scale;
+      const ty = (containerHeight - scaledContentHeight) / 2 - contentBBox.y * scale;
+
+      paper.translate(tx, ty);
+    };
+
+    // Centrer après un court délai pour s'assurer que le rendu est complet
+    setTimeout(centerContent, 100);
 
     return () => {
       window.removeEventListener('keydown', handlePanKeyDown);
@@ -841,11 +868,39 @@ const LanCartographyContent = () => {
           <Button
             variant="outline"
             size="icon"
+            title="Recentrer"
             onClick={() => {
-              if (paperRef.current && graphRef.current) {
+              if (paperRef.current && graphRef.current && containerRef.current) {
                 const cells = graphRef.current.getCells();
                 if (cells.length > 0) {
-                  paperRef.current.scaleContentToFit({ padding: 40, minScale: 0.4, maxScale: 1.2 });
+                  const graph = graphRef.current;
+                  const paper = paperRef.current;
+                  const container = containerRef.current;
+
+                  // Obtenir la bounding box du contenu
+                  const contentBBox = graph.getBBox();
+                  if (!contentBBox) return;
+
+                  // Obtenir les dimensions du container
+                  const containerWidth = container.clientWidth;
+                  const containerHeight = container.clientHeight;
+
+                  // Calculer l'échelle optimale
+                  const scaleX = (containerWidth - 80) / contentBBox.width;
+                  const scaleY = (containerHeight - 80) / contentBBox.height;
+                  const scale = Math.max(0.4, Math.min(1.2, Math.min(scaleX, scaleY)));
+
+                  // Appliquer l'échelle
+                  paper.scale(scale, scale);
+
+                  // Calculer la translation pour centrer
+                  const scaledContentWidth = contentBBox.width * scale;
+                  const scaledContentHeight = contentBBox.height * scale;
+
+                  const tx = (containerWidth - scaledContentWidth) / 2 - contentBBox.x * scale;
+                  const ty = (containerHeight - scaledContentHeight) / 2 - contentBBox.y * scale;
+
+                  paper.translate(tx, ty);
                 }
               }
             }}
@@ -946,7 +1001,7 @@ const LanCartographyContent = () => {
                     borderRadius: "12px",
                     backgroundColor: "#f9fafb",
                     position: "relative",
-                    overflow: "auto",
+                    overflow: "hidden",
                   }}
                 />
               </>
@@ -1222,14 +1277,7 @@ const LanCartographyContent = () => {
 };
 
 const LanCartography = () => {
-  const { isAuthenticated, isLoading } = useAuth();
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      navigate("/login");
-    }
-  }, [isAuthenticated, isLoading, navigate]);
+  const { isAuthenticated, isLoading } = useRequireAuth();
 
   if (isLoading) {
     return (

@@ -102,7 +102,7 @@ const UsersSection = () => {
   return (
     <div className="space-y-8">
       <PageHeader
-        title="Gestion des Utilisateurs"
+        title="Gestion des utilisateurs"
         description="Gérez les comptes utilisateurs et leurs permissions"
         icon={<Users className="h-6 w-6 text-primary" />}
         breadcrumbs={[

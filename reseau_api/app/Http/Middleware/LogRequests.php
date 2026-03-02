@@ -15,14 +15,24 @@ class LogRequests
      */
     public function handle(Request $request, Closure $next): Response
     {
-        // Logger toutes les requêtes API
+        $headers = $request->headers->all();
+
+        if (isset($headers['authorization'])) {
+            $headers['authorization'] = ['***MASKED***'];
+        }
+        if (isset($headers['cookie'])) {
+            $headers['cookie'] = ['***MASKED***'];
+        }
+
         \Log::info('API Request', [
+            'correlation_id' => app()->bound('correlation_id') ? app('correlation_id') : null,
             'method' => $request->method(),
             'url' => $request->fullUrl(),
             'ip' => $request->ip(),
-            'headers' => $request->headers->all(),
+            'user_id' => $request->user()?->id,
+            'headers' => $headers,
         ]);
-        
+
         return $next($request);
     }
 }

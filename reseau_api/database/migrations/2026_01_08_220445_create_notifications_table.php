@@ -21,7 +21,7 @@ return new class extends Migration
             $table->boolean('read')->default(false);
             $table->timestamp('read_at')->nullable();
             $table->timestamps();
-            
+
             $table->index(['user_id', 'read']);
             $table->index('created_at');
         });

@@ -44,11 +44,11 @@ export default function Navbar() {
   const getRoleBadgeColor = (role: string) => {
     switch (role) {
       case "admin":
-        return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200";
+        return "bg-rose-50 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400";
       case "technician":
-        return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200";
+        return "bg-sky-50 text-sky-600 dark:bg-sky-900/30 dark:text-sky-400";
       default:
-        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200";
+        return "bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400";
     }
   };
 

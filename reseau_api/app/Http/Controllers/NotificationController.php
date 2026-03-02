@@ -3,25 +3,21 @@
 namespace App\Http\Controllers;
 
 use App\Models\Notification;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class NotificationController extends Controller
 {
-    /**
-     * Obtenir toutes les notifications de l'utilisateur connecté
-     */
-    public function index(Request $request)
+    public function index(Request $request): JsonResponse
     {
         $query = Notification::where('user_id', Auth::id())
             ->orderBy('created_at', 'desc');
 
-        // Filtrer par statut de lecture
         if ($request->has('read')) {
             $query->where('read', filter_var($request->read, FILTER_VALIDATE_BOOLEAN));
         }
 
-        // Filtrer par type
         if ($request->has('type')) {
             $query->where('type', $request->type);
         }
@@ -29,25 +25,19 @@ class NotificationController extends Controller
         $perPage = $request->get('per_page', 15);
         $notifications = $query->paginate($perPage);
 
-        return response()->json($notifications);
+        return $this->paginatedResponse($notifications);
     }
 
-    /**
-     * Obtenir le nombre de notifications non lues
-     */
-    public function unreadCount()
+    public function unreadCount(): JsonResponse
     {
         $count = Notification::where('user_id', Auth::id())
             ->where('read', false)
             ->count();
 
-        return response()->json(['count' => $count]);
+        return $this->successResponse(['count' => $count]);
     }
 
-    /**
-     * Obtenir les notifications non lues uniquement
-     */
-    public function unread()
+    public function unread(): JsonResponse
     {
         $notifications = Notification::where('user_id', Auth::id())
             ->where('read', false)
@@ -55,31 +45,20 @@ class NotificationController extends Controller
             ->limit(10)
             ->get();
 
-        return response()->json([
-            'data' => $notifications,
-        ]);
+        return $this->successResponse($notifications);
     }
 
-    /**
-     * Marquer une notification comme lue
-     */
-    public function markAsRead($id)
+    public function markAsRead($id): JsonResponse
     {
         $notification = Notification::where('user_id', Auth::id())
             ->findOrFail($id);
 
         $notification->markAsRead();
 
-        return response()->json([
-            'message' => 'Notification marquée comme lue',
-            'data' => $notification,
-        ]);
+        return $this->successResponse($notification, 'Notification marquée comme lue');
     }
 
-    /**
-     * Marquer toutes les notifications comme lues
-     */
-    public function markAllAsRead()
+    public function markAllAsRead(): JsonResponse
     {
         Notification::where('user_id', Auth::id())
             ->where('read', false)
@@ -88,41 +67,28 @@ class NotificationController extends Controller
                 'read_at' => now(),
             ]);
 
-        return response()->json([
-            'message' => 'Toutes les notifications ont été marquées comme lues',
-        ]);
+        return $this->successResponse(message: 'Toutes les notifications ont été marquées comme lues');
     }
 
-    /**
-     * Supprimer une notification
-     */
-    public function destroy($id)
+    public function destroy($id): JsonResponse
     {
         $notification = Notification::where('user_id', Auth::id())
             ->findOrFail($id);
 
         $notification->delete();
 
-        return response()->json([
-            'message' => 'Notification supprimée',
-        ]);
+        return $this->successResponse(message: 'Notification supprimée');
     }
 
-    /**
-     * Afficher une notification spécifique
-     */
-    public function show($id)
+    public function show($id): JsonResponse
     {
         $notification = Notification::where('user_id', Auth::id())
             ->findOrFail($id);
 
-        // Marquer comme lue si elle ne l'est pas déjà
-        if (!$notification->read) {
+        if (! $notification->read) {
             $notification->markAsRead();
         }
 
-        return response()->json([
-            'data' => $notification,
-        ]);
+        return $this->successResponse($notification);
     }
 }

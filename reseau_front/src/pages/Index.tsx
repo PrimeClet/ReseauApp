@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
+import { useRequireAuth } from "@/hooks/useRequireAuth";
 import AppShell from "@/components/layout/AppShell";
 import DashboardOverview from "@/components/dashboard/DashboardOverview";
 import ArmoiresSection from "@/components/sections/ArmoiresSection";
@@ -13,14 +12,7 @@ import UsersSection from "@/components/sections/UsersSection";
 
 const Index = () => {
   const [activeSection, setActiveSection] = useState("dashboard");
-  const { isAuthenticated, isLoading } = useAuth();
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      navigate('/login');
-    }
-  }, [isAuthenticated, isLoading, navigate]);
+  const { isAuthenticated, isLoading } = useRequireAuth();
 
   // Récupérer la section active depuis localStorage au chargement
   useEffect(() => {

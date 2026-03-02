@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        if (!Schema::hasTable('maintenances')) {
+        if (! Schema::hasTable('maintenances')) {
             Schema::create('maintenances', function (Blueprint $table) {
                 $table->id();
                 $table->foreignId('equipement_id')->nullable()->constrained('equipements')->onDelete('set null');
@@ -28,28 +28,28 @@ return new class extends Migration
         } else {
             // Table existe déjà, vérifier et ajouter les colonnes manquantes
             Schema::table('maintenances', function (Blueprint $table) {
-                if (!Schema::hasColumn('maintenances', 'equipement_id')) {
+                if (! Schema::hasColumn('maintenances', 'equipement_id')) {
                     $table->foreignId('equipement_id')->nullable()->after('id')->constrained('equipements')->onDelete('set null');
                 }
-                if (!Schema::hasColumn('maintenances', 'date_debut')) {
+                if (! Schema::hasColumn('maintenances', 'date_debut')) {
                     $table->date('date_debut')->after('equipement_id');
                 }
-                if (!Schema::hasColumn('maintenances', 'heure_debut')) {
+                if (! Schema::hasColumn('maintenances', 'heure_debut')) {
                     $table->time('heure_debut')->after('date_debut');
                 }
-                if (!Schema::hasColumn('maintenances', 'duree')) {
+                if (! Schema::hasColumn('maintenances', 'duree')) {
                     $table->string('duree')->after('heure_debut');
                 }
-                if (!Schema::hasColumn('maintenances', 'technicien')) {
+                if (! Schema::hasColumn('maintenances', 'technicien')) {
                     $table->string('technicien')->after('duree');
                 }
-                if (!Schema::hasColumn('maintenances', 'priorite')) {
+                if (! Schema::hasColumn('maintenances', 'priorite')) {
                     $table->enum('priorite', ['basse', 'moyenne', 'haute', 'critique'])->default('moyenne')->after('technicien');
                 }
-                if (!Schema::hasColumn('maintenances', 'description')) {
+                if (! Schema::hasColumn('maintenances', 'description')) {
                     $table->text('description')->after('priorite');
                 }
-                if (!Schema::hasColumn('maintenances', 'statut')) {
+                if (! Schema::hasColumn('maintenances', 'statut')) {
                     $table->enum('statut', ['planifiee', 'en_cours', 'terminee', 'annulee'])->default('planifiee')->after('description');
                 }
             });

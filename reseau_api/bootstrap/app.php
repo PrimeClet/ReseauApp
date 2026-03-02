@@ -1,15 +1,16 @@
 <?php
 
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
-use Illuminate\Auth\AuthenticationException;
 use Illuminate\Http\Request;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
         api: __DIR__.'/../routes/api.php',
+        apiPrefix: 'api/v1',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
@@ -24,9 +25,10 @@ return Application::configure(basePath: dirname(__DIR__))
         // décommentez la ligne suivante et ajoutez SANCTUM_STATEFUL_DOMAINS dans .env
         // $middleware->statefulApi();
 
-        // Ajouter le middleware CORS et logging pour les requêtes API
+        // Ajouter le middleware CORS, Correlation ID et logging pour les requêtes API
         $middleware->api(prepend: [
             \Illuminate\Http\Middleware\HandleCors::class,
+            \App\Http\Middleware\CorrelationId::class,
             \App\Http\Middleware\LogRequests::class,
         ]);
 
@@ -35,6 +37,7 @@ return Application::configure(basePath: dirname(__DIR__))
             if ($request->expectsJson() || $request->is('api/*')) {
                 return null; // Ne pas rediriger, laisser l'exception être gérée
             }
+
             return '/login';
         });
     })

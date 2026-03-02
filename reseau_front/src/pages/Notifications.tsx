@@ -1,6 +1,5 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
+import { useState } from "react";
+import { useRequireAuth } from "@/hooks/useRequireAuth";
 import AppShell from "@/components/layout/AppShell";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, CheckCheck, Trash2, Filter, Bell, BellOff } from "lucide-react";
@@ -36,18 +35,11 @@ const typeIcons: Record<string, string> = {
 };
 
 const Notifications = () => {
-  const { isAuthenticated, isLoading: isLoadingAuth } = useAuth();
-  const navigate = useNavigate();
+  const { isAuthenticated, isLoading: isLoadingAuth } = useRequireAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState<'all' | 'unread' | 'read'>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
-
-  useEffect(() => {
-    if (!isLoadingAuth && !isAuthenticated) {
-      navigate("/login");
-    }
-  }, [isAuthenticated, isLoadingAuth, navigate]);
 
   const { data: notificationsData, isLoading, refetch } = useQuery({
     queryKey: ['notifications', filter, typeFilter],

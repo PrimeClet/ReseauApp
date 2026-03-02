@@ -39,7 +39,7 @@ class Notification extends Model
      */
     public function markAsRead(): void
     {
-        if (!$this->read) {
+        if (! $this->read) {
             $this->update([
                 'read' => true,
                 'read_at' => now(),

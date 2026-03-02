@@ -1,6 +1,6 @@
-import { useEffect, useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
+import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { useData } from "@/contexts/DataContext";
 import AppShell from "@/components/layout/AppShell";
 import PageHeader from "@/components/ui/page-header";
@@ -10,7 +10,7 @@ import EditModal from "@/components/ui/edit-modal";
 import AddArmoireForm from "@/components/forms/AddArmoireForm";
 import QRCodeModal from "@/components/ui/qr-code-modal";
 import { toast } from "@/hooks/use-toast";
-import { Loader2, X, Server, QrCode } from "lucide-react";
+import { Loader2, X, Server, QrCode, Router, CheckCircle2, ExternalLink, DoorOpen, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/tooltip";
 
 const Armoires = () => {
-  const { isAuthenticated, isLoading: isLoadingAuth } = useAuth();
+  const { isAuthenticated, isLoading: isLoadingAuth } = useRequireAuth();
   const navigate = useNavigate();
   const { coffrets, sites, zones, batiments, salles, isLoadingCoffrets, updateCoffret, deleteCoffret, restoreCoffret, importCoffrets, refetchCoffrets } = useData();
   const [selectedCoffret, setSelectedCoffret] = useState<any>(null);
@@ -83,12 +83,6 @@ const Armoires = () => {
     }
   }, [selectedBatimentId, filteredSalles, selectedSalleId]);
 
-  useEffect(() => {
-    if (!isLoadingAuth && !isAuthenticated) {
-      navigate("/login");
-    }
-  }, [isAuthenticated, isLoadingAuth, navigate]);
-
   if (isLoadingAuth) {
     return (
       <AppShell>
@@ -104,12 +98,16 @@ const Armoires = () => {
   }
 
   const handleRowClick = (coffret: any) => {
-    setSelectedCoffret(coffret);
+    // Trouver l'armoire originale dans la liste pour avoir toutes les données
+    const originalCoffret = coffrets.find(c => c.id === coffret.id) || coffret;
+    setSelectedCoffret(originalCoffret);
     setIsDetailsOpen(true);
   };
 
   const handleEdit = (coffret: any) => {
-    setSelectedCoffret(coffret);
+    // Trouver l'armoire originale dans la liste pour avoir toutes les données
+    const originalCoffret = coffrets.find(c => c.id === coffret.id) || coffret;
+    setSelectedCoffret(originalCoffret);
     setIsEditOpen(true);
   };
 
@@ -120,15 +118,35 @@ const Armoires = () => {
         : updatedCoffret.salle_id;
       // Trouver le batiment_id à partir de la salle
       const salle = salles.find(s => s.id === salleId);
-      await updateCoffret(updatedCoffret.id, {
-        nom: updatedCoffret.nom,
-        code: updatedCoffret.code,
-        piece: updatedCoffret.piece,
-        long: updatedCoffret.long || undefined,
-        lat: updatedCoffret.lat || undefined,
-        batiment_id: salle?.batiment_id || updatedCoffret.batiment_id || undefined,
-        salle_id: salleId || undefined,
-      });
+
+      // Check if there's a file upload
+      if (updatedCoffret.photo instanceof File) {
+        // Use FormData for file upload
+        const formData = new FormData();
+        formData.append('nom', updatedCoffret.nom);
+        if (updatedCoffret.modele) formData.append('modele', updatedCoffret.modele);
+        if (updatedCoffret.emplacement) formData.append('emplacement', updatedCoffret.emplacement);
+        if (updatedCoffret.long !== undefined && updatedCoffret.long !== null && updatedCoffret.long !== '') formData.append('long', String(updatedCoffret.long));
+        if (updatedCoffret.lat !== undefined && updatedCoffret.lat !== null && updatedCoffret.lat !== '') formData.append('lat', String(updatedCoffret.lat));
+        if (salle?.batiment_id) formData.append('batiment_id', String(salle.batiment_id));
+        if (salleId) formData.append('salle_id', String(salleId));
+        if (updatedCoffret.status) formData.append('status', updatedCoffret.status);
+        formData.append('photo', updatedCoffret.photo);
+        // For PUT with FormData, Laravel needs _method
+        formData.append('_method', 'PUT');
+        await updateCoffret(updatedCoffret.id, formData as any);
+      } else {
+        await updateCoffret(updatedCoffret.id, {
+          nom: updatedCoffret.nom,
+          modele: updatedCoffret.modele || undefined,
+          emplacement: updatedCoffret.emplacement || undefined,
+          long: updatedCoffret.long || undefined,
+          lat: updatedCoffret.lat || undefined,
+          batiment_id: salle?.batiment_id || updatedCoffret.batiment_id || undefined,
+          salle_id: salleId || undefined,
+          status: updatedCoffret.status || undefined,
+        });
+      }
       toast({
         title: "Armoire mise à jour",
         description: "Les informations de l'armoire ont été enregistrées.",
@@ -206,6 +224,7 @@ const Armoires = () => {
       id: coffret.id,
       Code: coffret.code,
       Nom: coffret.nom,
+      Modèle: (coffret as any).modele || "-",
       Bâtiment: batiment?.nom || "-",
       Salle: salle?.nom || "-",
       salle_id: coffret.salle_id,
@@ -240,65 +259,110 @@ const Armoires = () => {
     };
   };
 
+  // Rendu personnalisé pour la colonne Nom (identifiant principal)
+  const renderNomCell = (value: string) => {
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100">
+        {value}
+      </span>
+    );
+  };
+
   // Rendu personnalisé pour la colonne Code avec lien vers la vue détaillée
   const renderCodeCell = (value: string, row: any) => {
     return (
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
-            <span
-              className="cursor-pointer text-primary hover:underline font-medium"
+            <button
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors cursor-pointer border border-primary/20"
               onClick={(e) => {
                 e.stopPropagation();
-                // Rediriger directement vers ArmoiresSection avec la vue détaillée
-                localStorage.setItem('selectedCoffretId', row.id.toString());
-                localStorage.setItem('returnToArmoires', 'true');
-                navigate('/armoires-detail');
+                navigate(`/armoires/${value}/details`);
               }}
             >
               {value}
-            </span>
+              <ExternalLink className="h-3 w-3" />
+            </button>
           </TooltipTrigger>
           <TooltipContent>
-            <p>Cliquez pour voir les détails et composants de l'armoire</p>
+            <p>Voir les détails et composants</p>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
     );
   };
 
+  // Rendu personnalisé pour la colonne Modèle
+  const renderModeleCell = (value: string) => {
+    if (value === '-') {
+      return <span className="text-muted-foreground text-xs">Non défini</span>;
+    }
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium bg-violet-50 text-violet-700 dark:bg-violet-950/50 dark:text-violet-400">
+        <Tag className="h-3 w-3" />
+        {value}
+      </span>
+    );
+  };
+
   // Rendu personnalisé pour la colonne Salle avec lien vers le modal
   const renderSalleCell = (value: string, row: any) => {
-    if (value === '-') return value;
+    if (value === '-') {
+      return <span className="text-muted-foreground text-xs">Non assignée</span>;
+    }
     return (
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
-            <span
-              className="cursor-pointer text-primary hover:underline"
+            <button
+              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-950 transition-colors cursor-pointer"
               onClick={(e) => {
                 e.stopPropagation();
                 setSelectedSalle(formatSalleForModal(row.salle_id));
                 setIsSalleDetailsOpen(true);
               }}
             >
+              <DoorOpen className="h-3 w-3" />
               {value}
-            </span>
+            </button>
           </TooltipTrigger>
           <TooltipContent>
-            <p>Cliquez pour voir les détails de la salle</p>
+            <p>Voir les détails de la salle</p>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
     );
   };
 
-  // Rendu pour la colonne Équipements (sans lien)
+  // Rendu pour la colonne Équipements (avec badge)
   const renderEquipementsCell = (value: number) => {
     return (
-      <span className="font-medium">
+      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium ${
+        value > 0
+          ? "bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-400"
+          : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+      }`}>
+        <Router className="h-3 w-3" />
         {value} équipement{value !== 1 ? 's' : ''}
       </span>
+    );
+  };
+
+  // Rendu personnalisé pour la colonne Status
+  const renderStatusCell = (value: string) => {
+    const isActive = value === "Actif";
+    return (
+      <div className="flex items-center gap-1.5">
+        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium ${
+          isActive
+            ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400"
+            : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
+        }`}>
+          <CheckCircle2 className="h-3 w-3" />
+          {value}
+        </span>
+      </div>
     );
   };
 
@@ -311,7 +375,7 @@ const Armoires = () => {
       setQrCodeData({
         qrCode: originalCoffret.qr_code,
         title: originalCoffret.nom || originalCoffret.code,
-        subtitle: batiment?.nom || salle?.nom || originalCoffret.piece || '',
+        subtitle: batiment?.nom || salle?.nom || originalCoffret.emplacement || '',
         code: originalCoffret.code
       });
       setIsQRCodeOpen(true);
@@ -365,7 +429,6 @@ const Armoires = () => {
       photo: originalCoffret.photo || "",
       photo_url: originalCoffret.photo_url || null,
       emplacement: originalCoffret.emplacement || "",
-      piece: originalCoffret.piece,
       qr_code: originalCoffret.qr_code || null,
       long: originalCoffret.long || 0,
       lat: originalCoffret.lat || 0,
@@ -383,7 +446,7 @@ const Armoires = () => {
     <AppShell>
       <div className="space-y-6">
         <PageHeader
-          title="Gestion des Armoires"
+          title="Gestion des armoires"
           description="Configuration et gestion des armoires réseau (coffrets)"
           icon={<Server className="h-6 w-6 text-primary" />}
           breadcrumbs={[
@@ -401,7 +464,7 @@ const Armoires = () => {
           <>
             <DataTableEnhanced
               title={`${filteredCoffrets.length} armoire${filteredCoffrets.length > 1 ? 's' : ''} configurée${filteredCoffrets.length > 1 ? 's' : ''}`}
-              columns={["Code", "Nom", "Salle", "Équipements", "Status"]}
+              columns={["Code", "Nom", "Modèle", "Salle", "Équipements", "Status"]}
               data={tableData}
               onRowClick={handleRowClick}
               onEdit={handleEdit}
@@ -410,72 +473,65 @@ const Armoires = () => {
               onImport={handleImport}
               enableImport={true}
               importModalTitle="Importer des armoires"
-              importTemplateColumns={["nom", "batiment", "salle", "piece", "status"]}
+              importTemplateColumns={["nom", "batiment", "salle", "status"]}
               importTemplateFileName="modele_armoires.csv"
               deleteConfirmTitle="Supprimer l'armoire"
               deleteConfirmDescription="Êtes-vous sûr de vouloir supprimer cette armoire ? Cette action est irréversible."
               restoreConfirmTitle="Restaurer l'armoire"
               restoreConfirmDescription="Êtes-vous sûr de vouloir restaurer cette armoire ?"
               customCellRenderers={{
+                "Nom": renderNomCell,
                 "Code": renderCodeCell,
+                "Modèle": renderModeleCell,
                 "Salle": renderSalleCell,
                 "Équipements": renderEquipementsCell,
+                "Status": renderStatusCell,
               }}
               renderRowActions={renderRowActions}
               customFilters={
-                <>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-muted-foreground whitespace-nowrap">Status:</span>
-                    <Select value={statusFilter} onValueChange={setStatusFilter}>
-                      <SelectTrigger className="w-28">
-                        <SelectValue placeholder="Tous" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Tous</SelectItem>
-                        <SelectItem value="Actif">Actif</SelectItem>
-                        <SelectItem value="Supprimé">Supprimé</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-muted-foreground whitespace-nowrap">Bâtiment:</span>
-                    <Select value={selectedBatimentId} onValueChange={setSelectedBatimentId}>
-                      <SelectTrigger className="w-40">
-                        <SelectValue placeholder="Tous" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Tous</SelectItem>
-                        {batiments.filter(b => !(b as any).deleted_at).map((batiment) => (
-                          <SelectItem key={batiment.id} value={batiment.id.toString()}>
-                            {batiment.nom}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-muted-foreground whitespace-nowrap">Salle:</span>
-                    <Select value={selectedSalleId} onValueChange={setSelectedSalleId}>
-                      <SelectTrigger className="w-40">
-                        <SelectValue placeholder="Toutes" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Toutes</SelectItem>
-                        {filteredSalles.filter(s => !(s as any).deleted_at).map((salle) => (
-                          <SelectItem key={salle.id} value={salle.id.toString()}>
-                            {salle.nom}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="w-[100px] sm:w-28 h-9 text-xs sm:text-sm">
+                      <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tous status</SelectItem>
+                      <SelectItem value="Actif">Actif</SelectItem>
+                      <SelectItem value="Supprimé">Supprimé</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={selectedBatimentId} onValueChange={setSelectedBatimentId}>
+                    <SelectTrigger className="w-[110px] sm:w-36 h-9 text-xs sm:text-sm">
+                      <SelectValue placeholder="Bâtiment" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tous bâtiments</SelectItem>
+                      {batiments.filter(b => !(b as any).deleted_at).map((batiment) => (
+                        <SelectItem key={batiment.id} value={batiment.id.toString()}>
+                          {batiment.nom}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={selectedSalleId} onValueChange={setSelectedSalleId}>
+                    <SelectTrigger className="w-[100px] sm:w-32 h-9 text-xs sm:text-sm">
+                      <SelectValue placeholder="Salle" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Toutes salles</SelectItem>
+                      {filteredSalles.filter(s => !(s as any).deleted_at).map((salle) => (
+                        <SelectItem key={salle.id} value={salle.id.toString()}>
+                          {salle.nom}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   {hasActiveFilters && (
-                    <Button variant="ghost" size="sm" onClick={clearFilters} className="text-muted-foreground">
-                      <X className="h-4 w-4 mr-1" />
-                      Effacer
+                    <Button variant="ghost" size="sm" onClick={clearFilters} className="text-muted-foreground h-9 px-2">
+                      <X className="h-4 w-4" />
                     </Button>
                   )}
-                </>
+                </div>
               }
             />
 
@@ -498,17 +554,29 @@ const Armoires = () => {
               data={formatCoffretForModal(selectedCoffret)}
               onSave={handleSave}
               fields={[
-                { key: "nom", label: "Nom", type: "text" },
-                { key: "code", label: "Code", type: "text" },
+                { key: "nom", label: "Nom", type: "text", required: true },
+                { key: "code", label: "Code", type: "text", disabled: true },
+                { key: "modele", label: "Modèle", type: "text" },
+                { key: "photo", label: "Photo", type: "file", accept: "image/*", currentImageKey: "photo_url" },
                 {
                   key: "salle_id",
                   label: "Salle",
                   type: "select",
+                  required: true,
                   options: salles.filter(s => !(s as any).deleted_at).map(s => ({ value: s.id.toString(), label: s.nom }))
                 },
-                { key: "piece", label: "Pièce", type: "text" },
+                { key: "emplacement", label: "Emplacement", type: "textarea" },
                 { key: "long", label: "Longitude", type: "number" },
                 { key: "lat", label: "Latitude", type: "number" },
+                {
+                  key: "status",
+                  label: "Statut",
+                  type: "select",
+                  options: [
+                    { value: "active", label: "Actif" },
+                    { value: "inactive", label: "Inactif" },
+                  ]
+                },
               ]}
             />
 

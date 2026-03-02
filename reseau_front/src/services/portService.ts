@@ -1,5 +1,7 @@
 import api from '@/axios';
 
+export type PortGenre = 'uplink' | 'downlink';
+
 export interface Port {
   id: number;
   port_label: string;
@@ -9,7 +11,8 @@ export interface Port {
   speed?: string;
   type_reseau?: 'IT' | 'OT';
   statut?: 'actif' | 'inactif' | 'reserve';
-  connexion_type?: 'fibre' | 'cuivre';
+  connexion_type?: 'fibre' | 'rj45' | 'cuivre';
+  port_genre?: PortGenre;
   uplink?: string;
   downlink?: string;
   equipement_id: number;
@@ -46,7 +49,8 @@ export interface PortCreateData {
   speed?: string;
   type_reseau?: 'IT' | 'OT';
   statut?: 'actif' | 'inactif' | 'reserve';
-  connexion_type?: 'fibre' | 'cuivre';
+  connexion_type?: 'fibre' | 'rj45' | 'cuivre';
+  port_genre?: PortGenre;
   uplink?: string;
   downlink?: string;
   equipement_id: number;

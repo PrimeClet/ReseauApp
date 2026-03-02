@@ -1,0 +1,28 @@
+#!/bin/sh
+
+# Frontend linting (only if frontend files changed)
+FRONT_CHANGED=$(git diff --cached --diff-filter=d --name-only -- 'reseau_front/' | grep -E '\.(ts|tsx|js|jsx)$' | sed 's|^reseau_front/||')
+if [ -n "$FRONT_CHANGED" ]; then
+  echo "Running ESLint on frontend..."
+  cd reseau_front
+  echo "$FRONT_CHANGED" | xargs npx eslint
+  ESLINT_EXIT=$?
+  cd ..
+  if [ $ESLINT_EXIT -ne 0 ]; then
+    echo "ESLint failed. Please fix errors before committing."
+    exit 1
+  fi
+fi
+
+# Backend linting (only if backend PHP files changed)
+API_CHANGED=$(git diff --cached --name-only -- 'reseau_api/' | grep -E '\.php$')
+if [ -n "$API_CHANGED" ]; then
+  echo "Running Laravel Pint on backend..."
+  cd reseau_api && ./vendor/bin/pint --test 2>/dev/null
+  PINT_EXIT=$?
+  cd ..
+  if [ $PINT_EXIT -ne 0 ]; then
+    echo "Laravel Pint found style issues. Run 'cd reseau_api && ./vendor/bin/pint' to fix."
+    exit 1
+  fi
+fi

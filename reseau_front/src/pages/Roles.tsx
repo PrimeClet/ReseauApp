@@ -1,6 +1,5 @@
-import { useEffect, useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
+import { useState, useMemo, useEffect } from "react";
+import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import roleService, { Role } from "@/services/roleService";
 import permissionService, { PermissionModule } from "@/services/permissionService";
@@ -48,8 +47,7 @@ const roleSchema = z.object({
 type RoleFormData = z.infer<typeof roleSchema>;
 
 const RolesPage = () => {
-  const { isAuthenticated, isLoading: isLoadingAuth } = useAuth();
-  const navigate = useNavigate();
+  const { isAuthenticated, isLoading: isLoadingAuth } = useRequireAuth();
   const queryClient = useQueryClient();
 
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -170,12 +168,6 @@ const RolesPage = () => {
       ...role,
     }));
   }, [roles]);
-
-  useEffect(() => {
-    if (!isLoadingAuth && !isAuthenticated) {
-      navigate("/login");
-    }
-  }, [isAuthenticated, isLoadingAuth, navigate]);
 
   // Remplir le formulaire d'édition
   useEffect(() => {
@@ -299,7 +291,7 @@ const RolesPage = () => {
     <AppShell>
       <div className="space-y-6">
         <PageHeader
-          title="Gestion des Rôles"
+          title="Gestion des rôles"
           description="Créez et maintenez les rôles et permissions des utilisateurs"
           icon={<ShieldCheck className="h-6 w-6 text-primary" />}
           breadcrumbs={[

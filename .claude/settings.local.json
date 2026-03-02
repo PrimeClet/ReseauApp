@@ -10,7 +10,15 @@
       "Bash(npm run build:*)",
       "Bash(php artisan db:seed:*)",
       "Bash(php artisan migrate:*)",
-      "Bash(php artisan migrate:status:*)"
+      "Bash(php artisan migrate:status:*)",
+      "Bash(grep:*)",
+      "Bash(ls:*)",
+      "Bash(wc:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npx vite build:*)",
+      "Bash(find /Users/primeclet/JOBS/ReseauApp/reseau_api/app/Http/Controllers -type f -exec wc -l {} +)",
+      "Bash(npx vitest run --reporter=verbose)",
+      "Bash(echo \"EXIT:$?\")"
     ]
   }
 }

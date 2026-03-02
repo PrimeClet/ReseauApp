@@ -2,15 +2,19 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
-use Spatie\Permission\Models\Role;
-use Spatie\Permission\Models\Permission;
 use App\Models\User;
+use Illuminate\Database\Seeder;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 
 class RolesAndPermissionsSeeder extends Seeder
 {
     /**
      * Les modules de l'application avec leurs permissions CRUD
+     *
+     * Logique Maintenance vs Modifications:
+     * - Maintenance: Créée par Admin, assignée à un Technicien (top-down)
+     * - Modifications: Soumises par Technicien, validées par Admin (bottom-up)
      */
     private array $modules = [
         'utilisateurs' => ['voir', 'creer', 'modifier', 'supprimer'],
@@ -23,13 +27,22 @@ class RolesAndPermissionsSeeder extends Seeder
         'ports' => ['voir', 'creer', 'modifier', 'supprimer', 'restaurer'],
         'liaisons' => ['voir', 'creer', 'modifier', 'supprimer', 'restaurer'],
         'lans' => ['voir', 'creer', 'modifier', 'supprimer'],
-        'maintenance' => ['voir', 'creer', 'modifier', 'supprimer'],
+        // Maintenance: Admin crée et assigne, Technicien exécute et rapporte
+        'maintenance' => ['voir', 'creer', 'modifier', 'supprimer', 'assigner', 'executer', 'rapporter'],
+        // Modifications: Technicien soumet, Admin valide
+        'modifications' => ['voir', 'creer', 'modifier', 'supprimer', 'valider', 'historique'],
         'cartographie' => ['voir', 'exporter'],
         'dashboard' => ['voir', 'statistiques'],
     ];
 
     /**
      * Les rôles par défaut avec leurs permissions
+     *
+     * Flux de travail:
+     * - Super Admin: Accès total
+     * - Administrateur: Crée maintenances, valide modifications, gère utilisateurs
+     * - Technicien: Exécute maintenances, soumet modifications (après scan QR)
+     * - Observateur: Lecture seule
      */
     private array $roles = [
         'Super Admin' => '*', // Toutes les permissions
@@ -44,7 +57,10 @@ class RolesAndPermissionsSeeder extends Seeder
             'ports.*',
             'liaisons.*',
             'lans.*',
-            'maintenance.*',
+            // Maintenance: peut tout faire sauf exécuter/rapporter (c'est le technicien)
+            'maintenance.voir', 'maintenance.creer', 'maintenance.modifier', 'maintenance.supprimer', 'maintenance.assigner',
+            // Modifications: peut voir, valider et consulter l'historique
+            'modifications.voir', 'modifications.valider', 'modifications.historique',
             'cartographie.*',
             'dashboard.*',
         ],
@@ -56,7 +72,10 @@ class RolesAndPermissionsSeeder extends Seeder
             'ports.voir', 'ports.creer', 'ports.modifier',
             'liaisons.voir', 'liaisons.creer', 'liaisons.modifier',
             'lans.voir',
-            'maintenance.voir', 'maintenance.creer', 'maintenance.modifier',
+            // Maintenance: peut voir ses maintenances assignées, exécuter et rapporter
+            'maintenance.voir', 'maintenance.executer', 'maintenance.rapporter',
+            // Modifications: peut créer, modifier ses propres demandes et voir l'historique
+            'modifications.voir', 'modifications.creer', 'modifications.modifier', 'modifications.historique',
             'cartographie.voir',
             'dashboard.voir',
         ],
@@ -69,6 +88,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'liaisons.voir',
             'lans.voir',
             'maintenance.voir',
+            'modifications.voir', 'modifications.historique',
             'cartographie.voir',
             'dashboard.voir',
         ],
@@ -92,7 +112,7 @@ class RolesAndPermissionsSeeder extends Seeder
             }
         }
 
-        $this->command->info('Permissions créées: ' . count($allPermissions));
+        $this->command->info('Permissions créées: '.count($allPermissions));
 
         // Créer les rôles et leur attribuer les permissions
         foreach ($this->roles as $roleName => $permissions) {
@@ -112,7 +132,7 @@ class RolesAndPermissionsSeeder extends Seeder
                         // Wildcard: ajouter toutes les permissions du module
                         $module = str_replace('.*', '', $perm);
                         foreach ($allPermissions as $permName => $permObj) {
-                            if (str_starts_with($permName, $module . '.')) {
+                            if (str_starts_with($permName, $module.'.')) {
                                 $rolePermissions[] = $permObj;
                             }
                         }
@@ -121,7 +141,7 @@ class RolesAndPermissionsSeeder extends Seeder
                     }
                 }
                 $role->syncPermissions($rolePermissions);
-                $this->command->info("Rôle '{$roleName}' créé avec " . count($rolePermissions) . " permissions");
+                $this->command->info("Rôle '{$roleName}' créé avec ".count($rolePermissions).' permissions');
             }
         }
 
@@ -158,7 +178,7 @@ class RolesAndPermissionsSeeder extends Seeder
             $oldRole = strtolower($user->role ?? '');
             if (isset($roleMapping[$oldRole])) {
                 $newRole = $roleMapping[$oldRole];
-                if (!$user->hasRole($newRole)) {
+                if (! $user->hasRole($newRole)) {
                     $user->assignRole($newRole);
                     $migratedCount++;
                 }

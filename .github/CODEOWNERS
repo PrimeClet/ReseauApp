@@ -1,0 +1,14 @@
+# Code Owners for ReseauApp
+# These owners will be requested for review when PRs touch their areas.
+
+# Default owner for everything
+* @PrimeClet
+
+# Backend (Laravel API)
+/reseau_api/ @PrimeClet
+
+# Frontend (React/TypeScript)
+/reseau_front/ @PrimeClet
+
+# CI/CD and project config
+/.github/ @PrimeClet

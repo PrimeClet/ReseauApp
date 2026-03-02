@@ -1,19 +1,12 @@
-import { useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
+import { useParams } from "react-router-dom";
+import { useRequireAuth } from "@/hooks/useRequireAuth";
 import AppShell from "@/components/layout/AppShell";
 import ArmoiresSection from "@/components/sections/ArmoiresSection";
 import { Loader2 } from "lucide-react";
 
 const ArmoiresDetail = () => {
-  const { isAuthenticated, isLoading: isLoadingAuth } = useAuth();
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    if (!isLoadingAuth && !isAuthenticated) {
-      navigate("/login");
-    }
-  }, [isAuthenticated, isLoadingAuth, navigate]);
+  const { isAuthenticated, isLoading: isLoadingAuth } = useRequireAuth();
+  const { code } = useParams<{ code: string }>();
 
   if (isLoadingAuth) {
     return (
@@ -31,7 +24,7 @@ const ArmoiresDetail = () => {
 
   return (
     <AppShell activeSection="armoires">
-      <ArmoiresSection />
+      <ArmoiresSection coffretCode={code} />
     </AppShell>
   );
 };

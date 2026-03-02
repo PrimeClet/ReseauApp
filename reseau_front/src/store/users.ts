@@ -8,6 +8,8 @@ export type user = {
     email: string,
     full_name: string,
     role: string,
+    roles: string[],
+    permissions: string[],
     is_active: number
 }
 

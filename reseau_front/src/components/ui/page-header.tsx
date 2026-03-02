@@ -30,21 +30,42 @@ export default function PageHeader({
   actions,
 }: PageHeaderProps) {
   return (
-    <div className="bg-card border border-border rounded-lg p-6 mb-6">
-      <div className="flex items-start justify-between">
-        <div className="flex items-start gap-4">
+    <div className="bg-card border border-border rounded-lg p-3 sm:p-6 mb-3 sm:mb-6">
+      {/* Breadcrumb en haut sur mobile */}
+      <Breadcrumb className="mb-2 sm:hidden">
+        <BreadcrumbList className="flex-wrap text-xs">
+          {breadcrumbs.map((item, index) => (
+            <React.Fragment key={index}>
+              {index > 0 && <BreadcrumbSeparator />}
+              <BreadcrumbItem>
+                {item.href ? (
+                  <BreadcrumbLink asChild>
+                    <Link to={item.href}>{item.label}</Link>
+                  </BreadcrumbLink>
+                ) : (
+                  <BreadcrumbPage>{item.label}</BreadcrumbPage>
+                )}
+              </BreadcrumbItem>
+            </React.Fragment>
+          ))}
+        </BreadcrumbList>
+      </Breadcrumb>
+
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-4">
+        <div className="flex items-start gap-3 sm:gap-4">
           {icon && (
-            <div className="flex-shrink-0 w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+            <div className="hidden sm:flex flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-primary/10 items-center justify-center">
               {icon}
             </div>
           )}
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">{title}</h1>
+          <div className="min-w-0 flex-1">
+            <h1 className="text-lg sm:text-2xl font-bold text-foreground truncate">{title}</h1>
             {description && (
-              <p className="text-sm text-muted-foreground mt-1">{description}</p>
+              <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 sm:mt-1 line-clamp-2 hidden sm:block">{description}</p>
             )}
-            <Breadcrumb className="mt-2">
-              <BreadcrumbList>
+            {/* Breadcrumb caché sur mobile, visible sur desktop */}
+            <Breadcrumb className="mt-2 hidden sm:block">
+              <BreadcrumbList className="flex-wrap">
                 {breadcrumbs.map((item, index) => (
                   <React.Fragment key={index}>
                     {index > 0 && <BreadcrumbSeparator />}
@@ -63,7 +84,7 @@ export default function PageHeader({
             </Breadcrumb>
           </div>
         </div>
-        {actions && <div className="flex-shrink-0">{actions}</div>}
+        {actions && <div className="flex-shrink-0 w-full sm:w-auto">{actions}</div>}
       </div>
     </div>
   );

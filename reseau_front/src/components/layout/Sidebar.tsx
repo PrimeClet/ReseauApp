@@ -8,7 +8,6 @@ import {
   LayoutDashboard,
   Server,
   Cable,
-  Router,
   Settings,
   HardDrive,
   Wrench,
@@ -25,10 +24,12 @@ import {
   Network,
   Map,
   Plug,
-  ClipboardList,
   CheckCircle2,
   History,
-  Bell
+  Bell,
+  FileEdit,
+  Activity,
+  CalendarClock
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -48,10 +49,9 @@ const menuItems = [
   { id: "equipements", label: "Équipements", icon: HardDrive },
   { id: "ports", label: "Ports", icon: Plug },
   { id: "liaisons", label: "Liaisons", icon: Cable },
-  { id: "maintenance", label: "Maintenance", icon: Wrench },
 ];
 
-const accessSections = ["users", "roles", "permissions"];
+const accessSections = ["users", "roles", "permissions", "activity-logs"];
 
 export default function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
   const navigate = useNavigate();
@@ -60,13 +60,14 @@ export default function Sidebar({ activeSection, onSectionChange }: SidebarProps
   const { setSidebarOpen } = useSidebarToggle();
   const { user } = useAuth();
   const [isAccessOpen, setIsAccessOpen] = useState(false);
-  const [isModificationsOpen, setIsModificationsOpen] = useState(false);
+  const [isMaintenancesOpen, setIsMaintenancesOpen] = useState(false);
 
   useEffect(() => {
     if (
       (location.pathname === "/" && accessSections.includes(activeSection)) ||
       location.pathname === "/roles" ||
-      location.pathname === "/permissions"
+      location.pathname === "/permissions" ||
+      location.pathname === "/activity-logs"
     ) {
       setIsAccessOpen(true);
     }
@@ -74,11 +75,12 @@ export default function Sidebar({ activeSection, onSectionChange }: SidebarProps
 
   useEffect(() => {
     if (
+      location.pathname === "/maintenances" ||
       location.pathname === "/modifications" ||
       location.pathname === "/validation-modifications" ||
       location.pathname === "/modification-history"
     ) {
-      setIsModificationsOpen(true);
+      setIsMaintenancesOpen(true);
     }
   }, [location.pathname]);
 
@@ -90,6 +92,9 @@ export default function Sidebar({ activeSection, onSectionChange }: SidebarProps
       return true;
     }
     if (sectionId === "users" && location.pathname === "/users") {
+      return true;
+    }
+    if (sectionId === "activity-logs" && location.pathname === "/activity-logs") {
       return true;
     }
     return false;
@@ -125,11 +130,13 @@ export default function Sidebar({ activeSection, onSectionChange }: SidebarProps
     <div className="flex flex-col h-full">
       {/* Header with logo and title */}
       <div className="px-4 py-4 border-b border-border">
-        <div className="flex items-center gap-2">
-          <Network className="h-6 w-6 text-primary shrink-0" />
+        <div className="flex items-center gap-3">
+          <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-primary/10">
+            <Network className="h-5 w-5 text-primary shrink-0" />
+          </div>
           <div>
-            <h1 className="text-lg font-bold text-foreground leading-tight">Réseau Inventaire</h1>
-            <p className="text-xs text-muted-foreground">Gestion de l'infrastructure réseau</p>
+            <h1 className="text-base font-bold text-primary leading-tight">NetInfra Manager</h1>
+            <p className="text-xs text-muted-foreground">Gestion d'infrastructure réseau</p>
           </div>
         </div>
       </div>
@@ -213,7 +220,7 @@ export default function Sidebar({ activeSection, onSectionChange }: SidebarProps
             {menuItems.filter(item => item.id !== "dashboard").map((item) => {
               // Gérer le cas spécial des armoires qui a sa propre page
               if (item.id === "armoires") {
-                const isActive = location.pathname === "/armoires" || location.pathname === "/armoires-detail";
+                const isActive = location.pathname === "/armoires" || location.pathname.startsWith("/armoires/");
                 return (
                   <Button
                     key={item.id}
@@ -232,7 +239,7 @@ export default function Sidebar({ activeSection, onSectionChange }: SidebarProps
 
               // Gérer le cas des équipements qui a sa propre page
               if (item.id === "equipements") {
-                const isActive = location.pathname === "/equipements";
+                const isActive = location.pathname === "/equipements" || location.pathname.startsWith("/equipements/");
                 return (
                   <Button
                     key={item.id}
@@ -305,26 +312,24 @@ export default function Sidebar({ activeSection, onSectionChange }: SidebarProps
             })}
           </div>
 
-          {/* Section MODIFICATIONS */}
+          {/* Section MAINTENANCES */}
           <div className="space-y-1">
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-3 pb-2">
-              Modifications
+              Maintenances
             </p>
-            <Collapsible open={isModificationsOpen} onOpenChange={setIsModificationsOpen}>
+            <Collapsible open={isMaintenancesOpen} onOpenChange={setIsMaintenancesOpen}>
               <CollapsibleTrigger asChild>
                 <Button
                   variant="ghost"
                   className={cn(
-                    "w-full justify-between text-nav-text hover:bg-muted hover:text-foreground",
-                    (location.pathname === "/modifications" || location.pathname === "/validation-modifications" || location.pathname === "/modification-history") &&
-                      "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
+                    "w-full justify-between text-nav-text hover:bg-muted hover:text-foreground"
                   )}
                 >
                   <div className="flex items-center">
-                    <ClipboardList className="mr-3 h-4 w-4" />
-                    Demandes de modification
+                    <Wrench className="mr-3 h-4 w-4" />
+                    Gestion des interventions
                   </div>
-                  {isModificationsOpen ? (
+                  {isMaintenancesOpen ? (
                     <ChevronDown className="h-4 w-4" />
                   ) : (
                     <ChevronRight className="h-4 w-4" />
@@ -332,6 +337,20 @@ export default function Sidebar({ activeSection, onSectionChange }: SidebarProps
                 </Button>
               </CollapsibleTrigger>
               <CollapsibleContent className="pl-4 space-y-1">
+                {/* Maintenances - visible par Admin (créateur) et Technicien (exécutant) */}
+                <Button
+                  variant="ghost"
+                  className={cn(
+                    "w-full justify-start text-sm text-nav-text hover:bg-muted hover:text-foreground",
+                    location.pathname === "/maintenances" &&
+                      "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
+                  )}
+                  onClick={() => handleNavigate("/maintenances")}
+                >
+                  <CalendarClock className="mr-3 h-4 w-4" />
+                  Maintenances
+                </Button>
+                {/* Mises à jour (Modifications) - Technicien soumet, Admin valide */}
                 <Button
                   variant="ghost"
                   className={cn(
@@ -341,9 +360,10 @@ export default function Sidebar({ activeSection, onSectionChange }: SidebarProps
                   )}
                   onClick={() => handleNavigate("/modifications")}
                 >
-                  <ClipboardList className="mr-3 h-4 w-4" />
-                  Mes demandes
+                  <FileEdit className="mr-3 h-4 w-4" />
+                  Mises à jour
                 </Button>
+                {/* Validation - Admin uniquement */}
                 {user?.role === 'administrator' && (
                   <Button
                     variant="ghost"
@@ -358,6 +378,7 @@ export default function Sidebar({ activeSection, onSectionChange }: SidebarProps
                     Validation
                   </Button>
                 )}
+                {/* Historique */}
                 <Button
                   variant="ghost"
                   className={cn(
@@ -383,13 +404,13 @@ export default function Sidebar({ activeSection, onSectionChange }: SidebarProps
               variant="ghost"
               className={cn(
                 "w-full justify-start text-nav-text hover:bg-muted hover:text-foreground",
-                location.pathname === "/lans" &&
+                location.pathname === "/vlans" &&
                   "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
               )}
-              onClick={() => handleNavigate("/lans")}
+              onClick={() => handleNavigate("/vlans")}
             >
-              <Network className="mr-3 h-4 w-4" />
-              Gestion des LANs
+              <Layers className="mr-3 h-4 w-4" />
+              VLANs
             </Button>
             <Button
               variant="ghost"
@@ -462,6 +483,17 @@ export default function Sidebar({ activeSection, onSectionChange }: SidebarProps
                 >
                   <KeyRound className="mr-3 h-4 w-4" />
                   Permissions
+                </Button>
+                <Button
+                  variant="ghost"
+                  className={cn(
+                    "w-full justify-start text-nav-text hover:bg-muted hover:text-foreground text-sm",
+                    isAccessButtonActive("activity-logs") && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
+                  )}
+                  onClick={() => handleNavigate("/activity-logs")}
+                >
+                  <Activity className="mr-3 h-4 w-4" />
+                  Logs d'activité
                 </Button>
               </CollapsibleContent>
             </Collapsible>

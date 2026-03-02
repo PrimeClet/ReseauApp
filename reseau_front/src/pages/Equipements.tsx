@@ -1,6 +1,6 @@
-import { useEffect, useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
+import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { useData } from "@/contexts/DataContext";
 import AppShell from "@/components/layout/AppShell";
 import PageHeader from "@/components/ui/page-header";
@@ -9,7 +9,9 @@ import DetailsModal from "@/components/ui/details-modal";
 import EditModal from "@/components/ui/edit-modal";
 import AddEquipmentForm from "@/components/forms/AddEquipmentForm";
 import { toast } from "@/hooks/use-toast";
-import { Loader2, Router, Server, Shield, Wifi, Box } from "lucide-react";
+import { Loader2, Router, Server, Shield, Wifi, Box, QrCode, ExternalLink, Printer, Laptop, Monitor, Tag, Hash, Archive, Factory, BarCode3, Network, Globe, Layers, ToggleLeft, Settings2, FileText, Building } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import QRCodeModal from "@/components/ui/qr-code-modal";
 import {
   Select,
   SelectContent,
@@ -24,25 +26,81 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-// Mapping des types d'équipements vers les icônes
-const typeIcons: Record<string, { icon: React.ReactNode; label: string; color: string }> = {
-  switch: { icon: <Router className="h-4 w-4" />, label: "Switch", color: "text-blue-600" },
-  routeur: { icon: <Router className="h-4 w-4" />, label: "Routeur", color: "text-green-600" },
-  firewall: { icon: <Shield className="h-4 w-4" />, label: "Firewall", color: "text-red-600" },
-  "point-acces": { icon: <Wifi className="h-4 w-4" />, label: "Point d'accès", color: "text-purple-600" },
-  serveur: { icon: <Server className="h-4 w-4" />, label: "Serveur", color: "text-orange-600" },
-  autre: { icon: <Box className="h-4 w-4" />, label: "Autre", color: "text-gray-600" },
+// Mapping des types d'équipements vers les icônes avec couleurs subtiles
+const typeIcons: Record<string, { icon: React.ReactNode; label: string; bgClass: string; textClass: string }> = {
+  switch: {
+    icon: <Router className="h-3.5 w-3.5" />,
+    label: "Switch",
+    bgClass: "bg-blue-50 dark:bg-blue-950/50",
+    textClass: "text-blue-700 dark:text-blue-400"
+  },
+  routeur: {
+    icon: <Router className="h-3.5 w-3.5" />,
+    label: "Routeur",
+    bgClass: "bg-emerald-50 dark:bg-emerald-950/50",
+    textClass: "text-emerald-700 dark:text-emerald-400"
+  },
+  firewall: {
+    icon: <Shield className="h-3.5 w-3.5" />,
+    label: "Firewall",
+    bgClass: "bg-rose-50 dark:bg-rose-950/50",
+    textClass: "text-rose-700 dark:text-rose-400"
+  },
+  "point-acces": {
+    icon: <Wifi className="h-3.5 w-3.5" />,
+    label: "Point d'accès",
+    bgClass: "bg-violet-50 dark:bg-violet-950/50",
+    textClass: "text-violet-700 dark:text-violet-400"
+  },
+  serveur: {
+    icon: <Server className="h-3.5 w-3.5" />,
+    label: "Serveur",
+    bgClass: "bg-amber-50 dark:bg-amber-950/50",
+    textClass: "text-amber-700 dark:text-amber-400"
+  },
+  imprimante: {
+    icon: <Printer className="h-3.5 w-3.5" />,
+    label: "Imprimante",
+    bgClass: "bg-teal-50 dark:bg-teal-950/50",
+    textClass: "text-teal-700 dark:text-teal-400"
+  },
+  "ordinateur-portable": {
+    icon: <Laptop className="h-3.5 w-3.5" />,
+    label: "Ordinateur portable",
+    bgClass: "bg-indigo-50 dark:bg-indigo-950/50",
+    textClass: "text-indigo-700 dark:text-indigo-400"
+  },
+  "ordinateur-bureau": {
+    icon: <Monitor className="h-3.5 w-3.5" />,
+    label: "Ordinateur de bureau",
+    bgClass: "bg-cyan-50 dark:bg-cyan-950/50",
+    textClass: "text-cyan-700 dark:text-cyan-400"
+  },
+  prise_murale: {
+    icon: <Network className="h-3.5 w-3.5" />,
+    label: "Prise murale",
+    bgClass: "bg-orange-50 dark:bg-orange-950/50",
+    textClass: "text-orange-700 dark:text-orange-400"
+  },
+  autre: {
+    icon: <Box className="h-3.5 w-3.5" />,
+    label: "Autre",
+    bgClass: "bg-slate-100 dark:bg-slate-800",
+    textClass: "text-slate-600 dark:text-slate-400"
+  },
 };
 
 const Equipements = () => {
-  const { isAuthenticated, isLoading: isLoadingAuth } = useAuth();
+  const { isAuthenticated, isLoading: isLoadingAuth } = useRequireAuth();
   const navigate = useNavigate();
-  const { equipements, coffrets, isLoadingEquipements, updateEquipement, deleteEquipement, restoreEquipement, refetchEquipements, importEquipements } = useData();
+  const { equipements, coffrets, salles, isLoadingEquipements, updateEquipement, deleteEquipement, restoreEquipement, refetchEquipements, importEquipements } = useData();
   const [selectedEquipement, setSelectedEquipement] = useState<any>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [selectedCoffret, setSelectedCoffret] = useState<any>(null);
   const [isCoffretDetailsOpen, setIsCoffretDetailsOpen] = useState(false);
+  const [isQRCodeOpen, setIsQRCodeOpen] = useState(false);
+  const [qrCodeEquipement, setQrCodeEquipement] = useState<any>(null);
 
   // Filtres
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -101,19 +159,17 @@ const Equipements = () => {
     return data;
   }, [equipements, coffrets, statusFilter, typeFilter, coffretFilter]);
 
-  useEffect(() => {
-    if (!isLoadingAuth && !isAuthenticated) {
-      navigate("/login");
-    }
-  }, [isAuthenticated, isLoadingAuth, navigate]);
-
   const handleRowClick = (equipement: any) => {
-    setSelectedEquipement(equipement);
+    // Trouver l'équipement original dans la liste pour avoir toutes les données
+    const originalEquipement = equipements.find(eq => eq.id === equipement.id) || equipement;
+    setSelectedEquipement(originalEquipement);
     setIsDetailsOpen(true);
   };
 
   const handleEdit = (equipement: any) => {
-    setSelectedEquipement(equipement);
+    // Trouver l'équipement original dans la liste pour avoir toutes les données
+    const originalEquipement = equipements.find(eq => eq.id === equipement.id) || equipement;
+    setSelectedEquipement(originalEquipement);
     setIsEditOpen(true);
   };
 
@@ -135,15 +191,26 @@ const Equipements = () => {
           : updatedEquipement.nombre_ports;
       }
 
+      // Convertir is_manageable et is_principal en booléens
+      const isManageable = updatedEquipement.is_manageable === 'true' || updatedEquipement.is_manageable === true;
+      const isPrincipal = updatedEquipement.is_principal === 'true' || updatedEquipement.is_principal === true;
+
       const dataToSave = {
         name: updatedEquipement.name,
         type: updatedEquipement.type,
-        ip_address: updatedEquipement.ip_address,
-        vlan: updatedEquipement.vlan,
+        modele: updatedEquipement.modele || undefined,
+        fabricant: updatedEquipement.fabricant || undefined,
+        numero_serie: updatedEquipement.numero_serie || undefined,
+        type_reseau: updatedEquipement.type_reseau || undefined,
+        ip_address: updatedEquipement.ip_address || undefined,
+        mac_address: updatedEquipement.mac_address || undefined,
+        vlan: updatedEquipement.vlan || undefined,
         status: updatedEquipement.status,
-        description: updatedEquipement.description,
+        description: updatedEquipement.description || undefined,
         coffret_id: coffretId,
         nombre_ports: nombrePorts,
+        is_manageable: updatedEquipement.type === 'switch' ? isManageable : false,
+        is_principal: updatedEquipement.type === 'switch' ? isPrincipal : false,
       };
 
       await updateEquipement(updatedEquipement.id, dataToSave);
@@ -232,11 +299,18 @@ const Equipements = () => {
       equipement_code: originalEquipement.equipement_code,
       qr_code: originalEquipement.qr_code,
       type: originalEquipement.type,
+      modele: originalEquipement.modele || "",
+      fabricant: originalEquipement.fabricant || "",
+      numero_serie: originalEquipement.numero_serie || "",
+      type_reseau: originalEquipement.type_reseau || "IT",
+      mac_address: originalEquipement.mac_address || "",
+      is_manageable: originalEquipement.is_manageable || false,
+      is_principal: originalEquipement.is_principal || false,
       armoire: coffret?.nom || coffret?.code || null,
       coffret: coffret ? { nom: coffret.nom, code: coffret.code } : null,
       coffret_id: originalEquipement.coffret_id,
-      ip_address: originalEquipement.ip_address,
-      vlan: originalEquipement.vlan,
+      ip_address: originalEquipement.ip_address || "",
+      vlan: originalEquipement.vlan || "",
       status: originalEquipement.status,
       description: originalEquipement.description || "",
       nombre_ports: portsTotal,
@@ -254,23 +328,56 @@ const Equipements = () => {
       id: coffret.id,
       code: coffret.code,
       nom: coffret.nom,
-      piece: coffret.piece || "",
       qr_code: coffret.qr_code,
       nombre_equipements: equipementsCount,
     };
   };
 
-  // Rendu personnalisé pour la colonne Type avec icône
+  // Rendu personnalisé pour la colonne Nom (identifiant principal)
+  const renderNomCell = (value: string) => {
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100">
+        {value}
+      </span>
+    );
+  };
+
+  // Rendu personnalisé pour la colonne Code avec lien vers les détails
+  const renderCodeCell = (value: string) => {
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors cursor-pointer border border-primary/20"
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/equipements/${value}/details`);
+              }}
+            >
+              {value}
+              <ExternalLink className="h-3 w-3" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Voir les détails et les ports</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  };
+
+  // Rendu personnalisé pour la colonne Type avec icône et badge
   const renderTypeCell = (value: string) => {
     const typeInfo = typeIcons[value] || typeIcons.autre;
     return (
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
-            <div className={`flex items-center gap-2 ${typeInfo.color}`}>
+            <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium ${typeInfo.bgClass} ${typeInfo.textClass}`}>
               {typeInfo.icon}
-              <span className="capitalize">{typeInfo.label}</span>
-            </div>
+              {typeInfo.label}
+            </span>
           </TooltipTrigger>
           <TooltipContent>
             <p>Type: {typeInfo.label}</p>
@@ -282,19 +389,22 @@ const Equipements = () => {
 
   // Rendu personnalisé pour la colonne Armoire avec lien vers le modal
   const renderArmoireCell = (value: string, row: any) => {
-    if (value === '-') return value;
+    if (value === '-') {
+      return <span className="text-muted-foreground text-xs">Non assigné</span>;
+    }
     return (
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
             <span
-              className="cursor-pointer text-primary hover:underline"
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-400 cursor-pointer hover:bg-indigo-100 dark:hover:bg-indigo-950 transition-colors"
               onClick={(e) => {
                 e.stopPropagation();
                 setSelectedCoffret(formatCoffretForModal(row.coffret_id));
                 setIsCoffretDetailsOpen(true);
               }}
             >
+              <Server className="h-3 w-3" />
               {value}
             </span>
           </TooltipTrigger>
@@ -308,22 +418,34 @@ const Equipements = () => {
 
   // Rendu personnalisé pour la colonne Status avec badge coloré
   const renderStatusCell = (value: string) => {
-    let colorClass = "";
+    let bgClass = "";
+    let textClass = "";
+    let icon = null;
+
     switch (value) {
       case "Actif":
-        colorClass = "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200";
+        bgClass = "bg-emerald-50 dark:bg-emerald-950/50";
+        textClass = "text-emerald-700 dark:text-emerald-400";
+        icon = <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />;
         break;
       case "Maintenance":
-        colorClass = "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200";
+        bgClass = "bg-amber-50 dark:bg-amber-950/50";
+        textClass = "text-amber-700 dark:text-amber-400";
+        icon = <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />;
         break;
       case "Supprimé":
-        colorClass = "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200";
+        bgClass = "bg-slate-100 dark:bg-slate-800";
+        textClass = "text-slate-600 dark:text-slate-400";
+        icon = <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />;
         break;
       default:
-        colorClass = "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200";
+        bgClass = "bg-slate-100 dark:bg-slate-800";
+        textClass = "text-slate-600 dark:text-slate-400";
+        icon = <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />;
     }
     return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${colorClass}`}>
+      <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium ${bgClass} ${textClass}`}>
+        {icon}
         {value}
       </span>
     );
@@ -331,32 +453,77 @@ const Equipements = () => {
 
   // Rendu personnalisé pour la colonne Ports avec indicateur visuel
   const renderPortsCell = (value: string, row: any) => {
-    if (value === '-') return <span className="text-muted-foreground">-</span>;
+    if (value === '-') return <span className="text-muted-foreground text-xs">-</span>;
 
     const { portsConfigures, portsTotal, portsLibres } = row;
     const pourcentageUtilise = portsTotal > 0 ? (portsConfigures / portsTotal) * 100 : 0;
 
-    let colorClass = "text-green-600 dark:text-green-400"; // Beaucoup de ports libres
+    let bgClass = "bg-emerald-50 dark:bg-emerald-950/50";
+    let textClass = "text-emerald-700 dark:text-emerald-400";
+
     if (pourcentageUtilise >= 80) {
-      colorClass = "text-red-600 dark:text-red-400"; // Presque plein
+      bgClass = "bg-rose-50 dark:bg-rose-950/50";
+      textClass = "text-rose-700 dark:text-rose-400";
     } else if (pourcentageUtilise >= 50) {
-      colorClass = "text-yellow-600 dark:text-yellow-400"; // Moitié utilisée
+      bgClass = "bg-amber-50 dark:bg-amber-950/50";
+      textClass = "text-amber-700 dark:text-amber-400";
     }
 
     return (
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
-            <span className={`font-medium ${colorClass}`}>
+            <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${bgClass} ${textClass}`}>
               {value}
             </span>
           </TooltipTrigger>
           <TooltipContent>
-            <div className="text-sm">
+            <div className="text-sm space-y-0.5">
               <p>Total: {portsTotal} ports</p>
               <p>Configurés: {portsConfigures} ports</p>
               <p>Libres: {portsLibres} ports</p>
             </div>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  };
+
+  // Afficher le QR code d'un équipement
+  const handleViewQRCode = (row: any) => {
+    const originalEquipement = equipements.find(e => e.id === row.id);
+    if (originalEquipement) {
+      const typeInfo = typeIcons[originalEquipement.type] || typeIcons.autre;
+      setQrCodeEquipement({
+        ...originalEquipement,
+        typeLabel: typeInfo.label
+      });
+      setIsQRCodeOpen(true);
+    }
+  };
+
+  // Rendu des actions personnalisées (QR Code)
+  const renderRowActions = (row: any) => {
+    const originalEquipement = equipements.find(e => e.id === row.id);
+    if (!originalEquipement?.qr_code) return null;
+
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleViewQRCode(row);
+              }}
+            >
+              <QrCode className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Voir le QR Code</p>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
@@ -415,11 +582,14 @@ const Equipements = () => {
               restoreConfirmTitle="Restaurer l'équipement"
               restoreConfirmDescription="Êtes-vous sûr de vouloir restaurer cet équipement ?"
               customCellRenderers={{
+                "Nom": renderNomCell,
+                "Code": renderCodeCell,
                 "Type": renderTypeCell,
                 "Armoire": renderArmoireCell,
                 "Ports": renderPortsCell,
                 "Status": renderStatusCell,
               }}
+              renderRowActions={renderRowActions}
               customFilters={
                 <>
                   <div className="flex items-center gap-2">
@@ -448,8 +618,8 @@ const Equipements = () => {
                           const typeInfo = typeIcons[type] || typeIcons.autre;
                           return (
                             <SelectItem key={type} value={type}>
-                              <div className="flex items-center gap-2">
-                                <span className={typeInfo.color}>{typeInfo.icon}</span>
+                              <div className={`flex items-center gap-2 ${typeInfo.textClass}`}>
+                                {typeInfo.icon}
                                 {typeInfo.label}
                               </div>
                             </SelectItem>
@@ -497,18 +667,23 @@ const Equipements = () => {
               data={formatEquipementForModal(selectedEquipement)}
               onSave={handleSave}
               fields={[
-                { key: "name", label: "Nom", type: "text" },
-                { key: "equipement_code", label: "Code", type: "text", disabled: true },
+                { key: "name", label: "Nom", type: "text", icon: <Tag className="h-3 w-3" /> },
+                { key: "equipement_code", label: "Code", type: "text", disabled: true, icon: <Hash className="h-3 w-3" /> },
                 {
                   key: "type",
                   label: "Type",
                   type: "select",
+                  icon: <Box className="h-3 w-3" />,
                   options: [
                     { value: "switch", label: "Switch" },
                     { value: "routeur", label: "Routeur" },
                     { value: "firewall", label: "Firewall" },
                     { value: "point-acces", label: "Point d'accès" },
                     { value: "serveur", label: "Serveur" },
+                    { value: "imprimante", label: "Imprimante" },
+                    { value: "ordinateur-portable", label: "Ordinateur portable" },
+                    { value: "ordinateur-bureau", label: "Ordinateur de bureau" },
+                    { value: "prise_murale", label: "Prise murale" },
                     { value: "autre", label: "Autre" },
                   ]
                 },
@@ -516,21 +691,71 @@ const Equipements = () => {
                   key: "coffret_id",
                   label: "Armoire",
                   type: "select",
-                  options: coffrets.filter(c => !(c as any).deleted_at).map(c => ({ value: c.id.toString(), label: c.nom || c.code }))
+                  icon: <Archive className="h-3 w-3" />,
+                  options: [
+                    { value: "none", label: "— Aucune (dans une salle) —" },
+                    ...coffrets.filter(c => !(c as any).deleted_at).map(c => ({ value: c.id.toString(), label: c.nom || c.code }))
+                  ]
                 },
-                { key: "ip_address", label: "Adresse IP", type: "text" },
-                { key: "vlan", label: "VLAN", type: "text" },
-                { key: "nombre_ports", label: "Nombre de ports", type: "number" },
+                {
+                  key: "salle_id",
+                  label: "Salle",
+                  type: "select",
+                  icon: <Building className="h-3 w-3" />,
+                  visibleWhen: { field: "coffret_id", value: "none" },
+                  options: salles.filter((s: any) => !s.deleted_at).map((s: any) => ({ value: s.id.toString(), label: s.nom }))
+                },
+                { key: "modele", label: "Modèle", type: "text", icon: <Settings2 className="h-3 w-3" /> },
+                { key: "fabricant", label: "Fabricant", type: "text", icon: <Factory className="h-3 w-3" /> },
+                { key: "numero_serie", label: "N° série", type: "text", icon: <Hash className="h-3 w-3" /> },
+                {
+                  key: "type_reseau",
+                  label: "Réseau",
+                  type: "select",
+                  icon: <Network className="h-3 w-3" />,
+                  options: [
+                    { value: "IT", label: "IT" },
+                    { value: "OT", label: "OT" },
+                  ]
+                },
+                { key: "ip_address", label: "Adresse IP", type: "text", icon: <Globe className="h-3 w-3" /> },
+                { key: "mac_address", label: "Adresse MAC", type: "text", icon: <Network className="h-3 w-3" /> },
+                { key: "vlan", label: "VLAN", type: "text", icon: <Layers className="h-3 w-3" /> },
+                { key: "nombre_ports", label: "Ports", type: "number", icon: <Hash className="h-3 w-3" /> },
+                {
+                  key: "is_manageable",
+                  label: "Manageable",
+                  type: "radio",
+                  icon: <ToggleLeft className="h-3 w-3" />,
+                  options: [
+                    { value: "true", label: "Oui" },
+                    { value: "false", label: "Non" },
+                  ],
+                  visibleWhen: { field: "type", value: "switch" }
+                },
+                {
+                  key: "is_principal",
+                  label: "Principal",
+                  type: "radio",
+                  icon: <ToggleLeft className="h-3 w-3" />,
+                  options: [
+                    { value: "true", label: "Oui" },
+                    { value: "false", label: "Non" },
+                  ],
+                  visibleWhen: { field: "type", value: "switch" }
+                },
                 {
                   key: "status",
-                  label: "Status",
+                  label: "Statut",
                   type: "select",
+                  icon: <ToggleLeft className="h-3 w-3" />,
                   options: [
                     { value: "active", label: "Actif" },
                     { value: "maintenance", label: "Maintenance" },
+                    { value: "inactive", label: "Inactif" },
                   ]
                 },
-                { key: "description", label: "Description", type: "textarea" },
+                { key: "description", label: "Description", type: "textarea", icon: <FileText className="h-3 w-3" />, fullWidth: true },
               ]}
             />
 
@@ -545,6 +770,19 @@ const Equipements = () => {
                 navigate('/armoires');
               }}
             />
+
+            {/* Modal QR Code */}
+            {qrCodeEquipement?.qr_code && (
+              <QRCodeModal
+                open={isQRCodeOpen}
+                onOpenChange={setIsQRCodeOpen}
+                qrCode={qrCodeEquipement.qr_code}
+                title={qrCodeEquipement.name}
+                subtitle={qrCodeEquipement.typeLabel}
+                type="equipement"
+                code={qrCodeEquipement.equipement_code}
+              />
+            )}
           </>
         )}
       </div>

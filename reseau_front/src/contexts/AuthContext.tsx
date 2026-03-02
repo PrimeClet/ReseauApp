@@ -1,8 +1,11 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { login as loginAction, logout as logoutAction } from '@/store/users';
 import { authService } from '@/services';
 import type { RootState } from '@/store/store';
+
+// Durée d'inactivité avant déconnexion automatique (15 minutes en ms)
+const INACTIVITY_TIMEOUT = 15 * 60 * 1000;
 
 interface User {
   id: number;
@@ -11,6 +14,8 @@ interface User {
   surname?: string;
   username: string;
   role: string;
+  roles: string[];
+  permissions: string[];
   is_active: boolean;
 }
 
@@ -20,6 +25,7 @@ interface AuthContextType {
   logout: () => void;
   isAuthenticated: boolean;
   isLoading: boolean;
+  hasPermission: (permission: string) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -36,6 +42,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     name: reduxUser.full_name || reduxUser.username,
     username: reduxUser.username,
     role: reduxUser.role,
+    roles: reduxUser.roles || [],
+    permissions: reduxUser.permissions || [],
     is_active: reduxUser.is_active === 1
   } : null;
 
@@ -53,6 +61,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               email: userData.email,
               full_name: `${userData.name} ${userData.surname}`,
               role: userData.role,
+              roles: userData.roles || [],
+              permissions: userData.permissions || [],
               is_active: userData.is_active ? 1 : 0
             },
             token: token
@@ -85,6 +95,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             email: apiUser.email,
             full_name: `${apiUser.name} ${apiUser.surname}`,
             role: apiUser.role,
+            roles: apiUser.roles || [],
+            permissions: apiUser.permissions || [],
             is_active: apiUser.is_active ? 1 : 0
           },
           token: apiToken
@@ -100,7 +112,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     try {
       // Appeler l'API de déconnexion si on a un token
       if (token) {
@@ -112,12 +124,89 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       // Toujours déconnecter localement
       dispatch(logoutAction());
     }
-  };
+  }, [token, dispatch]);
 
   const isAuthenticated = !!isLogin && !!user;
 
+  /**
+   * Vérifie si l'utilisateur a une permission donnée
+   * Utilise les permissions retournées par l'API (Spatie)
+   */
+  const hasPermission = useCallback((permission: string): boolean => {
+    if (!reduxUser) return false;
+
+    // Vérifier si l'utilisateur a un rôle Super Admin ou Administrateur (toutes permissions)
+    const userRoles = reduxUser.roles || [];
+    if (userRoles.includes('Super Admin') || userRoles.includes('Administrateur')) {
+      return true;
+    }
+
+    // Fallback sur l'ancien système de rôles
+    const legacyRole = reduxUser.role?.toLowerCase();
+    if (legacyRole === 'administrator') {
+      return true;
+    }
+
+    // Vérifier dans les permissions de l'API
+    const userPermissions = reduxUser.permissions || [];
+
+    // Vérifier la permission exacte
+    return userPermissions.includes(permission);
+  }, [reduxUser]);
+
+  // Gestion de la déconnexion automatique après inactivité
+  const inactivityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const resetInactivityTimer = useCallback(() => {
+    // Annuler le timer existant
+    if (inactivityTimerRef.current) {
+      clearTimeout(inactivityTimerRef.current);
+    }
+
+    // Démarrer un nouveau timer uniquement si l'utilisateur est connecté
+    if (isAuthenticated) {
+      inactivityTimerRef.current = setTimeout(() => {
+        console.log('Déconnexion automatique pour inactivité');
+        logout();
+      }, INACTIVITY_TIMEOUT);
+    }
+  }, [isAuthenticated, logout]);
+
+  // Écouter les événements d'activité utilisateur
+  useEffect(() => {
+    if (!isAuthenticated) {
+      // Nettoyer le timer si non authentifié
+      if (inactivityTimerRef.current) {
+        clearTimeout(inactivityTimerRef.current);
+        inactivityTimerRef.current = null;
+      }
+      return;
+    }
+
+    // Événements à écouter pour détecter l'activité
+    const activityEvents = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click'];
+
+    // Démarrer le timer initial
+    resetInactivityTimer();
+
+    // Ajouter les listeners
+    activityEvents.forEach(event => {
+      window.addEventListener(event, resetInactivityTimer);
+    });
+
+    // Cleanup
+    return () => {
+      activityEvents.forEach(event => {
+        window.removeEventListener(event, resetInactivityTimer);
+      });
+      if (inactivityTimerRef.current) {
+        clearTimeout(inactivityTimerRef.current);
+      }
+    };
+  }, [isAuthenticated, resetInactivityTimer]);
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, isAuthenticated, isLoading }}>
+    <AuthContext.Provider value={{ user, login, logout, isAuthenticated, isLoading, hasPermission }}>
       {children}
     </AuthContext.Provider>
   );

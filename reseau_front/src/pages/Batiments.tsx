@@ -1,6 +1,5 @@
-import { useEffect, useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
+import { useState, useMemo } from "react";
+import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { useData } from "@/contexts/DataContext";
 import AppShell from "@/components/layout/AppShell";
 import PageHeader from "@/components/ui/page-header";
@@ -9,7 +8,7 @@ import DetailsModal from "@/components/ui/details-modal";
 import EditModal from "@/components/ui/edit-modal";
 import AddBatimentForm from "@/components/forms/AddBatimentForm";
 import { toast } from "@/hooks/use-toast";
-import { Loader2, Building2 } from "lucide-react";
+import { Loader2, Building2, Layers, DoorOpen, CheckCircle2 } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -19,8 +18,7 @@ import {
 } from "@/components/ui/select";
 
 const Batiments = () => {
-  const { isAuthenticated, isLoading: isLoadingAuth } = useAuth();
-  const navigate = useNavigate();
+  const { isAuthenticated, isLoading: isLoadingAuth } = useRequireAuth();
   const { batiments, salles, zones, isLoadingBatiments, updateBatiment, deleteBatiment, restoreBatiment, refetchBatiments, importBatiments } = useData();
   const [selectedBatiment, setSelectedBatiment] = useState<any>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
@@ -59,7 +57,7 @@ const Batiments = () => {
         Zone: zoneName,
         Nom: batiment.nom,
         Description: batiment.description || '-',
-        "Nombre de Salles": nombreSalles,
+        "Nombre de salles": nombreSalles,
         "Status": isDeleted ? "Supprimé" : "Actif",
       };
     });
@@ -81,22 +79,16 @@ const Batiments = () => {
     // Appliquer le filtre de nombre de salles
     if (sallesFilter !== "all") {
       if (sallesFilter === "0") {
-        data = data.filter((item) => item["Nombre de Salles"] === 0);
+        data = data.filter((item) => item["Nombre de salles"] === 0);
       } else if (sallesFilter === "1-5") {
-        data = data.filter((item) => item["Nombre de Salles"] >= 1 && item["Nombre de Salles"] <= 5);
+        data = data.filter((item) => item["Nombre de salles"] >= 1 && item["Nombre de salles"] <= 5);
       } else if (sallesFilter === "6+") {
-        data = data.filter((item) => item["Nombre de Salles"] >= 6);
+        data = data.filter((item) => item["Nombre de salles"] >= 6);
       }
     }
 
     return data;
   }, [batiments, sallesCountByBatiment, zoneIdToLabel, zoneFilter, statusFilter, sallesFilter]);
-
-  useEffect(() => {
-    if (!isLoadingAuth && !isAuthenticated) {
-      navigate("/login");
-    }
-  }, [isAuthenticated, isLoadingAuth, navigate]);
 
   const handleRowClick = (batiment: any) => {
     setSelectedBatiment(batiment);
@@ -183,6 +175,63 @@ const Batiments = () => {
     }
   };
 
+  // Rendu personnalisé pour la colonne Nom (identifiant principal)
+  const renderNomCell = (value: string) => {
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100">
+        {value}
+      </span>
+    );
+  };
+
+  // Rendu personnalisé pour la colonne Zone
+  const renderZoneCell = (value: string) => {
+    if (value === '-') {
+      return <span className="text-muted-foreground text-xs">Non assigné</span>;
+    }
+    return (
+      <div className="flex items-center gap-1.5">
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-violet-50 text-violet-700 dark:bg-violet-950/50 dark:text-violet-400">
+          <Layers className="h-3 w-3" />
+          {value}
+        </span>
+      </div>
+    );
+  };
+
+  // Rendu personnalisé pour la colonne Status
+  const renderStatusCell = (value: string) => {
+    const isActive = value === "Actif";
+    return (
+      <div className="flex items-center gap-1.5">
+        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium ${
+          isActive
+            ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400"
+            : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
+        }`}>
+          <CheckCircle2 className="h-3 w-3" />
+          {value}
+        </span>
+      </div>
+    );
+  };
+
+  // Rendu personnalisé pour la colonne Nombre de salles
+  const renderSallesCell = (value: number) => {
+    return (
+      <div className="flex items-center gap-1.5">
+        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium ${
+          value > 0
+            ? "bg-cyan-50 text-cyan-700 dark:bg-cyan-950/50 dark:text-cyan-400"
+            : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+        }`}>
+          <DoorOpen className="h-3 w-3" />
+          {value} salle{value !== 1 ? 's' : ''}
+        </span>
+      </div>
+    );
+  };
+
   // Préparer les données pour les modals (format attendu)
   const formatBatimentForModal = (batiment: any) => {
     if (!batiment) return null;
@@ -220,7 +269,7 @@ const Batiments = () => {
     <AppShell>
       <div className="space-y-6">
         <PageHeader
-          title="Gestion des Bâtiments"
+          title="Gestion des bâtiments"
           description="Configuration et gestion des bâtiments de votre infrastructure"
           icon={<Building2 className="h-6 w-6 text-primary" />}
           breadcrumbs={[
@@ -238,7 +287,7 @@ const Batiments = () => {
           <>
             <DataTableEnhanced
               title={`${tableData.length} bâtiment${tableData.length > 1 ? 's' : ''} configuré${tableData.length > 1 ? 's' : ''}`}
-              columns={["Zone", "Nom", "Description", "Nombre de Salles", "Status"]}
+              columns={["Zone", "Nom", "Description", "Nombre de salles", "Status"]}
               data={tableData}
               onRowClick={handleRowClick}
               onEdit={handleEdit}
@@ -253,6 +302,12 @@ const Batiments = () => {
               deleteConfirmDescription="Êtes-vous sûr de vouloir supprimer ce bâtiment ? Cette action est irréversible."
               restoreConfirmTitle="Restaurer le bâtiment"
               restoreConfirmDescription="Êtes-vous sûr de vouloir restaurer ce bâtiment ?"
+              customCellRenderers={{
+                "Nom": renderNomCell,
+                "Zone": renderZoneCell,
+                "Status": renderStatusCell,
+                "Nombre de salles": renderSallesCell,
+              }}
               customFilters={
                 <>
                   <div className="flex items-center gap-2">
@@ -323,7 +378,7 @@ const Batiments = () => {
               onSave={handleSave}
               fields={[
                 { key: "nom", label: "Nom", type: "text" },
-                { key: "zone_id", label: "Zone", type: "select", options: [{ value: "", label: "Aucune zone" }, ...zones.map(z => ({ value: z.id, label: z.libelle }))] },
+                { key: "zone_id", label: "Zone", type: "select", options: [{ value: "none", label: "Aucune zone" }, ...zones.map(z => ({ value: String(z.id), label: z.libelle }))] },
                 { key: "description", label: "Description", type: "text" },
               ]}
             />

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
+import { useSearchParams } from "react-router-dom";
+import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { useData } from "@/contexts/DataContext";
 import AppShell from "@/components/layout/AppShell";
 import DetailsModal from "@/components/ui/details-modal";
@@ -49,13 +49,12 @@ const typeColors: Record<string, string> = {
 };
 
 const ModificationHistory = () => {
-  const { isAuthenticated, isLoading: isLoadingAuth, user } = useAuth();
-  const navigate = useNavigate();
+  const { isAuthenticated, isLoading: isLoadingAuth, user } = useRequireAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { coffrets, isLoadingCoffrets } = useData();
   const [searchParams, setSearchParams] = useSearchParams();
-  
+
   const [selectedCoffretId, setSelectedCoffretId] = useState<number | null>(
     searchParams.get('coffret_id') ? parseInt(searchParams.get('coffret_id')!) : null
   );
@@ -66,12 +65,6 @@ const ModificationHistory = () => {
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
-
-  useEffect(() => {
-    if (!isLoadingAuth && !isAuthenticated) {
-      navigate("/login");
-    }
-  }, [isAuthenticated, isLoadingAuth, navigate]);
 
   const { data: historyData, isLoading, refetch } = useQuery({
     queryKey: ['modifications', 'history', selectedCoffretId, typeFilter, dateFrom, dateTo],

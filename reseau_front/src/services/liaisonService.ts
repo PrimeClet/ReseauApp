@@ -1,11 +1,16 @@
 import api from '@/axios';
 
+export type LiaisonDirection = 'up' | 'down';
+
 export interface Liaison {
   id: number;
   from: number; // ID du port source
   to: number; // ID du port destination
+  direction: LiaisonDirection; // Direction du flux réseau (up = upstream, down = downstream)
   label?: string;
   media?: string;
+  cable_type?: string; // Type de câble (Cat6, fibre, etc.)
+  description?: string;
   length?: number;
   status: boolean;
   deleted_at?: string;
@@ -44,8 +49,11 @@ export interface LiaisonListResponse {
 export interface LiaisonCreateData {
   from: number;
   to: number;
+  direction?: LiaisonDirection;
   label?: string;
   media?: string;
+  cable_type?: string;
+  description?: string;
   length?: number;
   status?: boolean;
 }

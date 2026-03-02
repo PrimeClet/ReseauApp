@@ -7,7 +7,6 @@ export interface Coffret {
   modele?: string;
   photo?: string;
   photo_url?: string;
-  piece: string;
   emplacement?: string;
   long: number;
   lat: number;
@@ -53,7 +52,6 @@ export interface CoffretCreateData {
   nom: string;
   modele?: string;
   photo?: string;
-  piece?: string;
   emplacement?: string;
   long?: number;
   lat?: number;

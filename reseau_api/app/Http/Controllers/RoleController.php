@@ -2,206 +2,66 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\Role\StoreRoleRequest;
+use App\Http\Requests\Role\UpdateRoleRequest;
+use App\Services\RoleService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Spatie\Permission\Models\Role;
-use Spatie\Permission\Models\Permission;
 
 class RoleController extends Controller
 {
-    /**
-     * Liste tous les rôles avec leurs permissions
-     */
-    public function index(Request $request)
+    public function __construct(
+        private readonly RoleService $roleService,
+    ) {}
+
+    public function index(Request $request): JsonResponse
     {
-        $query = Role::with('permissions');
-
-        if ($request->has('search')) {
-            $search = $request->search;
-            $query->where('name', 'like', "%{$search}%");
-        }
-
-        $roles = $query->orderBy('name')->get();
-
-        $data = $roles->map(function ($role) {
-            return [
-                'id' => $role->id,
-                'name' => $role->name,
-                'guard_name' => $role->guard_name,
-                'permissions' => $role->permissions->pluck('name'),
-                'permissions_count' => $role->permissions->count(),
-                'users_count' => $role->users()->count(),
-                'created_at' => $role->created_at,
-                'updated_at' => $role->updated_at,
-            ];
-        });
-
-        return response()->json([
-            'data' => $data
-        ]);
+        return $this->successResponse($this->roleService->list($request->search));
     }
 
-    /**
-     * Affiche un rôle spécifique
-     */
-    public function show($id)
+    public function show($id): JsonResponse
     {
-        $role = Role::with('permissions')->findOrFail($id);
-
-        return response()->json([
-            'data' => [
-                'id' => $role->id,
-                'name' => $role->name,
-                'guard_name' => $role->guard_name,
-                'permissions' => $role->permissions->map(function ($perm) {
-                    return [
-                        'id' => $perm->id,
-                        'name' => $perm->name,
-                    ];
-                }),
-                'users' => $role->users->map(function ($user) {
-                    return [
-                        'id' => $user->id,
-                        'name' => $user->name,
-                        'email' => $user->email,
-                    ];
-                }),
-                'created_at' => $role->created_at,
-                'updated_at' => $role->updated_at,
-            ]
-        ]);
+        return $this->successResponse($this->roleService->find($id));
     }
 
-    /**
-     * Crée un nouveau rôle
-     */
-    public function store(Request $request)
+    public function store(StoreRoleRequest $request): JsonResponse
     {
-        if (!auth()->user()->can('roles.creer')) {
-            return response()->json(['message' => 'Non autorisé'], 403);
-        }
+        $data = $this->roleService->create($request->validated());
 
-        $validated = $request->validate([
-            'name' => 'required|string|max:255|unique:roles,name',
-            'permissions' => 'nullable|array',
-            'permissions.*' => 'exists:permissions,name',
-        ]);
-
-        $role = Role::create([
-            'name' => $validated['name'],
-            'guard_name' => 'web',
-        ]);
-
-        if (isset($validated['permissions']) && !empty($validated['permissions'])) {
-            $role->syncPermissions($validated['permissions']);
-        }
-
-        return response()->json([
-            'message' => 'Rôle créé avec succès.',
-            'data' => [
-                'id' => $role->id,
-                'name' => $role->name,
-                'permissions' => $role->permissions->pluck('name'),
-            ]
-        ], 201);
+        return $this->successResponse($data, 'Rôle créé avec succès.', 201);
     }
 
-    /**
-     * Met à jour un rôle
-     */
-    public function update(Request $request, $id)
+    public function update(UpdateRoleRequest $request, $id): JsonResponse
     {
-        if (!auth()->user()->can('roles.modifier')) {
-            return response()->json(['message' => 'Non autorisé'], 403);
+        $result = $this->roleService->update($id, $request->validated());
+
+        if (! $result['success']) {
+            return $this->errorResponse($result['message'], 403);
         }
 
-        $role = Role::findOrFail($id);
-
-        // Empêcher la modification du rôle Super Admin
-        if ($role->name === 'Super Admin' && !auth()->user()->hasRole('Super Admin')) {
-            return response()->json(['message' => 'Vous ne pouvez pas modifier le rôle Super Admin.'], 403);
-        }
-
-        $validated = $request->validate([
-            'name' => 'sometimes|string|max:255|unique:roles,name,' . $id,
-            'permissions' => 'nullable|array',
-            'permissions.*' => 'exists:permissions,name',
-        ]);
-
-        if (isset($validated['name'])) {
-            $role->name = $validated['name'];
-            $role->save();
-        }
-
-        if (isset($validated['permissions'])) {
-            $role->syncPermissions($validated['permissions']);
-        }
-
-        return response()->json([
-            'message' => 'Rôle mis à jour avec succès.',
-            'data' => [
-                'id' => $role->id,
-                'name' => $role->name,
-                'permissions' => $role->permissions->pluck('name'),
-            ]
-        ]);
+        return $this->successResponse($result['data'], 'Rôle mis à jour avec succès.');
     }
 
-    /**
-     * Supprime un rôle
-     */
-    public function destroy($id)
+    public function destroy($id): JsonResponse
     {
-        if (!auth()->user()->can('roles.supprimer')) {
-            return response()->json(['message' => 'Non autorisé'], 403);
+        $result = $this->roleService->delete($id);
+
+        if (! $result['success']) {
+            return $this->errorResponse($result['message'], $result['status']);
         }
 
-        $role = Role::findOrFail($id);
-
-        // Empêcher la suppression des rôles système
-        $systemRoles = ['Super Admin', 'Administrateur', 'Technicien', 'Observateur'];
-        if (in_array($role->name, $systemRoles)) {
-            return response()->json(['message' => 'Impossible de supprimer un rôle système.'], 403);
-        }
-
-        // Vérifier si des utilisateurs ont ce rôle
-        if ($role->users()->count() > 0) {
-            return response()->json([
-                'message' => 'Impossible de supprimer ce rôle car des utilisateurs y sont assignés.'
-            ], 400);
-        }
-
-        $role->delete();
-
-        return response()->json([
-            'message' => 'Rôle supprimé avec succès.'
-        ]);
+        return $this->successResponse(message: $result['message']);
     }
 
-    /**
-     * Assigne des permissions à un rôle
-     */
-    public function assignPermissions(Request $request, $id)
+    public function assignPermissions(Request $request, $id): JsonResponse
     {
-        if (!auth()->user()->can('permissions.attribuer')) {
-            return response()->json(['message' => 'Non autorisé'], 403);
-        }
-
-        $role = Role::findOrFail($id);
-
         $validated = $request->validate([
             'permissions' => 'required|array',
             'permissions.*' => 'exists:permissions,name',
         ]);
 
-        $role->syncPermissions($validated['permissions']);
+        $data = $this->roleService->assignPermissions($id, $validated['permissions']);
 
-        return response()->json([
-            'message' => 'Permissions assignées avec succès.',
-            'data' => [
-                'id' => $role->id,
-                'name' => $role->name,
-                'permissions' => $role->permissions->pluck('name'),
-            ]
-        ]);
+        return $this->successResponse($data, 'Permissions assignées avec succès.');
     }
 }

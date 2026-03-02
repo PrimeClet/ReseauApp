@@ -5,6 +5,7 @@ import { Controller, ControllerProps, FieldPath, FieldValues, FormProvider, useF
 
 import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
+import { getLabelIcon } from "@/lib/label-icons";
 
 const Form = FormProvider;
 
@@ -74,11 +75,31 @@ FormItem.displayName = "FormItem";
 
 const FormLabel = React.forwardRef<
   React.ElementRef<typeof LabelPrimitive.Root>,
-  React.ComponentPropsWithoutRef<typeof LabelPrimitive.Root>
->(({ className, ...props }, ref) => {
+  React.ComponentPropsWithoutRef<typeof LabelPrimitive.Root> & { showIcon?: boolean }
+>(({ className, children, showIcon = true, ...props }, ref) => {
   const { error, formItemId } = useFormField();
 
-  return <Label ref={ref} className={cn(error && "text-destructive", className)} htmlFor={formItemId} {...props} />;
+  // Extraire le texte du label pour déterminer l'icône
+  const labelText = typeof children === 'string' ? children : '';
+  const icon = showIcon ? getLabelIcon(labelText) : null;
+
+  return (
+    <Label
+      ref={ref}
+      className={cn(error && "text-destructive", className)}
+      htmlFor={formItemId}
+      {...props}
+    >
+      {icon ? (
+        <span className="flex items-center gap-1.5">
+          {icon}
+          {children}
+        </span>
+      ) : (
+        children
+      )}
+    </Label>
+  );
 });
 FormLabel.displayName = "FormLabel";
 

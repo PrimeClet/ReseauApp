@@ -6,11 +6,11 @@ export interface Lan {
   subnet: string;
   vlan_id: number;
   gateway?: string;
-  site: string;
+  site?: string;
   status: string;
   description?: string;
-  batiment_id: number;
-  salle_id: number;
+  batiment_id?: number;
+  salle_id?: number;
   created_at?: string;
   updated_at?: string;
   batiment?: {
@@ -21,6 +21,16 @@ export interface Lan {
     id: number;
     nom: string;
   };
+  equipements?: Array<{
+    id: number;
+    name: string;
+    equipement_code: string;
+    ip_address?: string;
+    pivot?: {
+      is_tagged: boolean;
+      ports?: string;
+    };
+  }>;
 }
 
 export interface LanListResponse {
@@ -36,11 +46,12 @@ export interface LanCreateData {
   subnet: string;
   vlan_id: number;
   gateway?: string;
-  site: string;
+  site?: string;
   status: string;
   description?: string;
-  batiment_id: number;
-  salle_id: number;
+  batiment_id?: number;
+  salle_id?: number;
+  equipement_id?: number;
 }
 
 const lanService = {

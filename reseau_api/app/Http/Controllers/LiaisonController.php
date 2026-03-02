@@ -2,142 +2,54 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\Liaison\StoreLiaisonRequest;
+use App\Http\Requests\Liaison\UpdateLiaisonRequest;
 use App\Models\Liaison;
+use App\Services\LiaisonService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class LiaisonController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
-    public function index(Request $request)
+    public function __construct(
+        private readonly LiaisonService $liaisonService,
+    ) {}
+
+    public function index(Request $request): JsonResponse
     {
-        $query = Liaison::query();
-
-        // Inclure les éléments supprimés si demandé
-        if ($request->get('with_trashed') === 'true') {
-            $query->withTrashed();
-        }
-
-        // Afficher uniquement les éléments supprimés
-        if ($request->get('only_trashed') === 'true') {
-            $query->onlyTrashed();
-        }
-
-        if ($request->has('status')) {
-            $query->where('status', $request->status);
-        }
-
-        if ($request->has('search')) {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('label', 'like', "%{$search}%")
-                  ->orWhere('media', 'like', "%{$search}%");
-            });
-        }
-
-        $perPage = (int) $request->get('per_page', 15);
-        $perPage = $perPage > 0 && $perPage <= 100 ? $perPage : 15;
-
-        $liaisons = $query->with(['fromPort.equipement', 'toPort.equipement'])->orderBy('label')->paginate($perPage);
-
-        return response()->json($liaisons);
+        return $this->successResponse($this->liaisonService->list($request));
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(Request $request)
+    public function store(StoreLiaisonRequest $request): JsonResponse
     {
-        if (!auth()->user()->isAdministrator()) {
-            return response()->json(['message' => 'Non autorisé'], 403);
-        }
-        
-        $request->validate([
-            'from' => 'required|exists:ports,id',
-            'to' => 'required|exists:ports,id',
-            'label' => 'required|string|max:255',
-            'media' => 'required|string|max:255',
-            'length' => 'nullable|integer',
-            'status' => 'required|boolean',
-        ]);
+        $liaison = $this->liaisonService->create($request->validated());
 
-        $liaison = Liaison::create($request->all());
-
-        return response()->json([
-            'message' => 'Liaison créée avec succès.',
-            'data' => $liaison->load(['fromPort.equipement', 'toPort.equipement']),
-        ], 201);
+        return $this->successResponse($liaison, 'Liaison créée avec succès.', 201);
     }
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(Liaison $liaison)
+    public function show(Liaison $liaison): JsonResponse
     {
-        $liaison->load(['fromPort.equipement', 'toPort.equipement']);
-        return response()->json([
-            'data' => $liaison
-        ]);
+        return $this->successResponse($this->liaisonService->find($liaison));
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, Liaison $liaison)
+    public function update(UpdateLiaisonRequest $request, Liaison $liaison): JsonResponse
     {
-        if (!auth()->user()->isAdministrator()) {
-            return response()->json(['message' => 'Non autorisé'], 403);
-        }
+        $liaison = $this->liaisonService->update($liaison, $request->validated());
 
-        $request->validate([
-            'from' => 'sometimes|exists:ports,id',
-            'to' => 'sometimes|exists:ports,id',
-            'label' => 'sometimes|string|max:255',
-            'media' => 'sometimes|string|max:255',
-            'length' => 'nullable|integer',
-            'status' => 'sometimes|boolean',
-        ]);
-
-        $liaison->update($request->all());
-
-        return response()->json([
-            'message' => 'Liaison mise à jour avec succès.',
-            'data' => $liaison->load(['fromPort.equipement', 'toPort.equipement']),
-        ], 200);
+        return $this->successResponse($liaison, 'Liaison mise à jour avec succès.');
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(Liaison $liaison)
+    public function destroy(Liaison $liaison): JsonResponse
     {
-        if (!auth()->user()->isAdministrator()) {
-            return response()->json(['message' => 'Non autorisé'], 403);
-        }
+        $this->liaisonService->delete($liaison);
 
-        $liaison->delete();
-
-        return response()->json([
-            'message' => 'Liaison supprimée avec succès.',
-        ], 200);
+        return $this->successResponse(message: 'Liaison supprimée avec succès.');
     }
 
-    /**
-     * Restore the specified resource from storage.
-     */
-    public function restore($id)
+    public function restore($id): JsonResponse
     {
-        if (!auth()->user()->isAdministrator()) {
-            return response()->json(['message' => 'Non autorisé'], 403);
-        }
+        $liaison = $this->liaisonService->restore($id);
 
-        $liaison = Liaison::withTrashed()->findOrFail($id);
-        $liaison->restore();
-
-        return response()->json([
-            'message' => 'Liaison restaurée avec succès.',
-            'data' => $liaison->load(['fromPort.equipement', 'toPort.equipement']),
-        ], 200);
+        return $this->successResponse($liaison, 'Liaison restaurée avec succès.');
     }
 }
